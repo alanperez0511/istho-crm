@@ -1,0 +1,102 @@
+<h2>⚠️ Alerta de Inventario</h2>
+
+<p>Se han detectado las siguientes alertas en el inventario:</p>
+
+{{#if stockBajo.length}}
+<h3 style="color: #f44336; margin-top: 30px;">📉 Stock Bajo</h3>
+
+<div class="info-box error">
+  Los siguientes productos tienen stock por debajo del mínimo establecido.
+</div>
+
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th>Producto</th>
+      <th>Stock Actual</th>
+      <th>Stock Mínimo</th>
+      <th>Ubicación</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each stockBajo}}
+    <tr>
+      <td>{{this.sku}}</td>
+      <td>{{this.producto}}</td>
+      <td style="text-align: right; color: #f44336; font-weight: bold;">{{this.cantidad}}</td>
+      <td style="text-align: right;">{{this.stock_minimo}}</td>
+      <td>{{this.ubicacion}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+{{#if proximosVencer.length}}
+<h3 style="color: #ff9800; margin-top: 30px;">📅 Próximos a Vencer</h3>
+
+<div class="info-box warning">
+  Los siguientes productos vencen en los próximos 30 días.
+</div>
+
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th>Producto</th>
+      <th>Lote</th>
+      <th>Cantidad</th>
+      <th>Fecha Vencimiento</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each proximosVencer}}
+    <tr>
+      <td>{{this.sku}}</td>
+      <td>{{this.producto}}</td>
+      <td>{{this.lote}}</td>
+      <td style="text-align: right;">{{this.cantidad}}</td>
+      <td style="color: #ff9800; font-weight: bold;">{{this.fecha_vencimiento}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+{{#if vencidos.length}}
+<h3 style="color: #f44336; margin-top: 30px;">🚫 Productos Vencidos</h3>
+
+<div class="info-box error">
+  <strong>ATENCIÓN:</strong> Los siguientes productos ya están vencidos y requieren acción inmediata.
+</div>
+
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th>Producto</th>
+      <th>Lote</th>
+      <th>Cantidad</th>
+      <th>Fecha Vencimiento</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each vencidos}}
+    <tr style="background-color: #ffebee;">
+      <td>{{this.sku}}</td>
+      <td>{{this.producto}}</td>
+      <td>{{this.lote}}</td>
+      <td style="text-align: right;">{{this.cantidad}}</td>
+      <td style="color: #f44336; font-weight: bold;">{{this.fecha_vencimiento}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+<p style="margin-top: 30px;">
+  <a href="{{urlInventario}}" class="btn">Ver Inventario Completo</a>
+</p>
+
+<p>Este es un correo automático generado por el sistema de alertas de ISTHO CRM.</p>

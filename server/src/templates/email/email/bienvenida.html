@@ -1,0 +1,39 @@
+<h2>¡Bienvenido(a) al CRM de ISTHO!</h2>
+
+<p>Hola <strong>{{nombre}}</strong>,</p>
+
+<p>Tu cuenta ha sido creada exitosamente en el sistema CRM de ISTHO S.A.S.</p>
+
+<div class="info-box">
+  <strong>Datos de acceso:</strong><br><br>
+  <strong>Usuario:</strong> {{username}}<br>
+  <strong>Correo:</strong> {{email}}<br>
+  <strong>Rol:</strong> {{rol}}
+</div>
+
+{{#if passwordTemporal}}
+<div class="info-box warning">
+  <strong>⚠️ Contraseña temporal:</strong> {{passwordTemporal}}<br><br>
+  Por seguridad, te recomendamos cambiar esta contraseña en tu primer inicio de sesión.
+</div>
+{{/if}}
+
+<p style="text-align: center; margin: 30px 0;">
+  <a href="{{urlLogin}}" class="btn">Iniciar Sesión</a>
+</p>
+
+<h3 style="color: #1a237e;">¿Qué puedes hacer en el CRM?</h3>
+
+<ul style="color: #333333; line-height: 2;">
+  <li>📦 Gestionar operaciones de ingreso y salida</li>
+  <li>📊 Consultar inventario en tiempo real</li>
+  <li>👥 Administrar clientes y contactos</li>
+  <li>📄 Subir y gestionar documentos</li>
+  <li>📈 Ver reportes y estadísticas</li>
+</ul>
+
+<p>Si tienes alguna pregunta o necesitas ayuda, no dudes en contactar al equipo de TI.</p>
+
+<p>¡Bienvenido al equipo!</p>
+
+<p><strong>Coordinación de Tecnología<br>ISTHO S.A.S.</strong></p>
