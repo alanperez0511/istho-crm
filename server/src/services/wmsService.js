@@ -42,6 +42,19 @@ const documentosWMS = {
       { sku: 'QUESO-002', producto: 'Queso Mozarella 400g', cantidad: 100, unidad_medida: 'UND', lote: 'Q2026-002', fecha_vencimiento: '2026-02-20' }
     ]
   },
+  'ING-2026-0003': {
+    tipo: 'ingreso',
+    numero_documento: 'ING-2026-0003',
+    fecha_documento: '2026-01-08',
+    cliente_codigo: 'CLI-0001',
+    cliente_nombre: 'Lácteos Betania S.A.S.',
+    proveedor: 'Alpina S.A.',
+    observaciones: 'Importación desde Ecuador',
+    productos: [
+      { sku: 'QUESO-001', producto: 'Queso Fresco 500g', cantidad: 150, unidad_medida: 'UND', lote: 'Q2026-001', fecha_vencimiento: '2026-02-15' },
+      { sku: 'QUESO-002', producto: 'Queso Mozarella 400g', cantidad: 100, unidad_medida: 'UND', lote: 'Q2026-002', fecha_vencimiento: '2026-02-20' }
+    ]
+  },
   // Salidas
   'SAL-2026-0001': {
     tipo: 'salida',
