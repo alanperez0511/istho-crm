@@ -1,0 +1,100 @@
+<h2>{{tipoOperacion}} Completado</h2>
+
+<p>Estimado(a) cliente,</p>
+
+<p>Le informamos que se ha completado exitosamente la siguiente operación:</p>
+
+<div class="info-box success">
+  <strong>Operación:</strong> {{numeroOperacion}}<br>
+  <strong>Documento WMS:</strong> {{documentoWms}}<br>
+  <strong>Fecha:</strong> {{fecha}}
+</div>
+
+<h3 style="color: #1a237e; margin-top: 30px;">📦 Detalle de la Operación</h3>
+
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th>Producto</th>
+      <th>Cantidad</th>
+      <th>U.M.</th>
+      {{#if tieneAverias}}
+      <th>Averías</th>
+      {{/if}}
+    </tr>
+  </thead>
+  <tbody>
+    {{#each productos}}
+    <tr>
+      <td>{{this.sku}}</td>
+      <td>{{this.producto}}</td>
+      <td style="text-align: right;">{{this.cantidad}}</td>
+      <td>{{this.unidad_medida}}</td>
+      {{#if ../tieneAverias}}
+      <td style="text-align: right; {{#if this.cantidad_averia}}color: #f44336; font-weight: bold;{{/if}}">
+        {{this.cantidad_averia}}
+      </td>
+      {{/if}}
+    </tr>
+    {{/each}}
+  </tbody>
+  <tfoot>
+    <tr style="background-color: #e3f2fd;">
+      <td colspan="2"><strong>TOTAL</strong></td>
+      <td style="text-align: right;"><strong>{{totalUnidades}}</strong></td>
+      <td></td>
+      {{#if tieneAverias}}
+      <td style="text-align: right; color: #f44336;"><strong>{{totalAverias}}</strong></td>
+      {{/if}}
+    </tr>
+  </tfoot>
+</table>
+
+{{#if tieneAverias}}
+<div class="info-box warning">
+  <strong>⚠️ Nota:</strong> Se registraron {{totalAverias}} unidades con avería.
+  Las evidencias fotográficas están disponibles en el sistema.
+</div>
+{{/if}}
+
+<h3 style="color: #1a237e; margin-top: 30px;">🚛 Información de Transporte</h3>
+
+<table class="data-table">
+  <tr>
+    <td style="width: 150px;"><strong>Origen:</strong></td>
+    <td>{{origen}}</td>
+  </tr>
+  <tr>
+    <td><strong>Destino:</strong></td>
+    <td>{{destino}}</td>
+  </tr>
+  <tr>
+    <td><strong>Placa:</strong></td>
+    <td>{{placa}}</td>
+  </tr>
+  <tr>
+    <td><strong>Conductor:</strong></td>
+    <td>{{conductor}}</td>
+  </tr>
+  <tr>
+    <td><strong>Cédula:</strong></td>
+    <td>{{conductorCedula}}</td>
+  </tr>
+  <tr>
+    <td><strong>Teléfono:</strong></td>
+    <td>{{conductorTelefono}}</td>
+  </tr>
+</table>
+
+{{#if observaciones}}
+<h3 style="color: #1a237e; margin-top: 30px;">📝 Observaciones</h3>
+<p>{{observaciones}}</p>
+{{/if}}
+
+<p style="margin-top: 30px;">
+  Los documentos de cumplido se encuentran adjuntos a este correo o disponibles en el sistema CRM.
+</p>
+
+<p>Atentamente,</p>
+<p><strong>Equipo de Operaciones<br>ISTHO S.A.S.</strong></p>
