@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * ISTHO CRM - Contexto de Autenticación
+ * ISTHO CRM - Contexto de Autenticación (CORREGIDO)
  * ============================================================================
  * Provee estado global de autenticación para toda la aplicación:
  * - Estado del usuario actual
@@ -9,7 +9,7 @@
  * - Persistencia en localStorage
  * 
  * @author Coordinación TI ISTHO
- * @version 1.0.0
+ * @version 1.1.0
  * @date Enero 2026
  */
 
@@ -24,6 +24,8 @@ import {
 import PropTypes from 'prop-types';
 import authService from '../api/auth.service';
 import { clearAuthToken, isAuthenticated as checkToken } from '../api/client';
+
+// ❌ ELIMINADO: import { hasPermission } from '../components/auth/PrivateRoute';
 
 // ============================================================================
 // CONTEXTO
@@ -379,6 +381,7 @@ export const useAuth = () => {
     throw new Error('useAuth debe ser usado dentro de un AuthProvider');
   }
   
+  // ✅ CORREGIDO: Retornar el contexto completo, no llamar a hasPermission
   return context;
 };
 

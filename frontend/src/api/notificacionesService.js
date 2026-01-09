@@ -9,7 +9,7 @@
  * @date Enero 2026
  */
 
-import apiClient from './apiClient';
+import apiClient from './client';
 
 // ════════════════════════════════════════════════════════════════════════════
 // NOTIFICACIONES SERVICE

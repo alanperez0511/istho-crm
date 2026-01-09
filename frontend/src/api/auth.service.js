@@ -1,21 +1,25 @@
 /**
  * ============================================================================
- * ISTHO CRM - Servicio de Autenticación
+ * ISTHO CRM - Servicio de Autenticación (CORREGIDO)
  * ============================================================================
- * Gestiona todas las operaciones relacionadas con autenticación:
- * - Login / Logout
- * - Obtener usuario actual
- * - Registro de usuarios (solo admin)
- * - Cambio de contraseña
- * - Refresh de token
+ * Gestiona todas las operaciones relacionadas con autenticación.
+ * 
+ * ⚠️ IMPORTANTE: Usa setAuthToken/clearAuthToken del client.js
+ * para mantener consistencia con el interceptor de Axios.
  * 
  * @author Coordinación TI ISTHO
- * @version 1.0.0
+ * @version 1.1.0
  * @date Enero 2026
  */
 
 import apiClient, { setAuthToken, clearAuthToken } from './client';
 import { AUTH_ENDPOINTS } from './endpoints';
+
+// ============================================================================
+// CONSTANTES
+// ============================================================================
+
+const USER_KEY = 'istho_user';
 
 // ============================================================================
 // SERVICIO DE AUTENTICACIÓN
@@ -33,13 +37,6 @@ const authService = {
    * @param {string} credentials.email - Email del usuario
    * @param {string} credentials.password - Contraseña
    * @returns {Promise<Object>} Datos del usuario y token
-   * 
-   * @example
-   * const result = await authService.login({
-   *   email: 'admin@istho.com.co',
-   *   password: 'MiPassword123'
-   * });
-   * // result.data = { user: {...}, token: '...', expiresIn: '24h' }
    */
   login: async (credentials) => {
     try {
@@ -48,9 +45,14 @@ const authService = {
       if (response.data.success) {
         const { token, user } = response.data.data;
         
-        // Guardar token y usuario en localStorage
+        // ⚠️ IMPORTANTE: Usar setAuthToken del client.js
+        // Esto guarda en 'istho_token' que es donde el interceptor lo busca
         setAuthToken(token);
-        localStorage.setItem('istho_user', JSON.stringify(user));
+        
+        // Guardar usuario
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+        
+        console.log('✅ Login exitoso, token guardado');
         
         return {
           success: true,
@@ -59,11 +61,15 @@ const authService = {
         };
       }
       
-      return response.data;
-    } catch (error) {
-      throw {
+      return {
         success: false,
-        message: error.message || 'Error al iniciar sesión',
+        message: response.data.message || 'Error al iniciar sesión',
+      };
+    } catch (error) {
+      console.error('❌ Error en login:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Error al iniciar sesión',
         code: error.code || 'LOGIN_ERROR',
       };
     }
@@ -86,7 +92,7 @@ const authService = {
       // Ignorar error si el token ya expiró
       console.warn('⚠️ Error al notificar logout al servidor:', error);
     } finally {
-      // Siempre limpiar datos locales
+      // ⚠️ IMPORTANTE: Usar clearAuthToken del client.js
       clearAuthToken();
       
       return {
@@ -103,10 +109,6 @@ const authService = {
   /**
    * Obtener información del usuario actualmente autenticado
    * @returns {Promise<Object>} Datos del usuario
-   * 
-   * @example
-   * const user = await authService.getCurrentUser();
-   * // user.data = { id, username, email, nombre_completo, rol, ultimo_acceso }
    */
   getCurrentUser: async () => {
     try {
@@ -114,12 +116,21 @@ const authService = {
       
       if (response.data.success) {
         // Actualizar usuario en localStorage
-        localStorage.setItem('istho_user', JSON.stringify(response.data.data));
+        localStorage.setItem(USER_KEY, JSON.stringify(response.data.data));
+        
+        return {
+          success: true,
+          data: response.data.data,
+        };
       }
       
-      return response.data;
+      return {
+        success: false,
+        message: response.data.message || 'Error al obtener usuario',
+      };
     } catch (error) {
-      throw {
+      console.error('❌ Error al obtener usuario:', error);
+      return {
         success: false,
         message: error.message || 'Error al obtener usuario',
         code: error.code || 'GET_USER_ERROR',
@@ -138,7 +149,7 @@ const authService = {
    */
   getStoredUser: () => {
     try {
-      const userStr = localStorage.getItem('istho_user');
+      const userStr = localStorage.getItem(USER_KEY);
       return userStr ? JSON.parse(userStr) : null;
     } catch {
       return null;
@@ -154,29 +165,14 @@ const authService = {
    * Solo puede ser ejecutado por administradores
    * 
    * @param {Object} userData - Datos del nuevo usuario
-   * @param {string} userData.username - Nombre de usuario
-   * @param {string} userData.email - Email
-   * @param {string} userData.password - Contraseña
-   * @param {string} userData.nombre_completo - Nombre completo
-   * @param {string} userData.rol - Rol ('admin'|'supervisor'|'operador'|'cliente')
-   * @param {number} [userData.cliente_id] - ID del cliente (solo si rol='cliente')
    * @returns {Promise<Object>}
-   * 
-   * @example
-   * const result = await authService.register({
-   *   username: 'operador1',
-   *   email: 'operador1@istho.com.co',
-   *   password: 'Password123!',
-   *   nombre_completo: 'Juan Pérez',
-   *   rol: 'operador'
-   * });
    */
   register: async (userData) => {
     try {
       const response = await apiClient.post(AUTH_ENDPOINTS.REGISTRO, userData);
       return response.data;
     } catch (error) {
-      throw {
+      return {
         success: false,
         message: error.message || 'Error al registrar usuario',
         errors: error.errors || [],
@@ -195,19 +191,13 @@ const authService = {
    * @param {string} passwords.password_actual - Contraseña actual
    * @param {string} passwords.password_nuevo - Nueva contraseña
    * @returns {Promise<Object>}
-   * 
-   * @example
-   * await authService.changePassword({
-   *   password_actual: 'MiPasswordActual',
-   *   password_nuevo: 'MiNuevoPassword123!'
-   * });
    */
   changePassword: async (passwords) => {
     try {
       const response = await apiClient.put(AUTH_ENDPOINTS.CAMBIAR_PASSWORD, passwords);
       return response.data;
     } catch (error) {
-      throw {
+      return {
         success: false,
         message: error.message || 'Error al cambiar contraseña',
         code: error.code || 'CHANGE_PASSWORD_ERROR',
@@ -231,13 +221,17 @@ const authService = {
       if (response.data.success) {
         const { token } = response.data.data;
         setAuthToken(token);
+        return response.data;
       }
       
-      return response.data;
+      return {
+        success: false,
+        message: 'Error al refrescar token',
+      };
     } catch (error) {
       // Si falla el refresh, limpiar sesión
       clearAuthToken();
-      throw {
+      return {
         success: false,
         message: 'Sesión expirada, por favor inicie sesión nuevamente',
         code: 'TOKEN_EXPIRED',
@@ -251,7 +245,6 @@ const authService = {
   
   /**
    * Verifica si hay una sesión activa
-   * Intenta obtener el usuario actual para validar el token
    * @returns {Promise<boolean>}
    */
   verifyAuth: async () => {
@@ -274,10 +267,6 @@ const authService = {
    * Verifica si el usuario tiene un rol específico
    * @param {string|string[]} roles - Rol o lista de roles permitidos
    * @returns {boolean}
-   * 
-   * @example
-   * authService.hasRole('admin'); // true/false
-   * authService.hasRole(['admin', 'supervisor']); // true si tiene alguno
    */
   hasRole: (roles) => {
     const user = authService.getStoredUser();
@@ -287,29 +276,29 @@ const authService = {
     return rolesArray.includes(user.rol);
   },
   
-  // ──────────────────────────────────────────────────────────────────────────
-  // VERIFICAR SI ES ADMIN
-  // ──────────────────────────────────────────────────────────────────────────
-  
   /**
    * Verifica si el usuario actual es administrador
    * @returns {boolean}
    */
-  isAdmin: () => {
-    return authService.hasRole('admin');
-  },
-  
-  // ──────────────────────────────────────────────────────────────────────────
-  // VERIFICAR SI ES CLIENTE
-  // ──────────────────────────────────────────────────────────────────────────
+  isAdmin: () => authService.hasRole('admin'),
   
   /**
    * Verifica si el usuario actual es un cliente externo
    * @returns {boolean}
    */
-  isCliente: () => {
-    return authService.hasRole('cliente');
-  },
+  isCliente: () => authService.hasRole('cliente'),
+  
+  /**
+   * Obtener token almacenado
+   * @returns {string|null}
+   */
+  getToken: () => localStorage.getItem('istho_token'),
+  
+  /**
+   * Verificar si hay sesión activa (sincrónico)
+   * @returns {boolean}
+   */
+  isAuthenticated: () => !!localStorage.getItem('istho_token'),
 };
 
 // ============================================================================

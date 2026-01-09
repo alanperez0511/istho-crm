@@ -1,17 +1,17 @@
 /**
  * ============================================================================
- * ISTHO CRM - PerfilUsuario (Fase 5 - Integración Completa)
+ * ISTHO CRM - PerfilUsuario (CORREGIDO)
  * ============================================================================
  * Página de perfil de usuario conectada al backend real.
  * 
- * CAMBIOS vs versión anterior:
- * - Eliminados MOCK_USUARIO, MOCK_PERMISOS, MOCK_ACTIVIDAD, MOCK_ESTADISTICAS
- * - Conectado con useAuth para datos de usuario actual
- * - API real para actualizar perfil y cambiar contraseña
- * - Permisos y actividad desde backend
+ * CORRECCIONES:
+ * - useAuth desestructurado correctamente
+ * - usuarioService.getPermisos() usa estructura correcta
+ * - Eliminadas llamadas a métodos inexistentes
+ * - Permisos mostrados desde rol del usuario
  * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.1.0
  * @date Enero 2026
  */
 
@@ -38,8 +38,6 @@ import {
   Settings,
   LogOut,
   CheckCircle,
-  AlertTriangle,
-  RefreshCw,
 } from 'lucide-react';
 
 // Layout
@@ -53,22 +51,16 @@ import { Button, Modal, StatusChip } from '../../components/common';
 // ════════════════════════════════════════════════════════════════════════════
 import { useAuth } from '../../context/AuthContext';
 import useNotification from '../../hooks/useNotification';
-import { authService } from '../../api/auth.service';
-import { usuarioService } from '../../api/usuarioService';
+import authService from '../../api/auth.service';
+import usuarioService from '../../api/usuarioService';
 
 // ════════════════════════════════════════════════════════════════════════════
 // MODAL EDITAR PERFIL
 // ════════════════════════════════════════════════════════════════════════════
-var EditProfileModal = function(props) {
-  var isOpen = props.isOpen;
-  var onClose = props.onClose;
-  var usuario = props.usuario;
-  var onSave = props.onSave;
-  var loading = props.loading;
-  
-  var _a = useState({}), formData = _a[0], setFormData = _a[1];
+const EditProfileModal = ({ isOpen, onClose, usuario, onSave, loading }) => {
+  const [formData, setFormData] = useState({});
 
-  useEffect(function() {
+  useEffect(() => {
     if (usuario) {
       setFormData({
         nombre: usuario.nombre || '',
@@ -81,15 +73,11 @@ var EditProfileModal = function(props) {
     }
   }, [usuario]);
 
-  var handleChange = function(field, value) {
-    setFormData(function(prev) { 
-      var updated = Object.assign({}, prev);
-      updated[field] = value;
-      return updated;
-    });
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  var handleSubmit = function() {
+  const handleSubmit = () => {
     onSave(formData);
   };
 
@@ -128,7 +116,7 @@ var EditProfileModal = function(props) {
             <input
               type="text"
               value={formData.nombre || ''}
-              onChange={function(e) { handleChange('nombre', e.target.value); }}
+              onChange={(e) => handleChange('nombre', e.target.value)}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
             />
           </div>
@@ -137,7 +125,7 @@ var EditProfileModal = function(props) {
             <input
               type="text"
               value={formData.apellido || ''}
-              onChange={function(e) { handleChange('apellido', e.target.value); }}
+              onChange={(e) => handleChange('apellido', e.target.value)}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
             />
           </div>
@@ -148,7 +136,7 @@ var EditProfileModal = function(props) {
           <input
             type="email"
             value={formData.email || ''}
-            onChange={function(e) { handleChange('email', e.target.value); }}
+            onChange={(e) => handleChange('email', e.target.value)}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -158,7 +146,7 @@ var EditProfileModal = function(props) {
           <input
             type="tel"
             value={formData.telefono || ''}
-            onChange={function(e) { handleChange('telefono', e.target.value); }}
+            onChange={(e) => handleChange('telefono', e.target.value)}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -191,29 +179,20 @@ var EditProfileModal = function(props) {
 // ════════════════════════════════════════════════════════════════════════════
 // MODAL CAMBIAR CONTRASEÑA
 // ════════════════════════════════════════════════════════════════════════════
-var ChangePasswordModal = function(props) {
-  var isOpen = props.isOpen;
-  var onClose = props.onClose;
-  var onSubmit = props.onSubmit;
-  var loading = props.loading;
-  
-  var _a = useState({
+const ChangePasswordModal = ({ isOpen, onClose, onSubmit, loading }) => {
+  const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-  }), formData = _a[0], setFormData = _a[1];
-  var _b = useState(''), error = _b[0], setError = _b[1];
+  });
+  const [error, setError] = useState('');
 
-  var handleChange = function(field, value) {
-    setFormData(function(prev) { 
-      var updated = Object.assign({}, prev);
-      updated[field] = value;
-      return updated;
-    });
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
     setError('');
   };
 
-  var handleSubmit = function() {
+  const handleSubmit = () => {
     if (formData.newPassword !== formData.confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
@@ -225,7 +204,7 @@ var ChangePasswordModal = function(props) {
     onSubmit(formData);
   };
 
-  useEffect(function() {
+  useEffect(() => {
     if (isOpen) {
       setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setError('');
@@ -253,7 +232,7 @@ var ChangePasswordModal = function(props) {
           <input
             type="password"
             value={formData.currentPassword}
-            onChange={function(e) { handleChange('currentPassword', e.target.value); }}
+            onChange={(e) => handleChange('currentPassword', e.target.value)}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -263,7 +242,7 @@ var ChangePasswordModal = function(props) {
           <input
             type="password"
             value={formData.newPassword}
-            onChange={function(e) { handleChange('newPassword', e.target.value); }}
+            onChange={(e) => handleChange('newPassword', e.target.value)}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -273,7 +252,7 @@ var ChangePasswordModal = function(props) {
           <input
             type="password"
             value={formData.confirmPassword}
-            onChange={function(e) { handleChange('confirmPassword', e.target.value); }}
+            onChange={(e) => handleChange('confirmPassword', e.target.value)}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -300,100 +279,65 @@ var ChangePasswordModal = function(props) {
 // COMPONENTES AUXILIARES
 // ════════════════════════════════════════════════════════════════════════════
 
-var InfoCard = function(props) {
-  var title = props.title;
-  var Icon = props.icon;
-  var children = props.children;
-  var action = props.action;
-  
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          {Icon && <Icon className="w-5 h-5 text-slate-500" />}
-          <h3 className="font-semibold text-slate-800">{title}</h3>
-        </div>
-        {action}
+const InfoCard = ({ title, icon: Icon, children, action }) => (
+  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div className="flex items-center gap-2">
+        {Icon && <Icon className="w-5 h-5 text-slate-500" />}
+        <h3 className="font-semibold text-slate-800">{title}</h3>
       </div>
-      <div className="p-5">{children}</div>
+      {action}
     </div>
-  );
-};
+    <div className="p-5">{children}</div>
+  </div>
+);
 
-var StatCardMini = function(props) {
-  var Icon = props.icon;
-  var label = props.label;
-  var value = props.value;
-  var color = props.color;
-  
-  return (
-    <div className="text-center p-4 bg-slate-50 rounded-xl">
-      <div className={'w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2 ' + color}>
-        <Icon className="w-5 h-5 text-white" />
-      </div>
-      <p className="text-xl font-bold text-slate-800">{value}</p>
-      <p className="text-xs text-slate-500">{label}</p>
+const StatCardMini = ({ icon: Icon, label, value, color }) => (
+  <div className="text-center p-4 bg-slate-50 rounded-xl">
+    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2 ${color}`}>
+      <Icon className="w-5 h-5 text-white" />
     </div>
-  );
-};
+    <p className="text-xl font-bold text-slate-800">{value}</p>
+    <p className="text-xs text-slate-500">{label}</p>
+  </div>
+);
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
-var PerfilUsuario = function() {
-  var navigate = useNavigate();
-  var authHook = useAuth();
-  var user = authHook.user;
-  var permissions = authHook.permissions;
-  var logout = authHook.logout;
-  var updateProfile = authHook.updateProfile;
-  var notif = useNotification();
-  var success = notif.success;
-  var apiError = notif.apiError;
+const PerfilUsuario = () => {
+  const navigate = useNavigate();
+  
+  // ✅ CORREGIDO: Desestructurar solo las propiedades que existen en useAuth
+  const { user, logout, updateUser } = useAuth();
+  const { success, error: apiError } = useNotification();
 
   // ──────────────────────────────────────────────────────────────────────────
   // ESTADOS
   // ──────────────────────────────────────────────────────────────────────────
-  var _a = useState(null), permisos = _a[0], setPermisos = _a[1];
-  var _b = useState([]), actividad = _b[0], setActividad = _b[1];
-  var _c = useState(null), estadisticas = _c[0], setEstadisticas = _c[1];
-  var _d = useState(true), loading = _d[0], setLoading = _d[1];
-  var _e = useState('info'), activeTab = _e[0], setActiveTab = _e[1];
+  const [permisos, setPermisos] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('info');
   
   // Modals
-  var _f = useState(false), editModal = _f[0], setEditModal = _f[1];
-  var _g = useState(false), passwordModal = _g[0], setPasswordModal = _g[1];
-  var _h = useState(false), formLoading = _h[0], setFormLoading = _h[1];
+  const [editModal, setEditModal] = useState(false);
+  const [passwordModal, setPasswordModal] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
 
   // ──────────────────────────────────────────────────────────────────────────
-  // CARGAR DATOS ADICIONALES
+  // CARGAR PERMISOS
   // ──────────────────────────────────────────────────────────────────────────
-  useEffect(function() {
-    var fetchData = async function() {
+  useEffect(() => {
+    const fetchData = async () => {
       setLoading(true);
       try {
-        // Cargar permisos detallados
-        if (usuarioService.getPermisos) {
-          var permisosData = await usuarioService.getPermisos();
-          setPermisos(permisosData);
-        } else {
-          // Usar permisos del contexto
-          setPermisos(permissions);
-        }
-        
-        // Cargar actividad reciente
-        if (usuarioService.getActividad) {
-          var actividadData = await usuarioService.getActividad();
-          setActividad(actividadData);
-        }
-        
-        // Cargar estadísticas
-        if (usuarioService.getEstadisticas) {
-          var statsData = await usuarioService.getEstadisticas();
-          setEstadisticas(statsData);
+        // ✅ CORREGIDO: Usar getPermisos que genera permisos localmente
+        const permisosResponse = await usuarioService.getPermisos();
+        if (permisosResponse.success && permisosResponse.data) {
+          setPermisos(permisosResponse.data);
         }
       } catch (err) {
-        console.error('Error cargando datos de perfil:', err);
+        console.error('Error cargando permisos:', err);
       } finally {
         setLoading(false);
       }
@@ -402,22 +346,28 @@ var PerfilUsuario = function() {
     if (user) {
       fetchData();
     }
-  }, [user, permissions]);
+  }, [user]);
 
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
   
-  var handleSaveProfile = async function(data) {
+  const handleSaveProfile = async (data) => {
     setFormLoading(true);
     try {
-      if (updateProfile) {
-        await updateProfile(data);
-      } else if (usuarioService.updateProfile) {
-        await usuarioService.updateProfile(data);
+      // ✅ CORREGIDO: Llamar al backend para persistir los cambios
+      const response = await usuarioService.actualizarPerfil(data);
+      
+      if (response.success) {
+        // Actualizar también el estado local/contexto
+        if (updateUser) {
+          updateUser(response.data || data);
+        }
+        success('Perfil actualizado correctamente');
+        setEditModal(false);
+      } else {
+        throw new Error(response.message || 'Error al actualizar perfil');
       }
-      success('Perfil actualizado correctamente');
-      setEditModal(false);
     } catch (err) {
       apiError(err);
     } finally {
@@ -425,7 +375,7 @@ var PerfilUsuario = function() {
     }
   };
 
-  var handleChangePassword = async function(data) {
+  const handleChangePassword = async (data) => {
     setFormLoading(true);
     try {
       await authService.changePassword({
@@ -441,23 +391,23 @@ var PerfilUsuario = function() {
     }
   };
 
-  var handleLogout = function() {
+  const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  var calcularAntiguedad = function(fechaIngreso) {
+  const calcularAntiguedad = (fechaIngreso) => {
     if (!fechaIngreso) return '-';
-    var ingreso = new Date(fechaIngreso);
-    var hoy = new Date();
-    var diff = hoy - ingreso;
-    var years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
-    var months = Math.floor((diff % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000));
+    const ingreso = new Date(fechaIngreso);
+    const hoy = new Date();
+    const diff = hoy - ingreso;
+    const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+    const months = Math.floor((diff % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000));
     
     if (years > 0) {
-      return years + ' año' + (years > 1 ? 's' : '') + ', ' + months + ' mes' + (months > 1 ? 'es' : '');
+      return `${years} año${years > 1 ? 's' : ''}, ${months} mes${months > 1 ? 'es' : ''}`;
     }
-    return months + ' mes' + (months > 1 ? 'es' : '');
+    return `${months} mes${months > 1 ? 'es' : ''}`;
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -485,23 +435,31 @@ var PerfilUsuario = function() {
   // VARIABLES DERIVADAS
   // ──────────────────────────────────────────────────────────────────────────
   
-  var tabs = [
+  const tabs = [
     { id: 'info', label: 'Información' },
     { id: 'permisos', label: 'Permisos' },
-    { id: 'actividad', label: 'Actividad' },
   ];
 
-  // Permisos formateados para tabla
-  var permisosTabla = permisos && Array.isArray(permisos) ? permisos : [
-    { modulo: 'Dashboard', ver: true, crear: true, editar: true, eliminar: true },
-    { modulo: 'Clientes', ver: true, crear: true, editar: true, eliminar: user.rol === 'admin' },
-    { modulo: 'Inventario', ver: true, crear: true, editar: true, eliminar: user.rol === 'admin' },
-    { modulo: 'Despachos', ver: true, crear: true, editar: true, eliminar: user.rol === 'admin' },
-    { modulo: 'Reportes', ver: true, crear: true, editar: false, eliminar: false },
-  ];
+  // ✅ CORREGIDO: Convertir permisos a formato tabla
+  const permisosTabla = permisos?.permisos 
+    ? Object.entries(permisos.permisos).map(([modulo, acciones]) => ({
+        modulo: modulo.charAt(0).toUpperCase() + modulo.slice(1),
+        ver: acciones.includes('ver'),
+        crear: acciones.includes('crear'),
+        editar: acciones.includes('editar'),
+        eliminar: acciones.includes('eliminar'),
+        exportar: acciones.includes('exportar'),
+      }))
+    : [
+        { modulo: 'Dashboard', ver: true, crear: false, editar: false, eliminar: false },
+        { modulo: 'Clientes', ver: true, crear: false, editar: false, eliminar: false },
+        { modulo: 'Inventario', ver: true, crear: false, editar: false, eliminar: false },
+        { modulo: 'Operaciones', ver: true, crear: false, editar: false, eliminar: false },
+        { modulo: 'Reportes', ver: true, crear: false, editar: false, eliminar: false },
+      ];
 
-  // Estadísticas con fallback
-  var stats = estadisticas || {
+  // Estadísticas calculadas localmente
+  const stats = {
     despachosCreados: 0,
     clientesGestionados: 0,
     reportesGenerados: 0,
@@ -554,17 +512,17 @@ var PerfilUsuario = function() {
                 )}
                 <span className="flex items-center gap-1">
                   <Shield className="w-4 h-4" />
-                  {user.rol || 'Usuario'}
+                  <span className="capitalize">{user.rol || 'Usuario'}</span>
                 </span>
               </div>
             </div>
 
             {/* Actions */}
             <div className="flex items-center gap-2">
-              <Button variant="outline" icon={Key} onClick={function() { setPasswordModal(true); }}>
+              <Button variant="outline" icon={Key} onClick={() => setPasswordModal(true)}>
                 Cambiar Contraseña
               </Button>
-              <Button variant="primary" icon={Pencil} onClick={function() { setEditModal(true); }}>
+              <Button variant="primary" icon={Pencil} onClick={() => setEditModal(true)}>
                 Editar Perfil
               </Button>
             </div>
@@ -577,26 +535,26 @@ var PerfilUsuario = function() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <StatCardMini 
             icon={Activity} 
-            label="Despachos Creados" 
-            value={stats.despachosCreados || 0} 
+            label="Operaciones" 
+            value={stats.despachosCreados} 
             color="bg-blue-500"
           />
           <StatCardMini 
             icon={User} 
-            label="Clientes Gestionados" 
-            value={stats.clientesGestionados || 0} 
+            label="Clientes" 
+            value={stats.clientesGestionados} 
             color="bg-emerald-500"
           />
           <StatCardMini 
             icon={FileText} 
-            label="Reportes Generados" 
-            value={stats.reportesGenerados || 0} 
+            label="Reportes" 
+            value={stats.reportesGenerados} 
             color="bg-violet-500"
           />
           <StatCardMini 
             icon={Award} 
             label="Días Activo" 
-            value={stats.diasActivo || 0} 
+            value={stats.diasActivo} 
             color="bg-amber-500"
           />
         </div>
@@ -611,23 +569,20 @@ var PerfilUsuario = function() {
               {/* Tabs */}
               <div className="border-b border-gray-100">
                 <nav className="flex px-6">
-                  {tabs.map(function(tab) {
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={function() { setActiveTab(tab.id); }}
-                        className={
-                          'py-4 px-4 text-sm font-medium transition-colors relative ' +
-                          (activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700')
-                        }
-                      >
-                        {tab.label}
-                        {activeTab === tab.id && (
-                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
-                        )}
-                      </button>
-                    );
-                  })}
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${
+                        activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {tab.label}
+                      {activeTab === tab.id && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+                      )}
+                    </button>
+                  ))}
                 </nav>
               </div>
 
@@ -668,16 +623,16 @@ var PerfilUsuario = function() {
                         <div className="flex items-center gap-3 text-sm">
                           <Building2 className="w-5 h-5 text-slate-400" />
                           <div>
-                            <p className="text-slate-500">Departamento</p>
-                            <p className="font-medium text-slate-800">{user.departamento || 'ISTHO S.A.S'}</p>
+                            <p className="text-slate-500">Empresa</p>
+                            <p className="font-medium text-slate-800">ISTHO S.A.S</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <MapPin className="w-5 h-5 text-slate-400" />
                           <div>
                             <p className="text-slate-500">Sede</p>
-                            <p className="font-medium text-slate-800">{user.sede || 'Centro Logístico Industrial del Norte'}</p>
-                            <p className="text-xs text-slate-400">{user.ciudad || 'Girardota, Antioquia'}</p>
+                            <p className="font-medium text-slate-800">Centro Logístico Industrial del Norte</p>
+                            <p className="text-xs text-slate-400">Girardota, Antioquia</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
@@ -708,7 +663,7 @@ var PerfilUsuario = function() {
                         <Shield className="w-5 h-5 text-slate-500" />
                         <span className="text-sm text-slate-500">Rol actual:</span>
                         <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-sm font-medium capitalize">
-                          {user.rol || 'Usuario'}
+                          {permisos?.rol || user.rol || 'Usuario'}
                         </span>
                       </div>
                     </div>
@@ -725,85 +680,44 @@ var PerfilUsuario = function() {
                           </tr>
                         </thead>
                         <tbody>
-                          {permisosTabla.map(function(permiso, idx) {
-                            return (
-                              <tr key={idx} className="border-b border-gray-50">
-                                <td className="py-3 px-4 text-sm font-medium text-slate-800">
-                                  {permiso.modulo}
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  {permiso.ver ? (
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                  ) : (
-                                    <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                  )}
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  {permiso.crear ? (
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                  ) : (
-                                    <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                  )}
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  {permiso.editar ? (
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                  ) : (
-                                    <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                  )}
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  {permiso.eliminar ? (
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                  ) : (
-                                    <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
+                          {permisosTabla.map((permiso, idx) => (
+                            <tr key={idx} className="border-b border-gray-50">
+                              <td className="py-3 px-4 text-sm font-medium text-slate-800">
+                                {permiso.modulo}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {permiso.ver ? (
+                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                ) : (
+                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {permiso.crear ? (
+                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                ) : (
+                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {permiso.editar ? (
+                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                ) : (
+                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {permiso.eliminar ? (
+                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                ) : (
+                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
+                                )}
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                )}
-
-                {/* Tab: Actividad */}
-                {activeTab === 'actividad' && (
-                  <div className="space-y-4">
-                    {actividad.length === 0 ? (
-                      <div className="py-12 text-center">
-                        <Activity className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-slate-500">No hay actividad reciente</p>
-                      </div>
-                    ) : (
-                      actividad.map(function(item) {
-                        return (
-                          <div key={item.id} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl">
-                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                              <Activity className="w-5 h-5 text-slate-500" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-slate-800">{item.accion || item.descripcion}</p>
-                              <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  {new Date(item.fecha || item.created_at).toLocaleString('es-CO')}
-                                </span>
-                                {item.modulo && (
-                                  <span className="px-2 py-0.5 bg-slate-200 rounded-full">
-                                    {item.modulo}
-                                  </span>
-                                )}
-                                {item.ip && (
-                                  <span>IP: {item.ip}</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
                   </div>
                 )}
               </div>
@@ -846,7 +760,13 @@ var PerfilUsuario = function() {
             {/* Acciones Rápidas */}
             <InfoCard title="Acciones Rápidas" icon={Settings}>
               <div className="space-y-2">
-                <Button variant="ghost" icon={Bell} fullWidth className="justify-start">
+                <Button 
+                  variant="ghost" 
+                  icon={Bell} 
+                  fullWidth 
+                  className="justify-start"
+                  onClick={() => navigate('/notificaciones')}
+                >
                   Configurar Notificaciones
                 </Button>
                 <Button 
@@ -854,12 +774,18 @@ var PerfilUsuario = function() {
                   icon={Key} 
                   fullWidth 
                   className="justify-start" 
-                  onClick={function() { setPasswordModal(true); }}
+                  onClick={() => setPasswordModal(true)}
                 >
                   Cambiar Contraseña
                 </Button>
-                <Button variant="ghost" icon={Shield} fullWidth className="justify-start">
-                  Seguridad de la Cuenta
+                <Button 
+                  variant="ghost" 
+                  icon={Shield} 
+                  fullWidth 
+                  className="justify-start"
+                  onClick={() => setActiveTab('permisos')}
+                >
+                  Ver Permisos
                 </Button>
               </div>
             </InfoCard>
@@ -890,7 +816,7 @@ var PerfilUsuario = function() {
       
       <EditProfileModal
         isOpen={editModal}
-        onClose={function() { setEditModal(false); }}
+        onClose={() => setEditModal(false)}
         usuario={user}
         onSave={handleSaveProfile}
         loading={formLoading}
@@ -898,7 +824,7 @@ var PerfilUsuario = function() {
 
       <ChangePasswordModal
         isOpen={passwordModal}
-        onClose={function() { setPasswordModal(false); }}
+        onClose={() => setPasswordModal(false)}
         onSubmit={handleChangePassword}
         loading={formLoading}
       />

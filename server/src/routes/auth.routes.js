@@ -63,6 +63,13 @@ router.post('/reset-password', resetPasswordValidator, authController.resetPassw
 router.get('/me', verificarToken, authController.me);
 
 /**
+ * @route   PUT /auth/me
+ * @desc    Actualizar perfil del usuario actual
+ * @access  Privado
+ */
+router.put('/me', verificarToken, authController.actualizarPerfil);
+
+/**
  * @route   POST /auth/logout
  * @desc    Cerrar sesión
  * @access  Privado

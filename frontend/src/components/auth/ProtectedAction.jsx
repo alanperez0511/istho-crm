@@ -11,7 +11,7 @@
  */
 
 import PropTypes from 'prop-types';
-import usePermissions from '../hooks/usePermissions';
+import usePermissions from '../../hooks/usePermissions';
 
 // ============================================================================
 // COMPONENTE PRINCIPAL

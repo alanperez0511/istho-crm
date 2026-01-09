@@ -50,7 +50,7 @@ import { Button, SearchBar } from '../../components/common';
 // ════════════════════════════════════════════════════════════════════════════
 import { useAuth } from '../../context/AuthContext';
 import useNotification from '../../hooks/useNotification';
-import { notificacionesService } from '../../services/api/notificacionesService';
+import notificacionesService from '../../api/notificacionesService';
 
 // ════════════════════════════════════════════════════════════════════════════
 // OPCIONES DE FILTRO

@@ -148,7 +148,7 @@ module.exports = (sequelize) => {
     
 hooks: {
   // Generar código de cliente automáticamente
-  beforeCreate: async (cliente, options) => {
+  beforeCreate: async (cliente, options) => { 
     if (!cliente.codigo_cliente) {
       // Usar el modelo directamente desde la instancia
       const Cliente = cliente.constructor;

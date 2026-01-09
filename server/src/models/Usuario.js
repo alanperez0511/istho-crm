@@ -1,11 +1,13 @@
 /**
+ * ============================================================================
  * ISTHO CRM - Modelo Usuario
+ * ============================================================================
  * 
  * Gestiona los usuarios del sistema con autenticación JWT.
  * Incluye hash de contraseñas y control de acceso por roles.
  * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const { DataTypes } = require('sequelize');
@@ -22,27 +24,18 @@ module.exports = (sequelize) => {
     username: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: {
-        msg: 'Este nombre de usuario ya está en uso'
-      },
+      unique: { msg: 'Este nombre de usuario ya está en uso' },
       validate: {
         notEmpty: { msg: 'El username es requerido' },
-        len: {
-          args: [3, 50],
-          msg: 'El username debe tener entre 3 y 50 caracteres'
-        },
-        isAlphanumeric: {
-          msg: 'El username solo puede contener letras y números'
-        }
+        len: { args: [3, 50], msg: 'El username debe tener entre 3 y 50 caracteres' },
+        isAlphanumeric: { msg: 'El username solo puede contener letras y números' }
       }
     },
     
     email: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      unique: {
-        msg: 'Este email ya está registrado'
-      },
+      unique: { msg: 'Este email ya está registrado' },
       validate: {
         notEmpty: { msg: 'El email es requerido' },
         isEmail: { msg: 'Debe ser un email válido' }
@@ -54,27 +47,53 @@ module.exports = (sequelize) => {
       allowNull: false
     },
     
+    // ═══════════════════════════════════════════════════════════════════════
+    // CAMPOS DE PERFIL
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    nombre: {
+      type: DataTypes.STRING(75),
+      allowNull: true
+    },
+    
+    apellido: {
+      type: DataTypes.STRING(75),
+      allowNull: true
+    },
+    
     nombre_completo: {
       type: DataTypes.STRING(150),
-      allowNull: false,
-      validate: {
-        notEmpty: { msg: 'El nombre completo es requerido' },
-        len: {
-          args: [3, 150],
-          msg: 'El nombre debe tener entre 3 y 150 caracteres'
-        }
-      }
+      allowNull: true
     },
+    
+    telefono: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    
+    cargo: {
+      type: DataTypes.STRING(100),
+      allowNull: true
+    },
+    
+    departamento: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      defaultValue: 'Operaciones'
+    },
+    
+    avatar_url: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // CAMPOS DE CONTROL
+    // ═══════════════════════════════════════════════════════════════════════
     
     rol: {
       type: DataTypes.ENUM('admin', 'supervisor', 'operador', 'cliente'),
-      defaultValue: 'operador',
-      validate: {
-        isIn: {
-          args: [['admin', 'supervisor', 'operador', 'cliente']],
-          msg: 'Rol no válido'
-        }
-      }
+      defaultValue: 'operador'
     },
     
     activo: {
@@ -111,7 +130,6 @@ module.exports = (sequelize) => {
     timestamps: true,
     underscored: true,
     
-    // Índices para optimizar búsquedas
     indexes: [
       { fields: ['email'] },
       { fields: ['username'] },
@@ -119,21 +137,26 @@ module.exports = (sequelize) => {
       { fields: ['activo'] }
     ],
     
-    // Hooks del modelo
     hooks: {
-      // Hash de contraseña antes de crear
       beforeCreate: async (usuario) => {
+        // Hash password
         if (usuario.password_hash) {
           const salt = await bcrypt.genSalt(12);
           usuario.password_hash = await bcrypt.hash(usuario.password_hash, salt);
         }
+        // Sincronizar nombre_completo
+        usuario.sincronizarNombreCompleto();
       },
       
-      // Hash de contraseña antes de actualizar (si cambió)
       beforeUpdate: async (usuario) => {
+        // Hash password si cambió
         if (usuario.changed('password_hash')) {
           const salt = await bcrypt.genSalt(12);
           usuario.password_hash = await bcrypt.hash(usuario.password_hash, salt);
+        }
+        // Sincronizar nombre_completo si cambió nombre o apellido
+        if (usuario.changed('nombre') || usuario.changed('apellido')) {
+          usuario.sincronizarNombreCompleto();
         }
       }
     }
@@ -144,9 +167,16 @@ module.exports = (sequelize) => {
   // ============================================
 
   /**
+   * Sincronizar nombre_completo desde nombre y apellido
+   */
+  Usuario.prototype.sincronizarNombreCompleto = function() {
+    if (this.nombre || this.apellido) {
+      this.nombre_completo = `${this.nombre || ''} ${this.apellido || ''}`.trim();
+    }
+  };
+
+  /**
    * Verificar contraseña
-   * @param {string} password - Contraseña en texto plano
-   * @returns {Promise<boolean>}
    */
   Usuario.prototype.verificarPassword = async function(password) {
     return await bcrypt.compare(password, this.password_hash);
@@ -154,7 +184,6 @@ module.exports = (sequelize) => {
 
   /**
    * Verificar si el usuario está bloqueado
-   * @returns {boolean}
    */
   Usuario.prototype.estaBloqueado = function() {
     if (!this.bloqueado_hasta) return false;
@@ -162,59 +191,54 @@ module.exports = (sequelize) => {
   };
 
   /**
-   * Obtener datos públicos (sin password)
-   * @returns {Object}
+   * Obtener nombre para mostrar
+   */
+  Usuario.prototype.getNombreDisplay = function() {
+    if (this.nombre || this.apellido) {
+      return `${this.nombre || ''} ${this.apellido || ''}`.trim();
+    }
+    return this.nombre_completo || this.username;
+  };
+
+  /**
+   * Obtener datos públicos (sin password ni tokens)
+   * ÚNICO PUNTO DE VERDAD para datos de usuario
    */
   Usuario.prototype.toPublicJSON = function() {
     return {
       id: this.id,
       username: this.username,
       email: this.email,
-      nombre_completo: this.nombre_completo,
+      nombre: this.nombre || null,
+      apellido: this.apellido || null,
+      nombre_completo: this.nombre_completo || this.getNombreDisplay(),
+      telefono: this.telefono || null,
+      cargo: this.cargo || null,
+      departamento: this.departamento || 'Operaciones',
+      avatar_url: this.avatar_url || null,
       rol: this.rol,
       activo: this.activo,
+      estado: this.activo ? 'activo' : 'inactivo',
       ultimo_acceso: this.ultimo_acceso,
       created_at: this.created_at
     };
   };
 
   // ============================================
-  // MÉTODOS DE CLASE (ESTÁTICOS)
+  // MÉTODOS ESTÁTICOS
   // ============================================
 
-  /**
-   * Buscar usuario por email
-   * @param {string} email 
-   * @returns {Promise<Usuario|null>}
-   */
   Usuario.findByEmail = async function(email) {
-    return await this.findOne({ 
-      where: { email: email.toLowerCase() } 
-    });
+    return await this.findOne({ where: { email: email.toLowerCase() } });
   };
 
-  /**
-   * Buscar usuario por username
-   * @param {string} username 
-   * @returns {Promise<Usuario|null>}
-   */
   Usuario.findByUsername = async function(username) {
-    return await this.findOne({ 
-      where: { username } 
-    });
+    return await this.findOne({ where: { username } });
   };
 
-  /**
-   * Crear usuario con password (helper)
-   * @param {Object} datos - Datos del usuario incluyendo password
-   * @returns {Promise<Usuario>}
-   */
   Usuario.crearConPassword = async function(datos) {
     const { password, ...resto } = datos;
-    return await this.create({
-      ...resto,
-      password_hash: password // El hook lo hasheará
-    });
+    return await this.create({ ...resto, password_hash: password });
   };
 
   return Usuario;
