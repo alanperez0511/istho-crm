@@ -1,8 +1,18 @@
 /**
- * ISTHO CRM - DespachoDetail Page
- * Vista de detalle completa del despacho
+ * ============================================================================
+ * ISTHO CRM - DespachoDetail (Fase 5 - Integración Completa)
+ * ============================================================================
+ * Vista de detalle del despacho conectada al backend real.
+ * 
+ * CAMBIOS vs versión anterior:
+ * - Eliminados MOCK_DESPACHO, MOCK_PRODUCTOS, MOCK_TIMELINE
+ * - Conectado con useDespachos hook (fetchById, productos, timeline)
+ * - Cambios de estado conectados a API
+ * - Cancelación conectada a API
+ * - Control de permisos
  * 
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Enero 2026
  */
 
@@ -27,6 +37,7 @@ import {
   Navigation,
   Camera,
   MessageSquare,
+  RefreshCw,
 } from 'lucide-react';
 
 // Layout
@@ -38,55 +49,25 @@ import { Button, StatusChip, ConfirmDialog, Modal } from '../../components/commo
 // Local Components
 import DespachoForm from './components/DespachoForm';
 
-// ============================================
-// DATOS MOCK
-// ============================================
-const MOCK_DESPACHO = {
-  id: 'DSP-001',
-  clienteId: 'CLI-001',
-  cliente: 'Lácteos Betania S.A.S',
-  clienteNit: '900.123.456-1',
-  contacto: 'María García',
-  contactoTelefono: '+57 300 123 4567',
-  destino: 'Medellín, Antioquia',
-  direccion: 'Cra 45 #78-90, Zona Industrial Norte',
-  vehiculo: 'ABC-123',
-  vehiculoTipo: 'Furgón 5 Toneladas',
-  conductor: 'Juan Pérez',
-  conductorTelefono: '+57 310 987 6543',
-  fechaProgramada: '2026-01-08',
-  horaEstimada: '14:00',
-  fechaSalida: '2026-01-08 08:30',
-  fechaEntrega: null,
-  estado: 'en_transito',
-  prioridad: 'alta',
-  instrucciones: 'Entregar en recepción de mercancías. Llamar 30 minutos antes de llegar.',
-  observaciones: 'Cliente preferencial. Verificar temperatura de productos refrigerados.',
-  documentos: ['Guía de Remisión', 'Factura', 'Certificado de Calidad'],
-  createdAt: '2026-01-07 15:30',
-  createdBy: 'Carlos Martínez',
-};
+// ════════════════════════════════════════════════════════════════════════════
+// HOOKS INTEGRADOS
+// ════════════════════════════════════════════════════════════════════════════
+import useDespachos from '../../hooks/useDespachos';
+import useNotification from '../../hooks/useNotification';
+import { useAuth } from '../../context/AuthContext';
 
-const MOCK_PRODUCTOS = [
-  { id: 1, productoId: 'PRD-001', codigo: 'SKU-LCH-001', nombre: 'Leche UHT x24', cantidad: 200, unidad: 'caja', lote: 'LOT-2026-001', vencimiento: '2026-06-15' },
-  { id: 2, productoId: 'PRD-002', codigo: 'SKU-YGT-001', nombre: 'Yogurt Griego x12', cantidad: 150, unidad: 'caja', lote: 'LOT-2026-015', vencimiento: '2026-02-28' },
-  { id: 3, productoId: 'PRD-006', codigo: 'SKU-QSO-001', nombre: 'Queso Doble Crema x5kg', cantidad: 100, unidad: 'unidad', lote: 'LOT-2026-008', vencimiento: '2026-02-15' },
-];
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTES INTERNOS
+// ════════════════════════════════════════════════════════════════════════════
 
-const MOCK_TIMELINE = [
-  { id: 1, tipo: 'creacion', titulo: 'Despacho creado', descripcion: 'Orden de despacho generada en el sistema', fecha: '2026-01-07 15:30', usuario: 'Carlos Martínez' },
-  { id: 2, tipo: 'asignacion', titulo: 'Vehículo asignado', descripcion: 'Asignado camión ABC-123 con conductor Juan Pérez', fecha: '2026-01-07 16:00', usuario: 'Sistema' },
-  { id: 3, tipo: 'preparacion', titulo: 'En preparación', descripcion: 'Inicio de alistamiento de productos en bodega', fecha: '2026-01-08 06:00', usuario: 'María López' },
-  { id: 4, tipo: 'verificacion', titulo: 'Verificación completada', descripcion: 'Productos verificados y cargados. 450 unidades totales.', fecha: '2026-01-08 07:45', usuario: 'María López' },
-  { id: 5, tipo: 'salida', titulo: 'Salida de bodega', descripcion: 'Vehículo sale de instalaciones hacia destino', fecha: '2026-01-08 08:30', usuario: 'Sistema' },
-  { id: 6, tipo: 'transito', titulo: 'En tránsito', descripcion: 'Ubicación actual: Vía Medellín - Girardota', fecha: '2026-01-08 10:15', usuario: 'GPS' },
-];
-
-// ============================================
-// TIMELINE ITEM
-// ============================================
-const TimelineItem = ({ item, isLast }) => {
-  const iconConfig = {
+/**
+ * Item del timeline
+ */
+var TimelineItem = function(props) {
+  var item = props.item;
+  var isLast = props.isLast;
+  
+  var iconConfig = {
     creacion: { icon: FileText, bg: 'bg-slate-100', color: 'text-slate-600' },
     asignacion: { icon: Truck, bg: 'bg-blue-100', color: 'text-blue-600' },
     preparacion: { icon: Package, bg: 'bg-amber-100', color: 'text-amber-600' },
@@ -95,97 +76,116 @@ const TimelineItem = ({ item, isLast }) => {
     transito: { icon: MapPin, bg: 'bg-blue-100', color: 'text-blue-600' },
     entrega: { icon: CheckCircle, bg: 'bg-emerald-100', color: 'text-emerald-600' },
     incidente: { icon: AlertCircle, bg: 'bg-red-100', color: 'text-red-600' },
+    cancelacion: { icon: XCircle, bg: 'bg-red-100', color: 'text-red-600' },
+    estado: { icon: Clock, bg: 'bg-orange-100', color: 'text-orange-600' },
   };
 
-  const config = iconConfig[item.tipo] || iconConfig.creacion;
-  const Icon = config.icon;
+  var config = iconConfig[item.tipo] || iconConfig.creacion;
+  var Icon = config.icon;
 
   return (
     <div className="flex gap-4">
-      {/* Icon & Line */}
       <div className="flex flex-col items-center">
-        <div className={`w-10 h-10 ${config.bg} rounded-full flex items-center justify-center z-10`}>
-          <Icon className={`w-5 h-5 ${config.color}`} />
+        <div className={'w-10 h-10 rounded-full flex items-center justify-center z-10 ' + config.bg}>
+          <Icon className={'w-5 h-5 ' + config.color} />
         </div>
         {!isLast && <div className="w-0.5 flex-1 bg-slate-200 my-2" />}
       </div>
 
-      {/* Content */}
-      <div className={`flex-1 ${!isLast ? 'pb-6' : ''}`}>
+      <div className={'flex-1 ' + (!isLast ? 'pb-6' : '')}>
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-medium text-slate-800">{item.titulo}</p>
-            <p className="text-sm text-slate-500 mt-0.5">{item.descripcion}</p>
+            <p className="font-medium text-slate-800">{item.titulo || item.accion}</p>
+            <p className="text-sm text-slate-500 mt-0.5">{item.descripcion || item.detalle}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            {item.fecha}
+            {new Date(item.fecha || item.created_at).toLocaleString('es-CO')}
           </span>
           <span>•</span>
-          <span>{item.usuario}</span>
+          <span>{item.usuario || item.usuario_nombre || 'Sistema'}</span>
         </div>
       </div>
     </div>
   );
 };
 
-// ============================================
-// PRODUCTO ROW
-// ============================================
-const ProductoRow = ({ producto }) => (
-  <div className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
-    <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-      <Package className="w-5 h-5 text-slate-500" />
-    </div>
-    <div className="flex-1">
-      <p className="font-medium text-slate-800">{producto.nombre}</p>
-      <p className="text-xs text-slate-500">{producto.codigo} • Lote: {producto.lote}</p>
-    </div>
-    <div className="text-right">
-      <p className="font-semibold text-slate-800">{producto.cantidad.toLocaleString()}</p>
-      <p className="text-xs text-slate-500">{producto.unidad}</p>
-    </div>
-  </div>
-);
-
-// ============================================
-// INFO CARD
-// ============================================
-const InfoCard = ({ title, icon: Icon, children, action }) => (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-      <div className="flex items-center gap-2">
-        {Icon && <Icon className="w-5 h-5 text-slate-500" />}
-        <h3 className="font-semibold text-slate-800">{title}</h3>
+/**
+ * Fila de producto
+ */
+var ProductoRow = function(props) {
+  var producto = props.producto;
+  
+  return (
+    <div className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
+      <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+        <Package className="w-5 h-5 text-slate-500" />
       </div>
-      {action}
+      <div className="flex-1">
+        <p className="font-medium text-slate-800">{producto.nombre || producto.producto_nombre}</p>
+        <p className="text-xs text-slate-500">
+          {producto.codigo || producto.sku} • Lote: {producto.lote || 'N/A'}
+        </p>
+      </div>
+      <div className="text-right">
+        <p className="font-semibold text-slate-800">{(producto.cantidad || 0).toLocaleString()}</p>
+        <p className="text-xs text-slate-500">{producto.unidad || producto.unidad_medida || 'unidades'}</p>
+      </div>
     </div>
-    <div className="p-5">{children}</div>
-  </div>
-);
+  );
+};
 
-// ============================================
-// ESTADO CHANGE MODAL
-// ============================================
-const EstadoChangeModal = ({ isOpen, onClose, onSubmit, currentEstado, loading }) => {
-  const [nuevoEstado, setNuevoEstado] = useState('');
-  const [observacion, setObservacion] = useState('');
+/**
+ * Tarjeta de información
+ */
+var InfoCard = function(props) {
+  var title = props.title;
+  var Icon = props.icon;
+  var children = props.children;
+  var action = props.action;
+  
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="w-5 h-5 text-slate-500" />}
+          <h3 className="font-semibold text-slate-800">{title}</h3>
+        </div>
+        {action}
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+};
 
-  const estados = [
+/**
+ * Modal de cambio de estado
+ */
+var EstadoChangeModal = function(props) {
+  var isOpen = props.isOpen;
+  var onClose = props.onClose;
+  var onSubmit = props.onSubmit;
+  var currentEstado = props.currentEstado;
+  var loading = props.loading;
+  
+  var _a = useState(''), nuevoEstado = _a[0], setNuevoEstado = _a[1];
+  var _b = useState(''), observacion = _b[0], setObservacion = _b[1];
+
+  var estados = [
     { value: 'programado', label: 'Programado', disabled: ['en_transito', 'completado'].includes(currentEstado) },
     { value: 'en_preparacion', label: 'En Preparación', disabled: ['en_transito', 'completado'].includes(currentEstado) },
     { value: 'en_transito', label: 'En Tránsito', disabled: ['completado'].includes(currentEstado) },
     { value: 'completado', label: 'Completado', disabled: false },
   ];
 
-  const handleSubmit = () => {
+  var handleSubmit = function() {
     if (!nuevoEstado) return;
-    onSubmit({ estado: nuevoEstado, observacion });
+    onSubmit({ estado: nuevoEstado, observacion: observacion });
   };
 
-  useEffect(() => {
+  useEffect(function() {
     if (isOpen) {
       setNuevoEstado('');
       setObservacion('');
@@ -213,27 +213,29 @@ const EstadoChangeModal = ({ isOpen, onClose, onSubmit, currentEstado, loading }
             Nuevo Estado
           </label>
           <div className="space-y-2">
-            {estados.map((e) => (
-              <label
-                key={e.value}
-                className={`
-                  flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors
-                  ${e.disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-50'}
-                  ${nuevoEstado === e.value ? 'border-orange-500 bg-orange-50' : 'border-slate-200'}
-                `}
-              >
-                <input
-                  type="radio"
-                  name="estado"
-                  value={e.value}
-                  checked={nuevoEstado === e.value}
-                  onChange={() => !e.disabled && setNuevoEstado(e.value)}
-                  disabled={e.disabled}
-                  className="w-4 h-4 text-orange-500 focus:ring-orange-500"
-                />
-                <span className="text-sm text-slate-700">{e.label}</span>
-              </label>
-            ))}
+            {estados.map(function(e) {
+              return (
+                <label
+                  key={e.value}
+                  className={
+                    'flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ' +
+                    (e.disabled ? 'opacity-50 cursor-not-allowed bg-slate-50 ' : 'hover:bg-slate-50 ') +
+                    (nuevoEstado === e.value ? 'border-orange-500 bg-orange-50' : 'border-slate-200')
+                  }
+                >
+                  <input
+                    type="radio"
+                    name="estado"
+                    value={e.value}
+                    checked={nuevoEstado === e.value}
+                    onChange={function() { if (!e.disabled) setNuevoEstado(e.value); }}
+                    disabled={e.disabled}
+                    className="w-4 h-4 text-orange-500 focus:ring-orange-500"
+                  />
+                  <span className="text-sm text-slate-700">{e.label}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
 
@@ -243,7 +245,7 @@ const EstadoChangeModal = ({ isOpen, onClose, onSubmit, currentEstado, loading }
           </label>
           <textarea
             value={observacion}
-            onChange={(e) => setObservacion(e.target.value)}
+            onChange={function(e) { setObservacion(e.target.value); }}
             placeholder="Agregar nota sobre el cambio de estado..."
             rows={2}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
@@ -254,86 +256,122 @@ const EstadoChangeModal = ({ isOpen, onClose, onSubmit, currentEstado, loading }
   );
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
-const DespachoDetail = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
+var DespachoDetail = function() {
+  var params = useParams();
+  var id = params.id;
+  var navigate = useNavigate();
+  var authHook = useAuth();
+  var hasPermission = authHook.hasPermission;
+  var notif = useNotification();
+  var success = notif.success;
+  var apiError = notif.apiError;
+  var despachoCerrado = notif.despachoCerrado;
 
-  // Estados
-  const [despacho, setDespacho] = useState(null);
-  const [productos, setProductos] = useState([]);
-  const [timeline, setTimeline] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('info');
+  // ──────────────────────────────────────────────────────────────────────────
+  // HOOK DE DESPACHOS
+  // ──────────────────────────────────────────────────────────────────────────
+  var despachosHook = useDespachos({ autoFetch: false });
+  
+  var currentDespacho = despachosHook.currentDespacho;
+  var loading = despachosHook.loading;
+  var error = despachosHook.error;
+  var productos = despachosHook.despachoProductos;
+  var timeline = despachosHook.despachoTimeline;
+  var loadingProductos = despachosHook.loadingProductos;
+  var loadingTimeline = despachosHook.loadingTimeline;
+  var fetchById = despachosHook.fetchById;
+  var fetchDespachoProductos = despachosHook.fetchDespachoProductos;
+  var fetchDespachoTimeline = despachosHook.fetchDespachoTimeline;
+  var updateDespacho = despachosHook.updateDespacho;
+  var cancelarDespacho = despachosHook.cancelarDespacho;
+  var cambiarEstado = despachosHook.cambiarEstado;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // ESTADOS LOCALES
+  // ──────────────────────────────────────────────────────────────────────────
+  var _a = useState('info'), activeTab = _a[0], setActiveTab = _a[1];
 
   // Modals
-  const [editModal, setEditModal] = useState(false);
-  const [estadoModal, setEstadoModal] = useState(false);
-  const [cancelModal, setCancelModal] = useState(false);
-  const [formLoading, setFormLoading] = useState(false);
+  var _b = useState(false), editModal = _b[0], setEditModal = _b[1];
+  var _c = useState(false), estadoModal = _c[0], setEstadoModal = _c[1];
+  var _d = useState(false), cancelModal = _d[0], setCancelModal = _d[1];
+  var _e = useState(false), formLoading = _e[0], setFormLoading = _e[1];
 
-  // Cargar datos
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
-      setDespacho(MOCK_DESPACHO);
-      setProductos(MOCK_PRODUCTOS);
-      setTimeline(MOCK_TIMELINE);
-      setLoading(false);
-    };
-    fetchData();
-  }, [id]);
+  // Permisos
+  var canEdit = hasPermission('despachos', 'editar');
 
-  // Handlers
-  const handleEditDespacho = async (data) => {
+  // ──────────────────────────────────────────────────────────────────────────
+  // CARGAR DATOS
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(function() {
+    if (id) {
+      fetchById(id);
+      fetchDespachoProductos(id);
+      fetchDespachoTimeline(id);
+    }
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var handleEditDespacho = async function(data) {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setDespacho((prev) => ({ ...prev, ...data }));
-    setFormLoading(false);
-    setEditModal(false);
+    try {
+      await updateDespacho(id, data);
+      success('Despacho actualizado correctamente');
+      setEditModal(false);
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleEstadoChange = async (data) => {
+  var handleEstadoChange = async function(data) {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    
-    // Agregar al timeline
-    const nuevoEvento = {
-      id: Date.now(),
-      tipo: data.estado === 'completado' ? 'entrega' : data.estado.replace('_', ''),
-      titulo: `Estado cambiado a ${data.estado.replace('_', ' ')}`,
-      descripcion: data.observacion || 'Cambio de estado manual',
-      fecha: new Date().toLocaleString('es-CO'),
-      usuario: 'Usuario',
-    };
-    setTimeline((prev) => [...prev, nuevoEvento]);
-    
-    // Actualizar despacho
-    setDespacho((prev) => ({
-      ...prev,
-      estado: data.estado,
-      ...(data.estado === 'completado' ? { fechaEntrega: new Date().toISOString() } : {}),
-    }));
-
-    setFormLoading(false);
-    setEstadoModal(false);
+    try {
+      await cambiarEstado(id, data.estado, data.observacion);
+      
+      if (data.estado === 'completado') {
+        despachoCerrado(currentDespacho.numero || id);
+      } else {
+        success('Estado actualizado a ' + data.estado.replace('_', ' '));
+      }
+      
+      // Refrescar timeline
+      fetchDespachoTimeline(id);
+      setEstadoModal(false);
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleCancelDespacho = async () => {
+  var handleCancelDespacho = async function() {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setDespacho((prev) => ({ ...prev, estado: 'cancelado' }));
-    setFormLoading(false);
-    setCancelModal(false);
+    try {
+      await cancelarDespacho(id, { motivo: 'Cancelado por usuario' });
+      success('Despacho cancelado correctamente');
+      setCancelModal(false);
+      // Refrescar datos
+      fetchById(id);
+      fetchDespachoTimeline(id);
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  // Calcular totales
-  const totalProductos = productos.length;
-  const totalUnidades = productos.reduce((sum, p) => sum + p.cantidad, 0);
-
+  // ──────────────────────────────────────────────────────────────────────────
+  // LOADING STATE
+  // ──────────────────────────────────────────────────────────────────────────
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -342,9 +380,9 @@ const DespachoDetail = () => {
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-48" />
             <div className="grid grid-cols-3 gap-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-48 bg-gray-200 rounded-2xl" />
-              ))}
+              {[0, 1, 2].map(function(i) {
+                return <div key={i} className="h-48 bg-gray-200 rounded-2xl" />;
+              })}
             </div>
           </div>
         </main>
@@ -352,24 +390,61 @@ const DespachoDetail = () => {
     );
   }
 
-  const tabs = [
+  // ──────────────────────────────────────────────────────────────────────────
+  // ERROR STATE
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  if (error || !currentDespacho) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <FloatingHeader />
+        <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Truck className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Despacho no encontrado</h2>
+            <p className="text-slate-500 mb-4">{error || 'El despacho solicitado no existe'}</p>
+            <Button variant="primary" onClick={function() { navigate('/despachos'); }}>
+              Volver a Despachos
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // VARIABLES CALCULADAS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var despacho = currentDespacho;
+  var totalProductos = productos.length;
+  var totalUnidades = productos.reduce(function(sum, p) { return sum + (p.cantidad || 0); }, 0);
+  var isEditable = !['completado', 'cancelado'].includes(despacho.estado);
+
+  var tabs = [
     { id: 'info', label: 'Información' },
-    { id: 'productos', label: `Productos (${totalProductos})` },
+    { id: 'productos', label: 'Productos (' + totalProductos + ')' },
     { id: 'timeline', label: 'Timeline' },
   ];
 
-  const isEditable = !['completado', 'cancelado'].includes(despacho.estado);
-
+  // ──────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────────────────
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <FloatingHeader />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* Header */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* HEADER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/despachos')}
+              onClick={function() { navigate('/despachos'); }}
               className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -380,7 +455,7 @@ const DespachoDetail = () => {
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-slate-800">{despacho.id}</h1>
+                  <h1 className="text-2xl font-bold text-slate-800">{despacho.numero || despacho.id}</h1>
                   <StatusChip status={despacho.estado} />
                   {despacho.prioridad === 'urgente' && (
                     <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
@@ -388,18 +463,18 @@ const DespachoDetail = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-slate-500">{despacho.cliente}</p>
+                <p className="text-slate-500">{despacho.cliente_nombre || despacho.cliente}</p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {isEditable && (
+            {isEditable && canEdit && (
               <>
-                <Button variant="outline" onClick={() => setEstadoModal(true)}>
+                <Button variant="outline" onClick={function() { setEstadoModal(true); }}>
                   Cambiar Estado
                 </Button>
-                <Button variant="outline" icon={Pencil} onClick={() => setEditModal(true)}>
+                <Button variant="outline" icon={Pencil} onClick={function() { setEditModal(true); }}>
                   Editar
                 </Button>
               </>
@@ -407,15 +482,17 @@ const DespachoDetail = () => {
             <Button variant="outline" icon={Printer}>
               Imprimir
             </Button>
-            {isEditable && (
-              <Button variant="danger" icon={XCircle} onClick={() => setCancelModal(true)}>
+            {isEditable && canEdit && (
+              <Button variant="danger" icon={XCircle} onClick={function() { setCancelModal(true); }}>
                 Cancelar
               </Button>
             )}
           </div>
         </div>
 
-        {/* Main Grid */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* MAIN GRID */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Info */}
           <div className="lg:col-span-2 space-y-6">
@@ -433,31 +510,32 @@ const DespachoDetail = () => {
               </div>
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
                 <Clock className="w-8 h-8 text-violet-500 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-slate-800">{despacho.horaEstimada}</p>
+                <p className="text-2xl font-bold text-slate-800">{despacho.hora_estimada || despacho.horaEstimada || '--:--'}</p>
                 <p className="text-sm text-slate-500">ETA</p>
               </div>
             </div>
 
             {/* Tabs Content */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-              {/* Tabs */}
               <div className="border-b border-gray-100">
                 <nav className="flex px-6">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`
-                        py-4 px-4 text-sm font-medium transition-colors relative
-                        ${activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'}
-                      `}
-                    >
-                      {tab.label}
-                      {activeTab === tab.id && (
-                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
-                      )}
-                    </button>
-                  ))}
+                  {tabs.map(function(tab) {
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={function() { setActiveTab(tab.id); }}
+                        className={
+                          'py-4 px-4 text-sm font-medium transition-colors relative ' +
+                          (activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700')
+                        }
+                      >
+                        {tab.label}
+                        {activeTab === tab.id && (
+                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </nav>
               </div>
 
@@ -471,24 +549,24 @@ const DespachoDetail = () => {
                         <div className="flex items-start gap-3 text-sm">
                           <Building2 className="w-5 h-5 text-slate-400 mt-0.5" />
                           <div>
-                            <p className="text-slate-800 font-medium">{despacho.cliente}</p>
-                            <p className="text-slate-500">NIT: {despacho.clienteNit}</p>
+                            <p className="text-slate-800 font-medium">{despacho.cliente_nombre || despacho.cliente}</p>
+                            <p className="text-slate-500">NIT: {despacho.cliente_nit || despacho.clienteNit || '-'}</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-3 text-sm">
                           <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
                           <div>
-                            <p className="text-slate-800">{despacho.direccion}</p>
-                            <p className="text-slate-500">{despacho.destino}</p>
+                            <p className="text-slate-800">{despacho.direccion_destino || despacho.direccion || '-'}</p>
+                            <p className="text-slate-500">{despacho.ciudad_destino || despacho.destino || '-'}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <User className="w-5 h-5 text-slate-400" />
-                          <span className="text-slate-800">{despacho.contacto}</span>
+                          <span className="text-slate-800">{despacho.contacto_nombre || despacho.contacto || '-'}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Phone className="w-5 h-5 text-slate-400" />
-                          <span className="text-slate-800">{despacho.contactoTelefono}</span>
+                          <span className="text-slate-800">{despacho.contacto_telefono || despacho.contactoTelefono || '-'}</span>
                         </div>
                       </div>
                     </div>
@@ -499,17 +577,17 @@ const DespachoDetail = () => {
                         <div className="flex items-center gap-3 text-sm">
                           <Truck className="w-5 h-5 text-slate-400" />
                           <div>
-                            <p className="text-slate-800 font-medium">{despacho.vehiculo}</p>
-                            <p className="text-slate-500">{despacho.vehiculoTipo}</p>
+                            <p className="text-slate-800 font-medium">{despacho.vehiculo || 'Sin asignar'}</p>
+                            <p className="text-slate-500">{despacho.vehiculo_tipo || despacho.vehiculoTipo || '-'}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <User className="w-5 h-5 text-slate-400" />
-                          <span className="text-slate-800">{despacho.conductor}</span>
+                          <span className="text-slate-800">{despacho.conductor || 'Sin asignar'}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Phone className="w-5 h-5 text-slate-400" />
-                          <span className="text-slate-800">{despacho.conductorTelefono}</span>
+                          <span className="text-slate-800">{despacho.conductor_telefono || despacho.conductorTelefono || '-'}</span>
                         </div>
                       </div>
                     </div>
@@ -522,46 +600,62 @@ const DespachoDetail = () => {
                         </p>
                       </div>
                     )}
-
-                    {despacho.documentos?.length > 0 && (
-                      <div className="md:col-span-2 space-y-2">
-                        <h4 className="font-semibold text-slate-800">Documentos</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {despacho.documentos.map((doc, idx) => (
-                            <span key={idx} className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm">
-                              <FileText className="w-4 h-4" />
-                              {doc}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
                 {/* Tab: Productos */}
                 {activeTab === 'productos' && (
                   <div>
-                    {productos.map((producto) => (
-                      <ProductoRow key={producto.id} producto={producto} />
-                    ))}
-                    <div className="flex justify-between items-center pt-4 mt-4 border-t border-gray-100">
-                      <span className="text-sm text-slate-500">Total</span>
-                      <span className="font-bold text-slate-800">{totalUnidades.toLocaleString()} unidades</span>
-                    </div>
+                    {loadingProductos ? (
+                      <div className="space-y-3">
+                        {[0, 1, 2].map(function(i) {
+                          return <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />;
+                        })}
+                      </div>
+                    ) : productos.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-500">No hay productos en este despacho</p>
+                      </div>
+                    ) : (
+                      <>
+                        {productos.map(function(producto) {
+                          return <ProductoRow key={producto.id} producto={producto} />;
+                        })}
+                        <div className="flex justify-between items-center pt-4 mt-4 border-t border-gray-100">
+                          <span className="text-sm text-slate-500">Total</span>
+                          <span className="font-bold text-slate-800">{totalUnidades.toLocaleString()} unidades</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
                 {/* Tab: Timeline */}
                 {activeTab === 'timeline' && (
                   <div>
-                    {timeline.map((item, idx) => (
-                      <TimelineItem 
-                        key={item.id} 
-                        item={item} 
-                        isLast={idx === timeline.length - 1}
-                      />
-                    ))}
+                    {loadingTimeline ? (
+                      <div className="space-y-4">
+                        {[0, 1, 2].map(function(i) {
+                          return <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />;
+                        })}
+                      </div>
+                    ) : timeline.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-500">No hay eventos en el timeline</p>
+                      </div>
+                    ) : (
+                      timeline.map(function(item, idx) {
+                        return (
+                          <TimelineItem 
+                            key={item.id} 
+                            item={item} 
+                            isLast={idx === timeline.length - 1}
+                          />
+                        );
+                      })
+                    )}
                   </div>
                 )}
               </div>
@@ -575,22 +669,22 @@ const DespachoDetail = () => {
               <div className="space-y-4">
                 <div>
                   <p className="text-xs text-slate-400 mb-1">Fecha Programada</p>
-                  <p className="font-medium text-slate-800">{despacho.fechaProgramada}</p>
+                  <p className="font-medium text-slate-800">{despacho.fecha_programada || despacho.fechaProgramada || '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400 mb-1">Hora Estimada</p>
-                  <p className="font-medium text-slate-800">{despacho.horaEstimada}</p>
+                  <p className="font-medium text-slate-800">{despacho.hora_estimada || despacho.horaEstimada || '-'}</p>
                 </div>
-                {despacho.fechaSalida && (
+                {(despacho.fecha_salida || despacho.fechaSalida) && (
                   <div>
                     <p className="text-xs text-slate-400 mb-1">Fecha de Salida</p>
-                    <p className="font-medium text-emerald-600">{despacho.fechaSalida}</p>
+                    <p className="font-medium text-emerald-600">{despacho.fecha_salida || despacho.fechaSalida}</p>
                   </div>
                 )}
-                {despacho.fechaEntrega && (
+                {(despacho.fecha_entrega || despacho.fechaEntrega) && (
                   <div>
                     <p className="text-xs text-slate-400 mb-1">Fecha de Entrega</p>
-                    <p className="font-medium text-emerald-600">{despacho.fechaEntrega}</p>
+                    <p className="font-medium text-emerald-600">{despacho.fecha_entrega || despacho.fechaEntrega}</p>
                   </div>
                 )}
               </div>
@@ -621,15 +715,17 @@ const DespachoDetail = () => {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Creado por</span>
-                  <span className="text-slate-800">{despacho.createdBy}</span>
+                  <span className="text-slate-800">{despacho.creado_por || despacho.createdBy || '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Fecha creación</span>
-                  <span className="text-slate-800">{despacho.createdAt}</span>
+                  <span className="text-slate-800">
+                    {despacho.created_at ? new Date(despacho.created_at).toLocaleString('es-CO') : despacho.createdAt || '-'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Prioridad</span>
-                  <span className="text-slate-800 capitalize">{despacho.prioridad}</span>
+                  <span className="text-slate-800 capitalize">{despacho.prioridad || 'normal'}</span>
                 </div>
               </div>
             </InfoCard>
@@ -637,10 +733,13 @@ const DespachoDetail = () => {
         </div>
       </main>
 
-      {/* Modals */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* MODALS */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      
       <DespachoForm
         isOpen={editModal}
-        onClose={() => setEditModal(false)}
+        onClose={function() { setEditModal(false); }}
         onSubmit={handleEditDespacho}
         despacho={despacho}
         loading={formLoading}
@@ -648,7 +747,7 @@ const DespachoDetail = () => {
 
       <EstadoChangeModal
         isOpen={estadoModal}
-        onClose={() => setEstadoModal(false)}
+        onClose={function() { setEstadoModal(false); }}
         onSubmit={handleEstadoChange}
         currentEstado={despacho.estado}
         loading={formLoading}
@@ -656,7 +755,7 @@ const DespachoDetail = () => {
 
       <ConfirmDialog
         isOpen={cancelModal}
-        onClose={() => setCancelModal(false)}
+        onClose={function() { setCancelModal(false); }}
         onConfirm={handleCancelDespacho}
         title="Cancelar Despacho"
         message="¿Estás seguro de cancelar este despacho? Esta acción notificará al cliente y liberará los productos reservados."

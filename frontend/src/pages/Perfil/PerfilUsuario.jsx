@@ -1,8 +1,17 @@
 /**
- * ISTHO CRM - PerfilUsuario Page
- * Página de perfil de usuario con información personal y configuración
+ * ============================================================================
+ * ISTHO CRM - PerfilUsuario (Fase 5 - Integración Completa)
+ * ============================================================================
+ * Página de perfil de usuario conectada al backend real.
+ * 
+ * CAMBIOS vs versión anterior:
+ * - Eliminados MOCK_USUARIO, MOCK_PERMISOS, MOCK_ACTIVIDAD, MOCK_ESTADISTICAS
+ * - Conectado con useAuth para datos de usuario actual
+ * - API real para actualizar perfil y cambiar contraseña
+ * - Permisos y actividad desde backend
  * 
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Enero 2026
  */
 
@@ -30,6 +39,7 @@ import {
   LogOut,
   CheckCircle,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 
 // Layout
@@ -38,74 +48,49 @@ import FloatingHeader from '../../components/layout/FloatingHeader';
 // Components
 import { Button, Modal, StatusChip } from '../../components/common';
 
-// ============================================
-// DATOS MOCK
-// ============================================
-const MOCK_USUARIO = {
-  id: 'USR-001',
-  nombre: 'Carlos',
-  apellido: 'Martínez',
-  email: 'carlos.martinez@istho.com.co',
-  telefono: '+57 300 123 4567',
-  cargo: 'Coordinador de Tecnología',
-  departamento: 'Tecnología e Innovación',
-  sede: 'Centro Logístico Industrial del Norte',
-  ciudad: 'Girardota, Antioquia',
-  fechaIngreso: '2023-03-15',
-  rol: 'Administrador',
-  estado: 'activo',
-  ultimoAcceso: '2026-01-08 10:45',
-  avatar: null,
-};
+// ════════════════════════════════════════════════════════════════════════════
+// HOOKS E INTEGRACIÓN
+// ════════════════════════════════════════════════════════════════════════════
+import { useAuth } from '../../context/AuthContext';
+import useNotification from '../../hooks/useNotification';
+import { authService } from '../../api/auth.service';
+import { usuarioService } from '../../api/usuarioService';
 
-const MOCK_PERMISOS = [
-  { modulo: 'Dashboard', ver: true, crear: true, editar: true, eliminar: true },
-  { modulo: 'Clientes', ver: true, crear: true, editar: true, eliminar: true },
-  { modulo: 'Inventario', ver: true, crear: true, editar: true, eliminar: true },
-  { modulo: 'Despachos', ver: true, crear: true, editar: true, eliminar: true },
-  { modulo: 'Trazabilidad', ver: true, crear: true, editar: true, eliminar: false },
-  { modulo: 'Reportes', ver: true, crear: true, editar: false, eliminar: false },
-  { modulo: 'Configuración', ver: true, crear: true, editar: true, eliminar: true },
-];
+// ════════════════════════════════════════════════════════════════════════════
+// MODAL EDITAR PERFIL
+// ════════════════════════════════════════════════════════════════════════════
+var EditProfileModal = function(props) {
+  var isOpen = props.isOpen;
+  var onClose = props.onClose;
+  var usuario = props.usuario;
+  var onSave = props.onSave;
+  var loading = props.loading;
+  
+  var _a = useState({}), formData = _a[0], setFormData = _a[1];
 
-const MOCK_ACTIVIDAD = [
-  { id: 1, accion: 'Inicio de sesión', fecha: '2026-01-08 10:45', ip: '192.168.1.100' },
-  { id: 2, accion: 'Creó despacho DSP-156', fecha: '2026-01-08 09:30', modulo: 'Despachos' },
-  { id: 3, accion: 'Editó cliente CLI-001', fecha: '2026-01-07 16:20', modulo: 'Clientes' },
-  { id: 4, accion: 'Generó reporte de inventario', fecha: '2026-01-07 14:15', modulo: 'Reportes' },
-  { id: 5, accion: 'Actualizó producto PRD-005', fecha: '2026-01-07 11:00', modulo: 'Inventario' },
-];
-
-const MOCK_ESTADISTICAS = {
-  despachosCreados: 45,
-  clientesGestionados: 12,
-  reportesGenerados: 28,
-  diasActivo: 324,
-};
-
-// ============================================
-// EDIT PROFILE MODAL
-// ============================================
-const EditProfileModal = ({ isOpen, onClose, usuario, onSave }) => {
-  const [formData, setFormData] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
+  useEffect(function() {
     if (usuario) {
-      setFormData({ ...usuario });
+      setFormData({
+        nombre: usuario.nombre || '',
+        apellido: usuario.apellido || '',
+        email: usuario.email || '',
+        telefono: usuario.telefono || '',
+        cargo: usuario.cargo || '',
+        departamento: usuario.departamento || '',
+      });
     }
   }, [usuario]);
 
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  var handleChange = function(field, value) {
+    setFormData(function(prev) { 
+      var updated = Object.assign({}, prev);
+      updated[field] = value;
+      return updated;
+    });
   };
 
-  const handleSubmit = async () => {
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
+  var handleSubmit = function() {
     onSave(formData);
-    setLoading(false);
-    onClose();
   };
 
   return (
@@ -127,7 +112,7 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave }) => {
         {/* Avatar */}
         <div className="flex items-center gap-4">
           <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">
-            {formData.nombre?.[0]}{formData.apellido?.[0]}
+            {(formData.nombre || '')[0]}{(formData.apellido || '')[0]}
           </div>
           <div>
             <Button variant="outline" size="sm" icon={Camera}>
@@ -143,7 +128,7 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave }) => {
             <input
               type="text"
               value={formData.nombre || ''}
-              onChange={(e) => handleChange('nombre', e.target.value)}
+              onChange={function(e) { handleChange('nombre', e.target.value); }}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
             />
           </div>
@@ -152,7 +137,7 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave }) => {
             <input
               type="text"
               value={formData.apellido || ''}
-              onChange={(e) => handleChange('apellido', e.target.value)}
+              onChange={function(e) { handleChange('apellido', e.target.value); }}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
             />
           </div>
@@ -163,7 +148,7 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave }) => {
           <input
             type="email"
             value={formData.email || ''}
-            onChange={(e) => handleChange('email', e.target.value)}
+            onChange={function(e) { handleChange('email', e.target.value); }}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -173,7 +158,7 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave }) => {
           <input
             type="tel"
             value={formData.telefono || ''}
-            onChange={(e) => handleChange('telefono', e.target.value)}
+            onChange={function(e) { handleChange('telefono', e.target.value); }}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -203,24 +188,32 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave }) => {
   );
 };
 
-// ============================================
-// CHANGE PASSWORD MODAL
-// ============================================
-const ChangePasswordModal = ({ isOpen, onClose }) => {
-  const [formData, setFormData] = useState({
+// ════════════════════════════════════════════════════════════════════════════
+// MODAL CAMBIAR CONTRASEÑA
+// ════════════════════════════════════════════════════════════════════════════
+var ChangePasswordModal = function(props) {
+  var isOpen = props.isOpen;
+  var onClose = props.onClose;
+  var onSubmit = props.onSubmit;
+  var loading = props.loading;
+  
+  var _a = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  }), formData = _a[0], setFormData = _a[1];
+  var _b = useState(''), error = _b[0], setError = _b[1];
 
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  var handleChange = function(field, value) {
+    setFormData(function(prev) { 
+      var updated = Object.assign({}, prev);
+      updated[field] = value;
+      return updated;
+    });
     setError('');
   };
 
-  const handleSubmit = async () => {
+  var handleSubmit = function() {
     if (formData.newPassword !== formData.confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
@@ -229,12 +222,15 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
       setError('La contraseña debe tener al menos 8 caracteres');
       return;
     }
-
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setLoading(false);
-    onClose();
+    onSubmit(formData);
   };
+
+  useEffect(function() {
+    if (isOpen) {
+      setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setError('');
+    }
+  }, [isOpen]);
 
   return (
     <Modal
@@ -257,7 +253,7 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
           <input
             type="password"
             value={formData.currentPassword}
-            onChange={(e) => handleChange('currentPassword', e.target.value)}
+            onChange={function(e) { handleChange('currentPassword', e.target.value); }}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -267,7 +263,7 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
           <input
             type="password"
             value={formData.newPassword}
-            onChange={(e) => handleChange('newPassword', e.target.value)}
+            onChange={function(e) { handleChange('newPassword', e.target.value); }}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -277,7 +273,7 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
           <input
             type="password"
             value={formData.confirmPassword}
-            onChange={(e) => handleChange('confirmPassword', e.target.value)}
+            onChange={function(e) { handleChange('confirmPassword', e.target.value); }}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
@@ -300,77 +296,175 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
   );
 };
 
-// ============================================
-// INFO CARD
-// ============================================
-const InfoCard = ({ title, icon: Icon, children, action }) => (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-      <div className="flex items-center gap-2">
-        {Icon && <Icon className="w-5 h-5 text-slate-500" />}
-        <h3 className="font-semibold text-slate-800">{title}</h3>
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTES AUXILIARES
+// ════════════════════════════════════════════════════════════════════════════
+
+var InfoCard = function(props) {
+  var title = props.title;
+  var Icon = props.icon;
+  var children = props.children;
+  var action = props.action;
+  
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="w-5 h-5 text-slate-500" />}
+          <h3 className="font-semibold text-slate-800">{title}</h3>
+        </div>
+        {action}
       </div>
-      {action}
+      <div className="p-5">{children}</div>
     </div>
-    <div className="p-5">{children}</div>
-  </div>
-);
+  );
+};
 
-// ============================================
-// STAT CARD MINI
-// ============================================
-const StatCardMini = ({ icon: Icon, label, value, color }) => (
-  <div className="text-center p-4 bg-slate-50 rounded-xl">
-    <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center mx-auto mb-2`}>
-      <Icon className="w-5 h-5 text-white" />
+var StatCardMini = function(props) {
+  var Icon = props.icon;
+  var label = props.label;
+  var value = props.value;
+  var color = props.color;
+  
+  return (
+    <div className="text-center p-4 bg-slate-50 rounded-xl">
+      <div className={'w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2 ' + color}>
+        <Icon className="w-5 h-5 text-white" />
+      </div>
+      <p className="text-xl font-bold text-slate-800">{value}</p>
+      <p className="text-xs text-slate-500">{label}</p>
     </div>
-    <p className="text-xl font-bold text-slate-800">{value}</p>
-    <p className="text-xs text-slate-500">{label}</p>
-  </div>
-);
+  );
+};
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
-const PerfilUsuario = () => {
-  const navigate = useNavigate();
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
+var PerfilUsuario = function() {
+  var navigate = useNavigate();
+  var authHook = useAuth();
+  var user = authHook.user;
+  var permissions = authHook.permissions;
+  var logout = authHook.logout;
+  var updateProfile = authHook.updateProfile;
+  var notif = useNotification();
+  var success = notif.success;
+  var apiError = notif.apiError;
 
-  const [usuario, setUsuario] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('info');
+  // ──────────────────────────────────────────────────────────────────────────
+  // ESTADOS
+  // ──────────────────────────────────────────────────────────────────────────
+  var _a = useState(null), permisos = _a[0], setPermisos = _a[1];
+  var _b = useState([]), actividad = _b[0], setActividad = _b[1];
+  var _c = useState(null), estadisticas = _c[0], setEstadisticas = _c[1];
+  var _d = useState(true), loading = _d[0], setLoading = _d[1];
+  var _e = useState('info'), activeTab = _e[0], setActiveTab = _e[1];
   
   // Modals
-  const [editModal, setEditModal] = useState(false);
-  const [passwordModal, setPasswordModal] = useState(false);
+  var _f = useState(false), editModal = _f[0], setEditModal = _f[1];
+  var _g = useState(false), passwordModal = _g[0], setPasswordModal = _g[1];
+  var _h = useState(false), formLoading = _h[0], setFormLoading = _h[1];
 
-  useEffect(() => {
-    const fetchData = async () => {
+  // ──────────────────────────────────────────────────────────────────────────
+  // CARGAR DATOS ADICIONALES
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(function() {
+    var fetchData = async function() {
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
-      setUsuario(MOCK_USUARIO);
-      setLoading(false);
+      try {
+        // Cargar permisos detallados
+        if (usuarioService.getPermisos) {
+          var permisosData = await usuarioService.getPermisos();
+          setPermisos(permisosData);
+        } else {
+          // Usar permisos del contexto
+          setPermisos(permissions);
+        }
+        
+        // Cargar actividad reciente
+        if (usuarioService.getActividad) {
+          var actividadData = await usuarioService.getActividad();
+          setActividad(actividadData);
+        }
+        
+        // Cargar estadísticas
+        if (usuarioService.getEstadisticas) {
+          var statsData = await usuarioService.getEstadisticas();
+          setEstadisticas(statsData);
+        }
+      } catch (err) {
+        console.error('Error cargando datos de perfil:', err);
+      } finally {
+        setLoading(false);
+      }
     };
-    fetchData();
-  }, []);
+    
+    if (user) {
+      fetchData();
+    }
+  }, [user, permissions]);
 
-  const handleSaveProfile = (data) => {
-    setUsuario(data);
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var handleSaveProfile = async function(data) {
+    setFormLoading(true);
+    try {
+      if (updateProfile) {
+        await updateProfile(data);
+      } else if (usuarioService.updateProfile) {
+        await usuarioService.updateProfile(data);
+      }
+      success('Perfil actualizado correctamente');
+      setEditModal(false);
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const calcularAntiguedad = (fechaIngreso) => {
-    const ingreso = new Date(fechaIngreso);
-    const hoy = new Date();
-    const diff = hoy - ingreso;
-    const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
-    const months = Math.floor((diff % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000));
+  var handleChangePassword = async function(data) {
+    setFormLoading(true);
+    try {
+      await authService.changePassword({
+        password_actual: data.currentPassword,
+        password_nuevo: data.newPassword,
+      });
+      success('Contraseña actualizada correctamente');
+      setPasswordModal(false);
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  var handleLogout = function() {
+    logout();
+    navigate('/login');
+  };
+
+  var calcularAntiguedad = function(fechaIngreso) {
+    if (!fechaIngreso) return '-';
+    var ingreso = new Date(fechaIngreso);
+    var hoy = new Date();
+    var diff = hoy - ingreso;
+    var years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+    var months = Math.floor((diff % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000));
     
     if (years > 0) {
-      return `${years} año${years > 1 ? 's' : ''}, ${months} mes${months > 1 ? 'es' : ''}`;
+      return years + ' año' + (years > 1 ? 's' : '') + ', ' + months + ' mes' + (months > 1 ? 'es' : '');
     }
-    return `${months} mes${months > 1 ? 'es' : ''}`;
+    return months + ' mes' + (months > 1 ? 'es' : '');
   };
 
-  if (loading) {
+  // ──────────────────────────────────────────────────────────────────────────
+  // LOADING STATE
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  if (loading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <FloatingHeader />
@@ -387,24 +481,51 @@ const PerfilUsuario = () => {
     );
   }
 
-  const tabs = [
+  // ──────────────────────────────────────────────────────────────────────────
+  // VARIABLES DERIVADAS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var tabs = [
     { id: 'info', label: 'Información' },
     { id: 'permisos', label: 'Permisos' },
     { id: 'actividad', label: 'Actividad' },
   ];
 
+  // Permisos formateados para tabla
+  var permisosTabla = permisos && Array.isArray(permisos) ? permisos : [
+    { modulo: 'Dashboard', ver: true, crear: true, editar: true, eliminar: true },
+    { modulo: 'Clientes', ver: true, crear: true, editar: true, eliminar: user.rol === 'admin' },
+    { modulo: 'Inventario', ver: true, crear: true, editar: true, eliminar: user.rol === 'admin' },
+    { modulo: 'Despachos', ver: true, crear: true, editar: true, eliminar: user.rol === 'admin' },
+    { modulo: 'Reportes', ver: true, crear: true, editar: false, eliminar: false },
+  ];
+
+  // Estadísticas con fallback
+  var stats = estadisticas || {
+    despachosCreados: 0,
+    clientesGestionados: 0,
+    reportesGenerados: 0,
+    diasActivo: Math.floor((new Date() - new Date(user.fecha_ingreso || user.created_at || Date.now())) / (1000 * 60 * 60 * 24)),
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────────────────
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <FloatingHeader />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* Header Card */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* HEADER CARD */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center gap-6">
             {/* Avatar */}
             <div className="relative">
               <div className="w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                {usuario.nombre[0]}{usuario.apellido[0]}
+                {(user.nombre || 'U')[0]}{(user.apellido || '')[0]}
               </div>
               <button className="absolute -bottom-2 -right-2 p-2 bg-white rounded-xl shadow-md hover:bg-slate-50 transition-colors">
                 <Camera className="w-4 h-4 text-slate-500" />
@@ -415,68 +536,74 @@ const PerfilUsuario = () => {
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
                 <h1 className="text-2xl font-bold text-slate-800">
-                  {usuario.nombre} {usuario.apellido}
+                  {user.nombre} {user.apellido}
                 </h1>
-                <StatusChip status={usuario.estado} />
+                <StatusChip status={user.estado || 'activo'} />
               </div>
-              <p className="text-slate-500 mb-2">{usuario.cargo}</p>
+              <p className="text-slate-500 mb-2">{user.cargo || 'Usuario'}</p>
               <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
                 <span className="flex items-center gap-1">
                   <Mail className="w-4 h-4" />
-                  {usuario.email}
+                  {user.email}
                 </span>
-                <span className="flex items-center gap-1">
-                  <Phone className="w-4 h-4" />
-                  {usuario.telefono}
-                </span>
+                {user.telefono && (
+                  <span className="flex items-center gap-1">
+                    <Phone className="w-4 h-4" />
+                    {user.telefono}
+                  </span>
+                )}
                 <span className="flex items-center gap-1">
                   <Shield className="w-4 h-4" />
-                  {usuario.rol}
+                  {user.rol || 'Usuario'}
                 </span>
               </div>
             </div>
 
             {/* Actions */}
             <div className="flex items-center gap-2">
-              <Button variant="outline" icon={Key} onClick={() => setPasswordModal(true)}>
+              <Button variant="outline" icon={Key} onClick={function() { setPasswordModal(true); }}>
                 Cambiar Contraseña
               </Button>
-              <Button variant="primary" icon={Pencil} onClick={() => setEditModal(true)}>
+              <Button variant="primary" icon={Pencil} onClick={function() { setEditModal(true); }}>
                 Editar Perfil
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Stats Row */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* STATS ROW */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <StatCardMini 
             icon={Activity} 
             label="Despachos Creados" 
-            value={MOCK_ESTADISTICAS.despachosCreados} 
+            value={stats.despachosCreados || 0} 
             color="bg-blue-500"
           />
           <StatCardMini 
             icon={User} 
             label="Clientes Gestionados" 
-            value={MOCK_ESTADISTICAS.clientesGestionados} 
+            value={stats.clientesGestionados || 0} 
             color="bg-emerald-500"
           />
           <StatCardMini 
             icon={FileText} 
             label="Reportes Generados" 
-            value={MOCK_ESTADISTICAS.reportesGenerados} 
+            value={stats.reportesGenerados || 0} 
             color="bg-violet-500"
           />
           <StatCardMini 
             icon={Award} 
             label="Días Activo" 
-            value={MOCK_ESTADISTICAS.diasActivo} 
+            value={stats.diasActivo || 0} 
             color="bg-amber-500"
           />
         </div>
 
-        {/* Main Grid */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* MAIN GRID */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2">
@@ -484,21 +611,23 @@ const PerfilUsuario = () => {
               {/* Tabs */}
               <div className="border-b border-gray-100">
                 <nav className="flex px-6">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`
-                        py-4 px-4 text-sm font-medium transition-colors relative
-                        ${activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'}
-                      `}
-                    >
-                      {tab.label}
-                      {activeTab === tab.id && (
-                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
-                      )}
-                    </button>
-                  ))}
+                  {tabs.map(function(tab) {
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={function() { setActiveTab(tab.id); }}
+                        className={
+                          'py-4 px-4 text-sm font-medium transition-colors relative ' +
+                          (activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700')
+                        }
+                      >
+                        {tab.label}
+                        {activeTab === tab.id && (
+                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </nav>
               </div>
 
@@ -513,21 +642,21 @@ const PerfilUsuario = () => {
                           <User className="w-5 h-5 text-slate-400" />
                           <div>
                             <p className="text-slate-500">Nombre Completo</p>
-                            <p className="font-medium text-slate-800">{usuario.nombre} {usuario.apellido}</p>
+                            <p className="font-medium text-slate-800">{user.nombre} {user.apellido}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Mail className="w-5 h-5 text-slate-400" />
                           <div>
                             <p className="text-slate-500">Correo Electrónico</p>
-                            <p className="font-medium text-slate-800">{usuario.email}</p>
+                            <p className="font-medium text-slate-800">{user.email}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Phone className="w-5 h-5 text-slate-400" />
                           <div>
                             <p className="text-slate-500">Teléfono</p>
-                            <p className="font-medium text-slate-800">{usuario.telefono}</p>
+                            <p className="font-medium text-slate-800">{user.telefono || '-'}</p>
                           </div>
                         </div>
                       </div>
@@ -540,23 +669,30 @@ const PerfilUsuario = () => {
                           <Building2 className="w-5 h-5 text-slate-400" />
                           <div>
                             <p className="text-slate-500">Departamento</p>
-                            <p className="font-medium text-slate-800">{usuario.departamento}</p>
+                            <p className="font-medium text-slate-800">{user.departamento || 'ISTHO S.A.S'}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <MapPin className="w-5 h-5 text-slate-400" />
                           <div>
                             <p className="text-slate-500">Sede</p>
-                            <p className="font-medium text-slate-800">{usuario.sede}</p>
-                            <p className="text-xs text-slate-400">{usuario.ciudad}</p>
+                            <p className="font-medium text-slate-800">{user.sede || 'Centro Logístico Industrial del Norte'}</p>
+                            <p className="text-xs text-slate-400">{user.ciudad || 'Girardota, Antioquia'}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Calendar className="w-5 h-5 text-slate-400" />
                           <div>
                             <p className="text-slate-500">Fecha de Ingreso</p>
-                            <p className="font-medium text-slate-800">{usuario.fechaIngreso}</p>
-                            <p className="text-xs text-emerald-600">Antigüedad: {calcularAntiguedad(usuario.fechaIngreso)}</p>
+                            <p className="font-medium text-slate-800">
+                              {user.fecha_ingreso || user.created_at 
+                                ? new Date(user.fecha_ingreso || user.created_at).toLocaleDateString('es-CO')
+                                : '-'
+                              }
+                            </p>
+                            <p className="text-xs text-emerald-600">
+                              Antigüedad: {calcularAntiguedad(user.fecha_ingreso || user.created_at)}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -571,8 +707,8 @@ const PerfilUsuario = () => {
                       <div className="flex items-center gap-2">
                         <Shield className="w-5 h-5 text-slate-500" />
                         <span className="text-sm text-slate-500">Rol actual:</span>
-                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
-                          {usuario.rol}
+                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-sm font-medium capitalize">
+                          {user.rol || 'Usuario'}
                         </span>
                       </div>
                     </div>
@@ -589,41 +725,43 @@ const PerfilUsuario = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {MOCK_PERMISOS.map((permiso, idx) => (
-                            <tr key={idx} className="border-b border-gray-50">
-                              <td className="py-3 px-4 text-sm font-medium text-slate-800">
-                                {permiso.modulo}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {permiso.ver ? (
-                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {permiso.crear ? (
-                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {permiso.editar ? (
-                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {permiso.eliminar ? (
-                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                          {permisosTabla.map(function(permiso, idx) {
+                            return (
+                              <tr key={idx} className="border-b border-gray-50">
+                                <td className="py-3 px-4 text-sm font-medium text-slate-800">
+                                  {permiso.modulo}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {permiso.ver ? (
+                                    <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                  ) : (
+                                    <X className="w-5 h-5 text-slate-300 mx-auto" />
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {permiso.crear ? (
+                                    <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                  ) : (
+                                    <X className="w-5 h-5 text-slate-300 mx-auto" />
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {permiso.editar ? (
+                                    <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                  ) : (
+                                    <X className="w-5 h-5 text-slate-300 mx-auto" />
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {permiso.eliminar ? (
+                                    <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                  ) : (
+                                    <X className="w-5 h-5 text-slate-300 mx-auto" />
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -633,30 +771,39 @@ const PerfilUsuario = () => {
                 {/* Tab: Actividad */}
                 {activeTab === 'actividad' && (
                   <div className="space-y-4">
-                    {MOCK_ACTIVIDAD.map((item) => (
-                      <div key={item.id} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl">
-                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                          <Activity className="w-5 h-5 text-slate-500" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-800">{item.accion}</p>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {item.fecha}
-                            </span>
-                            {item.modulo && (
-                              <span className="px-2 py-0.5 bg-slate-200 rounded-full">
-                                {item.modulo}
-                              </span>
-                            )}
-                            {item.ip && (
-                              <span>IP: {item.ip}</span>
-                            )}
-                          </div>
-                        </div>
+                    {actividad.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <Activity className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-500">No hay actividad reciente</p>
                       </div>
-                    ))}
+                    ) : (
+                      actividad.map(function(item) {
+                        return (
+                          <div key={item.id} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl">
+                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                              <Activity className="w-5 h-5 text-slate-500" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-slate-800">{item.accion || item.descripcion}</p>
+                              <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {new Date(item.fecha || item.created_at).toLocaleString('es-CO')}
+                                </span>
+                                {item.modulo && (
+                                  <span className="px-2 py-0.5 bg-slate-200 rounded-full">
+                                    {item.modulo}
+                                  </span>
+                                )}
+                                {item.ip && (
+                                  <span>IP: {item.ip}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 )}
               </div>
@@ -677,15 +824,20 @@ const PerfilUsuario = () => {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Último acceso</span>
-                  <span className="text-slate-800">{usuario.ultimoAcceso}</span>
+                  <span className="text-slate-800">
+                    {user.ultimo_acceso 
+                      ? new Date(user.ultimo_acceso).toLocaleString('es-CO')
+                      : 'Ahora'
+                    }
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">ID Usuario</span>
-                  <span className="text-slate-800 font-mono">{usuario.id}</span>
+                  <span className="text-slate-800 font-mono">{user.id || '-'}</span>
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <Button variant="outline" icon={LogOut} fullWidth>
+                <Button variant="outline" icon={LogOut} fullWidth onClick={handleLogout}>
                   Cerrar Sesión
                 </Button>
               </div>
@@ -697,7 +849,13 @@ const PerfilUsuario = () => {
                 <Button variant="ghost" icon={Bell} fullWidth className="justify-start">
                   Configurar Notificaciones
                 </Button>
-                <Button variant="ghost" icon={Key} fullWidth className="justify-start" onClick={() => setPasswordModal(true)}>
+                <Button 
+                  variant="ghost" 
+                  icon={Key} 
+                  fullWidth 
+                  className="justify-start" 
+                  onClick={function() { setPasswordModal(true); }}
+                >
                   Cambiar Contraseña
                 </Button>
                 <Button variant="ghost" icon={Shield} fullWidth className="justify-start">
@@ -718,19 +876,31 @@ const PerfilUsuario = () => {
             </div>
           </div>
         </div>
+
+        {/* Footer */}
+        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
+          © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
+          Centro Logístico Industrial del Norte, Girardota, Antioquia
+        </footer>
       </main>
 
-      {/* Modals */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* MODALS */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      
       <EditProfileModal
         isOpen={editModal}
-        onClose={() => setEditModal(false)}
-        usuario={usuario}
+        onClose={function() { setEditModal(false); }}
+        usuario={user}
         onSave={handleSaveProfile}
+        loading={formLoading}
       />
 
       <ChangePasswordModal
         isOpen={passwordModal}
-        onClose={() => setPasswordModal(false)}
+        onClose={function() { setPasswordModal(false); }}
+        onSubmit={handleChangePassword}
+        loading={formLoading}
       />
     </div>
   );

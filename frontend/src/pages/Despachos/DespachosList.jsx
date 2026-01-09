@@ -1,12 +1,22 @@
 /**
- * ISTHO CRM - DespachosList Page
- * Listado de despachos con búsqueda, filtros y paginación
+ * ============================================================================
+ * ISTHO CRM - DespachosList (Fase 5 - Integración Completa)
+ * ============================================================================
+ * Listado de despachos conectado al backend real.
+ * 
+ * CAMBIOS vs versión anterior:
+ * - Eliminado MOCK_DESPACHOS
+ * - Conectado con useDespachos hook
+ * - CRUD real de despachos
+ * - Estados y cancelaciones conectados a API
+ * - Control de permisos con ProtectedAction
  * 
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Enero 2026
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -23,7 +33,7 @@ import {
   Package,
   CheckCircle,
   XCircle,
-  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 
 // Layout
@@ -43,21 +53,17 @@ import {
 // Local Components
 import DespachoForm from './components/DespachoForm';
 
-// ============================================
-// DATOS MOCK
-// ============================================
-const MOCK_DESPACHOS = [
-  { id: 'DSP-001', clienteId: 'CLI-001', cliente: 'Lácteos Betania S.A.S', destino: 'Medellín, Antioquia', direccion: 'Cra 45 #78-90, Zona Industrial', vehiculo: 'ABC-123', conductor: 'Juan Pérez', fechaProgramada: '2026-01-08', horaEstimada: '14:00', estado: 'en_transito', prioridad: 'alta', productos: 3, unidades: 450, fechaSalida: '2026-01-08 08:30' },
-  { id: 'DSP-002', clienteId: 'CLI-002', cliente: 'Almacenes Éxito S.A', destino: 'Bogotá, Cundinamarca', direccion: 'Av 68 #22-15, Centro de Distribución', vehiculo: 'DEF-456', conductor: 'Carlos García', fechaProgramada: '2026-01-08', horaEstimada: '16:00', estado: 'completado', prioridad: 'normal', productos: 5, unidades: 1200, fechaSalida: '2026-01-08 06:00', fechaEntrega: '2026-01-08 15:45' },
-  { id: 'DSP-003', clienteId: 'CLI-003', cliente: 'Eternit Colombia S.A', destino: 'Cali, Valle del Cauca', direccion: 'Zona Franca del Pacífico, Bod 15', vehiculo: 'JKL-012', conductor: 'Pedro Martínez', fechaProgramada: '2026-01-09', horaEstimada: '10:00', estado: 'programado', prioridad: 'normal', productos: 2, unidades: 850 },
-  { id: 'DSP-004', clienteId: 'CLI-004', cliente: 'Prodenvases S.A.S', destino: 'Barranquilla, Atlántico', direccion: 'Vía 40 #85-55, Zona Industrial', vehiculo: 'DEF-456', conductor: 'Carlos García', fechaProgramada: '2026-01-08', horaEstimada: '18:00', estado: 'en_transito', prioridad: 'urgente', productos: 4, unidades: 2000, fechaSalida: '2026-01-08 10:15' },
-  { id: 'DSP-005', clienteId: 'CLI-005', cliente: 'Klar Colombia S.A.S', destino: 'Cartagena, Bolívar', direccion: 'Mamonal Km 5, Parque Industrial', vehiculo: 'GHI-789', conductor: 'María López', fechaProgramada: '2026-01-07', horaEstimada: '12:00', estado: 'completado', prioridad: 'alta', productos: 1, unidades: 320, fechaSalida: '2026-01-07 05:00', fechaEntrega: '2026-01-07 11:30' },
-  { id: 'DSP-006', clienteId: 'CLI-001', cliente: 'Lácteos Betania S.A.S', destino: 'Pereira, Risaralda', direccion: 'Zona Industrial La Popa, Bod 8', vehiculo: null, conductor: null, fechaProgramada: '2026-01-10', horaEstimada: '09:00', estado: 'programado', prioridad: 'normal', productos: 3, unidades: 680 },
-  { id: 'DSP-007', clienteId: 'CLI-002', cliente: 'Almacenes Éxito S.A', destino: 'Bucaramanga, Santander', direccion: 'Av Quebrada Seca #35-20', vehiculo: 'ABC-123', conductor: 'Juan Pérez', fechaProgramada: '2026-01-08', horaEstimada: '15:00', estado: 'en_preparacion', prioridad: 'normal', productos: 6, unidades: 1500 },
-  { id: 'DSP-008', clienteId: 'CLI-003', cliente: 'Eternit Colombia S.A', destino: 'Medellín, Antioquia', direccion: 'Cra 52 #10-30, Guayabal', vehiculo: null, conductor: null, fechaProgramada: '2026-01-06', horaEstimada: '14:00', estado: 'cancelado', prioridad: 'baja', productos: 1, unidades: 100, motivoCancelacion: 'Solicitud del cliente' },
-];
+// ════════════════════════════════════════════════════════════════════════════
+// HOOKS INTEGRADOS
+// ════════════════════════════════════════════════════════════════════════════
+import useDespachos from '../../hooks/useDespachos';
+import useNotification from '../../hooks/useNotification';
+import { useAuth } from '../../context/AuthContext';
+import { ProtectedAction } from '../../components/auth/PrivateRoute';
 
-// Opciones de filtros
+// ════════════════════════════════════════════════════════════════════════════
+// OPCIONES DE FILTROS
+// ════════════════════════════════════════════════════════════════════════════
 const FILTER_OPTIONS = {
   estado: [
     { value: 'programado', label: 'Programado' },
@@ -80,36 +86,40 @@ const FILTER_OPTIONS = {
   ],
 };
 
-// ============================================
-// PRIORITY BADGE
-// ============================================
-const PriorityBadge = ({ prioridad }) => {
-  const config = {
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTES INTERNOS
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Badge de prioridad
+ */
+const PriorityBadge = function({ prioridad }) {
+  var config = {
     urgente: { color: 'bg-red-100 text-red-700', label: 'Urgente' },
     alta: { color: 'bg-orange-100 text-orange-700', label: 'Alta' },
     normal: { color: 'bg-slate-100 text-slate-700', label: 'Normal' },
     baja: { color: 'bg-slate-100 text-slate-500', label: 'Baja' },
   };
 
-  const { color, label } = config[prioridad] || config.normal;
+  var c = config[prioridad] || config.normal;
 
   return (
-    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${color}`}>
-      {label}
+    <span className={'px-2 py-0.5 text-xs font-medium rounded-full ' + c.color}>
+      {c.label}
     </span>
   );
 };
 
-// ============================================
-// ROW ACTIONS
-// ============================================
-const RowActions = ({ despacho, onView, onEdit, onDelete, onCancel }) => {
-  const [isOpen, setIsOpen] = useState(false);
+/**
+ * Menú de acciones por fila
+ */
+const RowActions = function({ despacho, onView, onEdit, onDelete, onCancel, canEdit, canDelete }) {
+  var _a = useState(false), isOpen = _a[0], setIsOpen = _a[1];
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={function() { setIsOpen(!isOpen); }}
         className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
       >
         <MoreVertical className="w-4 h-4" />
@@ -117,19 +127,19 @@ const RowActions = ({ despacho, onView, onEdit, onDelete, onCancel }) => {
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="fixed inset-0 z-10" onClick={function() { setIsOpen(false); }} />
           <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20">
             <button
-              onClick={() => { onView(despacho); setIsOpen(false); }}
+              onClick={function() { onView(despacho); setIsOpen(false); }}
               className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
               <Eye className="w-4 h-4" />
               Ver detalle
             </button>
-            {despacho.estado !== 'completado' && despacho.estado !== 'cancelado' && (
+            {despacho.estado !== 'completado' && despacho.estado !== 'cancelado' && canEdit && (
               <>
                 <button
-                  onClick={() => { onEdit(despacho); setIsOpen(false); }}
+                  onClick={function() { onEdit(despacho); setIsOpen(false); }}
                   className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
                   <Pencil className="w-4 h-4" />
@@ -137,7 +147,7 @@ const RowActions = ({ despacho, onView, onEdit, onDelete, onCancel }) => {
                 </button>
                 <div className="border-t border-gray-100 my-1" />
                 <button
-                  onClick={() => { onCancel(despacho); setIsOpen(false); }}
+                  onClick={function() { onCancel(despacho); setIsOpen(false); }}
                   className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                 >
                   <XCircle className="w-4 h-4" />
@@ -145,9 +155,9 @@ const RowActions = ({ despacho, onView, onEdit, onDelete, onCancel }) => {
                 </button>
               </>
             )}
-            {despacho.estado === 'cancelado' && (
+            {despacho.estado === 'cancelado' && canDelete && (
               <button
-                onClick={() => { onDelete(despacho); setIsOpen(false); }}
+                onClick={function() { onDelete(despacho); setIsOpen(false); }}
                 className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
               >
                 <Trash2 className="w-4 h-4" />
@@ -161,11 +171,11 @@ const RowActions = ({ despacho, onView, onEdit, onDelete, onCancel }) => {
   );
 };
 
-// ============================================
-// DESPACHO CARD (Vista alternativa)
-// ============================================
-const DespachoCard = ({ despacho, onView, onEdit }) => {
-  const estadoIcon = {
+/**
+ * Tarjeta de despacho (vista alternativa)
+ */
+const DespachoCard = function({ despacho, onView, onEdit }) {
+  var estadoIcon = {
     programado: Calendar,
     en_preparacion: Package,
     en_transito: Truck,
@@ -173,11 +183,11 @@ const DespachoCard = ({ despacho, onView, onEdit }) => {
     cancelado: XCircle,
   };
 
-  const Icon = estadoIcon[despacho.estado] || Truck;
+  var Icon = estadoIcon[despacho.estado] || Truck;
 
   return (
     <div 
-      onClick={() => onView(despacho)}
+      onClick={function() { onView(despacho); }}
       className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer"
     >
       <div className="flex items-start justify-between mb-3">
@@ -186,8 +196,8 @@ const DespachoCard = ({ despacho, onView, onEdit }) => {
             <Icon className="w-5 h-5 text-slate-600" />
           </div>
           <div>
-            <p className="font-semibold text-slate-800">{despacho.id}</p>
-            <p className="text-sm text-slate-500">{despacho.cliente}</p>
+            <p className="font-semibold text-slate-800">{despacho.numero || despacho.id}</p>
+            <p className="text-sm text-slate-500">{despacho.cliente_nombre || despacho.cliente}</p>
           </div>
         </div>
         <PriorityBadge prioridad={despacho.prioridad} />
@@ -196,15 +206,15 @@ const DespachoCard = ({ despacho, onView, onEdit }) => {
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <MapPin className="w-4 h-4 text-slate-400" />
-          {despacho.destino}
+          {despacho.destino || despacho.ciudad_destino || '-'}
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <Calendar className="w-4 h-4 text-slate-400" />
-          {despacho.fechaProgramada} • {despacho.horaEstimada}
+          {despacho.fecha_programada || despacho.fechaProgramada} • {despacho.hora_estimada || despacho.horaEstimada || '--:--'}
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <Package className="w-4 h-4 text-slate-400" />
-          {despacho.productos} productos • {despacho.unidades.toLocaleString()} unidades
+          {despacho.total_productos || despacho.productos || 0} productos • {(despacho.total_unidades || despacho.unidades || 0).toLocaleString()} unidades
         </div>
       </div>
 
@@ -220,173 +230,201 @@ const DespachoCard = ({ despacho, onView, onEdit }) => {
   );
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
-const DespachosList = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
+const DespachosList = function() {
+  var navigate = useNavigate();
+  var searchParamsHook = useSearchParams();
+  var searchParams = searchParamsHook[0];
+  var authHook = useAuth();
+  var user = authHook.user;
+  var hasPermission = authHook.hasPermission;
+  var notif = useNotification();
+  var success = notif.success;
+  var apiError = notif.apiError;
+  var saved = notif.saved;
+  var deleted = notif.deleted;
 
-  // Estados
-  const [despachos, setDespachos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({});
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('table'); // 'table' | 'cards'
+  // ──────────────────────────────────────────────────────────────────────────
+  // HOOK DE DESPACHOS
+  // ──────────────────────────────────────────────────────────────────────────
+  var despachosHook = useDespachos({ 
+    autoFetch: true,
+    // Si es cliente, filtrar por su cliente_id
+    initialFilters: user && user.rol === 'cliente' ? { cliente_id: user.cliente_id } : {},
+  });
+  
+  var despachos = despachosHook.despachos;
+  var loading = despachosHook.loading;
+  var error = despachosHook.error;
+  var pagination = despachosHook.pagination;
+  var kpis = despachosHook.kpis;
+  var isRefreshing = despachosHook.isRefreshing;
+  var refresh = despachosHook.refresh;
+  var search = despachosHook.search;
+  var applyFilters = despachosHook.applyFilters;
+  var goToPage = despachosHook.goToPage;
+  var createDespacho = despachosHook.createDespacho;
+  var updateDespacho = despachosHook.updateDespacho;
+  var deleteDespacho = despachosHook.deleteDespacho;
+  var cancelarDespacho = despachosHook.cancelarDespacho;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // ESTADOS LOCALES
+  // ──────────────────────────────────────────────────────────────────────────
+  var _a = useState(''), searchTerm = _a[0], setSearchTerm = _a[1];
+  var _b = useState({}), filters = _b[0], setFilters = _b[1];
+  var _c = useState(false), showFilters = _c[0], setShowFilters = _c[1];
+  var _d = useState('table'), viewMode = _d[0], setViewMode = _d[1];
   
   // Modals
-  const [formModal, setFormModal] = useState({ isOpen: false, despacho: null });
-  const [cancelModal, setCancelModal] = useState({ isOpen: false, despacho: null });
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, despacho: null });
-  const [formLoading, setFormLoading] = useState(false);
+  var _e = useState({ isOpen: false, despacho: null }), formModal = _e[0], setFormModal = _e[1];
+  var _f = useState({ isOpen: false, despacho: null }), cancelModal = _f[0], setCancelModal = _f[1];
+  var _g = useState({ isOpen: false, despacho: null }), deleteModal = _g[0], setDeleteModal = _g[1];
+  var _h = useState(false), formLoading = _h[0], setFormLoading = _h[1];
 
-  const itemsPerPage = 8;
+  // Permisos
+  var canCreate = hasPermission('despachos', 'crear');
+  var canEdit = hasPermission('despachos', 'editar');
+  var canDelete = hasPermission('despachos', 'eliminar');
+  var canExport = hasPermission('despachos', 'exportar');
 
-  // Aplicar filtro de URL
-  useEffect(() => {
-    const filterParam = searchParams.get('filter');
+  // ──────────────────────────────────────────────────────────────────────────
+  // APLICAR FILTRO DE URL
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(function() {
+    var filterParam = searchParams.get('filter');
     if (filterParam === 'programados') {
       setFilters({ estado: 'programado' });
+      applyFilters({ estado: 'programado' });
     } else if (filterParam === 'completados') {
       setFilters({ estado: 'completado' });
+      applyFilters({ estado: 'completado' });
+    } else if (filterParam === 'en_transito') {
+      setFilters({ estado: 'en_transito' });
+      applyFilters({ estado: 'en_transito' });
     }
-  }, [searchParams]);
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cargar datos
-  useEffect(() => {
-    const fetchDespachos = async () => {
-      setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
-      setDespachos(MOCK_DESPACHOS);
-      setLoading(false);
-    };
-    fetchDespachos();
-  }, []);
-
-  // KPIs calculados
-  const kpis = useMemo(() => {
-    const hoy = new Date().toISOString().split('T')[0];
-    const enTransito = despachos.filter(d => d.estado === 'en_transito').length;
-    const programadosHoy = despachos.filter(d => d.estado === 'programado' && d.fechaProgramada === hoy).length;
-    const completadosHoy = despachos.filter(d => d.estado === 'completado' && d.fechaEntrega?.startsWith(hoy)).length;
-    const pendientes = despachos.filter(d => ['programado', 'en_preparacion'].includes(d.estado)).length;
-    
-    return { enTransito, programadosHoy, completadosHoy, pendientes };
-  }, [despachos]);
-
-  // Filtrar despachos
-  const filteredDespachos = useMemo(() => {
-    return despachos.filter((despacho) => {
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
-        const matchSearch = 
-          despacho.id.toLowerCase().includes(search) ||
-          despacho.cliente.toLowerCase().includes(search) ||
-          despacho.destino.toLowerCase().includes(search);
-        if (!matchSearch) return false;
-      }
-
-      if (filters.estado && despacho.estado !== filters.estado) return false;
-      if (filters.prioridad && despacho.prioridad !== filters.prioridad) return false;
-
-      return true;
-    });
-  }, [despachos, searchTerm, filters]);
-
-  // Paginar
-  const paginatedDespachos = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredDespachos.slice(start, start + itemsPerPage);
-  }, [filteredDespachos, currentPage]);
-
-  const totalPages = Math.ceil(filteredDespachos.length / itemsPerPage);
-
-  // Handlers
-  const handleSearch = (value) => {
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var handleSearch = function(value) {
     setSearchTerm(value);
-    setCurrentPage(1);
+    search(value);
   };
 
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
-    setCurrentPage(1);
+  var handleFilterChange = function(key, value) {
+    var newFilters = Object.assign({}, filters);
+    if (value) {
+      newFilters[key] = value;
+    } else {
+      delete newFilters[key];
+    }
+    setFilters(newFilters);
+    applyFilters(newFilters);
   };
 
-  const handleClearFilters = () => {
+  var handleClearFilters = function() {
     setFilters({});
     setSearchTerm('');
-    setCurrentPage(1);
+    applyFilters({});
+    search('');
   };
 
-  const handleCreate = () => {
+  var handleCreate = function() {
     setFormModal({ isOpen: true, despacho: null });
   };
 
-  const handleEdit = (despacho) => {
-    setFormModal({ isOpen: true, despacho });
+  var handleEdit = function(despacho) {
+    setFormModal({ isOpen: true, despacho: despacho });
   };
 
-  const handleView = (despacho) => {
-    navigate(`/despachos/${despacho.id}`);
+  var handleView = function(despacho) {
+    navigate('/despachos/' + (despacho.id || despacho.numero));
   };
 
-  const handleCancel = (despacho) => {
-    setCancelModal({ isOpen: true, despacho });
+  var handleCancel = function(despacho) {
+    setCancelModal({ isOpen: true, despacho: despacho });
   };
 
-  const handleDelete = (despacho) => {
-    setDeleteModal({ isOpen: true, despacho });
+  var handleDelete = function(despacho) {
+    setDeleteModal({ isOpen: true, despacho: despacho });
   };
 
-  const handleFormSubmit = async (data) => {
+  var handleFormSubmit = async function(data) {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    
-    if (formModal.despacho) {
-      setDespachos((prev) =>
-        prev.map((d) => (d.id === formModal.despacho.id ? { ...d, ...data } : d))
-      );
-    } else {
-      const newDespacho = {
-        ...data,
-        id: `DSP-${String(despachos.length + 1).padStart(3, '0')}`,
-        cliente: data.clienteNombre || 'Cliente',
-        productos: data.productos?.length || 0,
-        unidades: data.productos?.reduce((sum, p) => sum + p.cantidad, 0) || 0,
-      };
-      setDespachos((prev) => [newDespacho, ...prev]);
+    try {
+      if (formModal.despacho) {
+        await updateDespacho(formModal.despacho.id, data);
+        saved('Despacho');
+      } else {
+        await createDespacho(data);
+        saved('Despacho');
+      }
+      setFormModal({ isOpen: false, despacho: null });
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
     }
-
-    setFormLoading(false);
-    setFormModal({ isOpen: false, despacho: null });
   };
 
-  const handleConfirmCancel = async () => {
+  var handleConfirmCancel = async function() {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setDespachos((prev) =>
-      prev.map((d) => (d.id === cancelModal.despacho.id ? { ...d, estado: 'cancelado' } : d))
-    );
-    setFormLoading(false);
-    setCancelModal({ isOpen: false, despacho: null });
+    try {
+      await cancelarDespacho(cancelModal.despacho.id, {
+        motivo: 'Cancelado por usuario',
+      });
+      success('Despacho cancelado correctamente');
+      setCancelModal({ isOpen: false, despacho: null });
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleConfirmDelete = async () => {
+  var handleConfirmDelete = async function() {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setDespachos((prev) => prev.filter((d) => d.id !== deleteModal.despacho.id));
-    setFormLoading(false);
-    setDeleteModal({ isOpen: false, despacho: null });
+    try {
+      await deleteDespacho(deleteModal.despacho.id);
+      deleted('Despacho');
+      setDeleteModal({ isOpen: false, despacho: null });
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // KPIs LOCALES (fallback si API no provee)
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var displayKpis = kpis || {
+    enTransito: despachos.filter(function(d) { return d.estado === 'en_transito'; }).length,
+    programadosHoy: despachos.filter(function(d) { return d.estado === 'programado'; }).length,
+    completadosHoy: despachos.filter(function(d) { return d.estado === 'completado'; }).length,
+    pendientes: despachos.filter(function(d) { 
+      return d.estado === 'programado' || d.estado === 'en_preparacion'; 
+    }).length,
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────────────────
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader notificationCount={kpis.pendientes} />
+      <FloatingHeader notificationCount={displayKpis.pendientes} />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* Page Header */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* PAGE HEADER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">Despachos</h1>
@@ -396,48 +434,71 @@ const DespachosList = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" icon={Download} size="md">
-              Exportar
-            </Button>
-            <Button variant="primary" icon={Plus} onClick={handleCreate}>
-              Nuevo Despacho
-            </Button>
+            <Button 
+              variant="ghost" 
+              icon={RefreshCw} 
+              onClick={refresh}
+              loading={isRefreshing}
+              title="Actualizar datos"
+            />
+            
+            <ProtectedAction module="despachos" action="exportar">
+              <Button variant="outline" icon={Download} size="md">
+                Exportar
+              </Button>
+            </ProtectedAction>
+            
+            <ProtectedAction module="despachos" action="crear">
+              <Button variant="primary" icon={Plus} onClick={handleCreate}>
+                Nuevo Despacho
+              </Button>
+            </ProtectedAction>
           </div>
         </div>
 
+        {/* ════════════════════════════════════════════════════════════════ */}
         {/* KPIs */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <KpiCard
             title="En Tránsito"
-            value={kpis.enTransito}
+            value={displayKpis.enTransito}
             icon={Truck}
             iconBg="bg-blue-100"
             iconColor="text-blue-600"
+            onClick={function() { handleFilterChange('estado', 'en_transito'); }}
+            className="cursor-pointer hover:shadow-md transition-shadow"
           />
           <KpiCard
             title="Programados Hoy"
-            value={kpis.programadosHoy}
+            value={displayKpis.programadosHoy}
             icon={Calendar}
             iconBg="bg-amber-100"
             iconColor="text-amber-600"
+            onClick={function() { handleFilterChange('estado', 'programado'); }}
+            className="cursor-pointer hover:shadow-md transition-shadow"
           />
           <KpiCard
             title="Completados Hoy"
-            value={kpis.completadosHoy}
+            value={displayKpis.completadosHoy}
             icon={CheckCircle}
             iconBg="bg-emerald-100"
             iconColor="text-emerald-600"
+            onClick={function() { handleFilterChange('estado', 'completado'); }}
+            className="cursor-pointer hover:shadow-md transition-shadow"
           />
           <KpiCard
             title="Pendientes"
-            value={kpis.pendientes}
+            value={displayKpis.pendientes}
             icon={Clock}
             iconBg="bg-violet-100"
             iconColor="text-violet-600"
           />
         </div>
 
-        {/* Search & Filters Bar */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* SEARCH & FILTERS */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
@@ -445,7 +506,7 @@ const DespachosList = () => {
                 placeholder="Buscar por ID, cliente o destino..."
                 value={searchTerm}
                 onChange={handleSearch}
-                onClear={() => handleSearch('')}
+                onClear={function() { handleSearch(''); }}
               />
             </div>
 
@@ -453,14 +514,14 @@ const DespachosList = () => {
               {/* View Toggle */}
               <div className="flex bg-slate-100 rounded-lg p-1">
                 <button
-                  onClick={() => setViewMode('table')}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${viewMode === 'table' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+                  onClick={function() { setViewMode('table'); }}
+                  className={'px-3 py-1.5 text-sm rounded-md transition-colors ' + (viewMode === 'table' ? 'bg-white shadow text-slate-800' : 'text-slate-500')}
                 >
                   Tabla
                 </button>
                 <button
-                  onClick={() => setViewMode('cards')}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${viewMode === 'cards' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+                  onClick={function() { setViewMode('cards'); }}
+                  className={'px-3 py-1.5 text-sm rounded-md transition-colors ' + (viewMode === 'cards' ? 'bg-white shadow text-slate-800' : 'text-slate-500')}
                 >
                   Tarjetas
                 </button>
@@ -469,7 +530,7 @@ const DespachosList = () => {
               <Button
                 variant={showFilters ? 'secondary' : 'outline'}
                 icon={Filter}
-                onClick={() => setShowFilters(!showFilters)}
+                onClick={function() { setShowFilters(!showFilters); }}
               >
                 Filtros
                 {Object.keys(filters).length > 0 && (
@@ -488,21 +549,21 @@ const DespachosList = () => {
                   label="Estado"
                   options={FILTER_OPTIONS.estado}
                   value={filters.estado}
-                  onChange={(v) => handleFilterChange('estado', v)}
+                  onChange={function(v) { handleFilterChange('estado', v); }}
                   placeholder="Todos los estados"
                 />
                 <FilterDropdown
                   label="Prioridad"
                   options={FILTER_OPTIONS.prioridad}
                   value={filters.prioridad}
-                  onChange={(v) => handleFilterChange('prioridad', v)}
+                  onChange={function(v) { handleFilterChange('prioridad', v); }}
                   placeholder="Todas las prioridades"
                 />
                 <FilterDropdown
                   label="Fecha"
                   options={FILTER_OPTIONS.fecha}
                   value={filters.fecha}
-                  onChange={(v) => handleFilterChange('fecha', v)}
+                  onChange={function(v) { handleFilterChange('fecha', v); }}
                   placeholder="Todas las fechas"
                 />
               </div>
@@ -518,28 +579,34 @@ const DespachosList = () => {
           )}
         </div>
 
-        {/* Results Count */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* RESULTS COUNT */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="mb-4">
           <p className="text-sm text-slate-500">
-            {filteredDespachos.length} despacho{filteredDespachos.length !== 1 && 's'} encontrado{filteredDespachos.length !== 1 && 's'}
+            {pagination ? pagination.total : despachos.length} despacho{(pagination ? pagination.total : despachos.length) !== 1 ? 's' : ''} encontrado{(pagination ? pagination.total : despachos.length) !== 1 ? 's' : ''}
           </p>
         </div>
 
-        {/* Content */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* CONTENT */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         {loading ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50 animate-pulse">
-                <div className="w-10 h-10 bg-gray-200 rounded-lg" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-1/3" />
-                  <div className="h-3 bg-gray-100 rounded w-1/4" />
+            {[0, 1, 2, 3, 4].map(function(i) {
+              return (
+                <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50 animate-pulse">
+                  <div className="w-10 h-10 bg-gray-200 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-1/3" />
+                    <div className="h-3 bg-gray-100 rounded w-1/4" />
+                  </div>
+                  <div className="h-6 w-20 bg-gray-200 rounded-full" />
                 </div>
-                <div className="h-6 w-20 bg-gray-200 rounded-full" />
-              </div>
-            ))}
+              );
+            })}
           </div>
-        ) : paginatedDespachos.length === 0 ? (
+        ) : despachos.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 py-16 text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Truck className="w-8 h-8 text-slate-400" />
@@ -552,7 +619,7 @@ const DespachosList = () => {
                 ? 'Intenta ajustar los filtros de búsqueda'
                 : 'Comienza creando tu primer despacho'}
             </p>
-            {!searchTerm && Object.keys(filters).length === 0 && (
+            {!searchTerm && Object.keys(filters).length === 0 && canCreate && (
               <Button variant="primary" icon={Plus} onClick={handleCreate}>
                 Nuevo Despacho
               </Button>
@@ -561,14 +628,16 @@ const DespachosList = () => {
         ) : viewMode === 'cards' ? (
           // Cards View
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedDespachos.map((despacho) => (
-              <DespachoCard
-                key={despacho.id}
-                despacho={despacho}
-                onView={handleView}
-                onEdit={handleEdit}
-              />
-            ))}
+            {despachos.map(function(despacho) {
+              return (
+                <DespachoCard
+                  key={despacho.id}
+                  despacho={despacho}
+                  onView={handleView}
+                  onEdit={handleEdit}
+                />
+              );
+            })}
           </div>
         ) : (
           // Table View
@@ -601,92 +670,96 @@ const DespachosList = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedDespachos.map((despacho) => (
-                    <tr
-                      key={despacho.id}
-                      className="border-b border-gray-50 hover:bg-slate-50 transition-colors"
-                    >
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                            <Truck className="w-5 h-5 text-slate-500" />
+                  {despachos.map(function(despacho) {
+                    return (
+                      <tr
+                        key={despacho.id}
+                        className="border-b border-gray-50 hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                              <Truck className="w-5 h-5 text-slate-500" />
+                            </div>
+                            <div>
+                              <p 
+                                className="text-sm font-semibold text-slate-800 hover:text-orange-600 cursor-pointer"
+                                onClick={function() { handleView(despacho); }}
+                              >
+                                {despacho.numero || despacho.id}
+                              </p>
+                              {despacho.vehiculo && (
+                                <p className="text-xs text-slate-500">🚚 {despacho.vehiculo}</p>
+                              )}
+                            </div>
                           </div>
+                        </td>
+                        <td className="py-4 px-4">
                           <div>
-                            <p 
-                              className="text-sm font-semibold text-slate-800 hover:text-orange-600 cursor-pointer"
-                              onClick={() => handleView(despacho)}
-                            >
-                              {despacho.id}
+                            <p className="text-sm font-medium text-slate-800">{despacho.cliente_nombre || despacho.cliente}</p>
+                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {despacho.destino || despacho.ciudad_destino || '-'}
                             </p>
-                            {despacho.vehiculo && (
-                              <p className="text-xs text-slate-500">🚚 {despacho.vehiculo}</p>
-                            )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">{despacho.cliente}</p>
-                          <p className="text-xs text-slate-500 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {despacho.destino}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <div>
-                          <p className="text-sm text-slate-800">{despacho.fechaProgramada}</p>
-                          <p className="text-xs text-slate-500">{despacho.horaEstimada}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">{despacho.productos}</p>
-                          <p className="text-xs text-slate-500">{despacho.unidades.toLocaleString()} uds</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <PriorityBadge prioridad={despacho.prioridad} />
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <StatusChip status={despacho.estado} />
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <RowActions
-                          despacho={despacho}
-                          onView={handleView}
-                          onEdit={handleEdit}
-                          onCancel={handleCancel}
-                          onDelete={handleDelete}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <div>
+                            <p className="text-sm text-slate-800">{despacho.fecha_programada || despacho.fechaProgramada || '-'}</p>
+                            <p className="text-xs text-slate-500">{despacho.hora_estimada || despacho.horaEstimada || '--:--'}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <div>
+                            <p className="text-sm font-medium text-slate-800">{despacho.total_productos || despacho.productos || 0}</p>
+                            <p className="text-xs text-slate-500">{(despacho.total_unidades || despacho.unidades || 0).toLocaleString()} uds</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <PriorityBadge prioridad={despacho.prioridad} />
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <StatusChip status={despacho.estado} />
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <RowActions
+                            despacho={despacho}
+                            onView={handleView}
+                            onEdit={handleEdit}
+                            onCancel={handleCancel}
+                            onDelete={handleDelete}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            {totalPages > 1 && (
+            {pagination && pagination.totalPages > 1 && (
               <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                totalItems={filteredDespachos.length}
-                itemsPerPage={itemsPerPage}
-                onPageChange={setCurrentPage}
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.total}
+                itemsPerPage={pagination.limit}
+                onPageChange={goToPage}
               />
             )}
           </div>
         )}
 
         {/* Pagination for Cards */}
-        {viewMode === 'cards' && totalPages > 1 && (
+        {viewMode === 'cards' && pagination && pagination.totalPages > 1 && (
           <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100">
             <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={filteredDespachos.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              itemsPerPage={pagination.limit}
+              onPageChange={goToPage}
             />
           </div>
         )}
@@ -698,10 +771,13 @@ const DespachosList = () => {
         </footer>
       </main>
 
-      {/* Modals */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* MODALS */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      
       <DespachoForm
         isOpen={formModal.isOpen}
-        onClose={() => setFormModal({ isOpen: false, despacho: null })}
+        onClose={function() { setFormModal({ isOpen: false, despacho: null }); }}
         onSubmit={handleFormSubmit}
         despacho={formModal.despacho}
         loading={formLoading}
@@ -709,10 +785,10 @@ const DespachosList = () => {
 
       <ConfirmDialog
         isOpen={cancelModal.isOpen}
-        onClose={() => setCancelModal({ isOpen: false, despacho: null })}
+        onClose={function() { setCancelModal({ isOpen: false, despacho: null }); }}
         onConfirm={handleConfirmCancel}
         title="Cancelar Despacho"
-        message={`¿Estás seguro de cancelar el despacho "${cancelModal.despacho?.id}"? Esta acción notificará al cliente.`}
+        message={'¿Estás seguro de cancelar el despacho "' + (cancelModal.despacho ? (cancelModal.despacho.numero || cancelModal.despacho.id) : '') + '"? Esta acción notificará al cliente.'}
         confirmText="Cancelar Despacho"
         type="warning"
         loading={formLoading}
@@ -720,10 +796,10 @@ const DespachosList = () => {
 
       <ConfirmDialog
         isOpen={deleteModal.isOpen}
-        onClose={() => setDeleteModal({ isOpen: false, despacho: null })}
+        onClose={function() { setDeleteModal({ isOpen: false, despacho: null }); }}
         onConfirm={handleConfirmDelete}
         title="Eliminar Despacho"
-        message={`¿Eliminar permanentemente "${deleteModal.despacho?.id}"? Esta acción no se puede deshacer.`}
+        message={'¿Eliminar permanentemente "' + (deleteModal.despacho ? (deleteModal.despacho.numero || deleteModal.despacho.id) : '') + '"? Esta acción no se puede deshacer.'}
         confirmText="Eliminar"
         type="danger"
         loading={formLoading}

@@ -1,12 +1,22 @@
 /**
- * ISTHO CRM - ProductoDetail Page
- * Vista de detalle completa del producto
+ * ============================================================================
+ * ISTHO CRM - ProductoDetail (Fase 5 - Integración Completa)
+ * ============================================================================
+ * Vista de detalle del producto conectada al backend real.
+ * 
+ * CAMBIOS vs versión anterior:
+ * - Eliminados MOCK_PRODUCTO, MOCK_MOVIMIENTOS, MOCK_ESTADISTICAS
+ * - Conectado con useInventario hook
+ * - Movimientos reales desde API
+ * - Estadísticas calculadas desde backend
+ * - Control de permisos
  * 
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Enero 2026
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -27,6 +37,7 @@ import {
   AlertTriangle,
   Warehouse,
   FileText,
+  RefreshCw,
 } from 'lucide-react';
 
 // Layout
@@ -42,62 +53,30 @@ import { BarChart } from '../../components/charts';
 import ProductoForm from './components/ProductoForm';
 import MovimientoForm from './components/MovimientoForm';
 
-// ============================================
-// DATOS MOCK
-// ============================================
-const MOCK_PRODUCTO = {
-  id: 'PRD-001',
-  codigo: 'SKU-LCH-001',
-  nombre: 'Leche UHT x24',
-  descripcion: 'Caja de 24 unidades de leche UHT entera, larga vida. Presentación tetrapack 1 litro.',
-  categoria: 'lacteos',
-  clientePropietario: 'CLI-001',
-  clienteNombre: 'Lácteos Betania S.A.S',
-  bodega: 'BOD-01',
-  bodegaNombre: 'Área 01 - Refrigerados',
-  ubicacion: 'A-01-03',
-  lote: 'LOT-2026-001',
-  fechaVencimiento: '2026-06-15',
-  stockActual: 12500,
-  stockMinimo: 1000,
-  stockMaximo: 20000,
-  unidadMedida: 'caja',
-  costoUnitario: 48000,
-  precioVenta: 58000,
-  estado: 'disponible',
-  fechaCreacion: '2024-03-15',
-  ultimoMovimiento: '2026-01-08',
-};
+// ════════════════════════════════════════════════════════════════════════════
+// HOOKS INTEGRADOS
+// ════════════════════════════════════════════════════════════════════════════
+import useInventario from '../../hooks/useInventario';
+import useNotification from '../../hooks/useNotification';
+import { useAuth } from '../../context/AuthContext';
 
-const MOCK_MOVIMIENTOS = [
-  { id: 1, tipo: 'salida', cantidad: 450, motivo: 'Despacho a cliente', documento: 'DSP-001', fecha: '2026-01-08 14:30', responsable: 'María López', stockResultante: 12500 },
-  { id: 2, tipo: 'entrada', cantidad: 2000, motivo: 'Recepción de proveedor', documento: 'OC-2026-045', fecha: '2026-01-07 09:15', responsable: 'Carlos Martínez', stockResultante: 12950 },
-  { id: 3, tipo: 'salida', cantidad: 320, motivo: 'Despacho a cliente', documento: 'DSP-002', fecha: '2026-01-06 16:00', responsable: 'María López', stockResultante: 10950 },
-  { id: 4, tipo: 'salida', cantidad: 180, motivo: 'Despacho a cliente', documento: 'DSP-003', fecha: '2026-01-05 11:20', responsable: 'Juan Pérez', stockResultante: 11270 },
-  { id: 5, tipo: 'entrada', cantidad: 1500, motivo: 'Recepción de proveedor', documento: 'OC-2026-042', fecha: '2026-01-04 08:00', responsable: 'Carlos Martínez', stockResultante: 11450 },
-  { id: 6, tipo: 'salida', cantidad: 550, motivo: 'Despacho a cliente', documento: 'DSP-004', fecha: '2026-01-03 15:45', responsable: 'María López', stockResultante: 9950 },
-  { id: 7, tipo: 'ajuste', cantidad: -25, motivo: 'Ajuste por merma', documento: 'AJ-001', fecha: '2026-01-02 10:00', responsable: 'Supervisor', stockResultante: 10500 },
-  { id: 8, tipo: 'entrada', cantidad: 3000, motivo: 'Recepción de proveedor', documento: 'OC-2026-038', fecha: '2026-01-01 09:30', responsable: 'Carlos Martínez', stockResultante: 10525 },
-];
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTES INTERNOS
+// ════════════════════════════════════════════════════════════════════════════
 
-const MOCK_ESTADISTICAS = [
-  { label: 'Ago', value1: 4500, value2: 3200 },
-  { label: 'Sep', value1: 5200, value2: 4800 },
-  { label: 'Oct', value1: 4800, value2: 4200 },
-  { label: 'Nov', value1: 6100, value2: 5500 },
-  { label: 'Dic', value1: 7200, value2: 6800 },
-  { label: 'Ene', value1: 3500, value2: 1500 },
-];
-
-// ============================================
-// STOCK GAUGE COMPONENT
-// ============================================
-const StockGauge = ({ actual, minimo, maximo }) => {
-  const porcentaje = maximo > 0 ? (actual / maximo) * 100 : 0;
-  const minimoPos = maximo > 0 ? (minimo / maximo) * 100 : 0;
+/**
+ * Gauge de stock visual
+ */
+var StockGauge = function(props) {
+  var actual = props.actual;
+  var minimo = props.minimo;
+  var maximo = props.maximo;
   
-  let statusColor = 'bg-emerald-500';
-  let statusText = 'Óptimo';
+  var porcentaje = maximo > 0 ? (actual / maximo) * 100 : 0;
+  var minimoPos = maximo > 0 ? (minimo / maximo) * 100 : 0;
+  
+  var statusColor = 'bg-emerald-500';
+  var statusText = 'Óptimo';
   
   if (actual === 0) {
     statusColor = 'bg-red-500';
@@ -115,28 +94,25 @@ const StockGauge = ({ actual, minimo, maximo }) => {
       <h3 className="text-lg font-semibold text-slate-800 mb-4">Nivel de Stock</h3>
       
       <div className="relative h-8 bg-slate-100 rounded-full overflow-hidden mb-4">
-        {/* Zona de stock mínimo */}
         <div 
           className="absolute top-0 bottom-0 left-0 bg-red-100 opacity-50"
-          style={{ width: `${minimoPos}%` }}
+          style={{ width: minimoPos + '%' }}
         />
         
-        {/* Barra de stock actual */}
         <div 
-          className={`absolute top-0 bottom-0 left-0 ${statusColor} transition-all duration-500 rounded-full`}
-          style={{ width: `${Math.min(porcentaje, 100)}%` }}
+          className={'absolute top-0 bottom-0 left-0 transition-all duration-500 rounded-full ' + statusColor}
+          style={{ width: Math.min(porcentaje, 100) + '%' }}
         />
         
-        {/* Indicador de mínimo */}
         <div 
           className="absolute top-0 bottom-0 w-0.5 bg-red-500"
-          style={{ left: `${minimoPos}%` }}
+          style={{ left: minimoPos + '%' }}
         />
       </div>
 
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
-          <span className={`w-3 h-3 rounded-full ${statusColor}`} />
+          <span className={'w-3 h-3 rounded-full ' + statusColor} />
           <span className="font-medium text-slate-700">{statusText}</span>
         </div>
         <span className="text-slate-500">
@@ -162,14 +138,16 @@ const StockGauge = ({ actual, minimo, maximo }) => {
   );
 };
 
-// ============================================
-// MOVIMIENTO ITEM COMPONENT
-// ============================================
-const MovimientoItem = ({ movimiento }) => {
-  const isEntrada = movimiento.tipo === 'entrada';
-  const isAjuste = movimiento.tipo === 'ajuste';
+/**
+ * Item de movimiento
+ */
+var MovimientoItem = function(props) {
+  var movimiento = props.movimiento;
   
-  let iconConfig = {
+  var isEntrada = movimiento.tipo === 'entrada';
+  var isAjuste = movimiento.tipo === 'ajuste';
+  
+  var iconConfig = {
     icon: PackageMinus,
     bg: 'bg-red-100',
     color: 'text-red-600',
@@ -192,30 +170,30 @@ const MovimientoItem = ({ movimiento }) => {
     };
   }
 
-  const Icon = iconConfig.icon;
+  var Icon = iconConfig.icon;
 
   return (
     <div className="flex items-start gap-4 py-4 border-b border-gray-100 last:border-0">
-      <div className={`w-10 h-10 ${iconConfig.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-        <Icon className={`w-5 h-5 ${iconConfig.color}`} />
+      <div className={'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ' + iconConfig.bg}>
+        <Icon className={'w-5 h-5 ' + iconConfig.color} />
       </div>
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className={`text-sm font-semibold ${isEntrada ? 'text-emerald-600' : isAjuste ? 'text-amber-600' : 'text-red-600'}`}>
-                {isEntrada ? '+' : ''}{movimiento.cantidad.toLocaleString()}
+              <span className={'text-sm font-semibold ' + (isEntrada ? 'text-emerald-600' : isAjuste ? 'text-amber-600' : 'text-red-600')}>
+                {isEntrada ? '+' : ''}{(movimiento.cantidad || 0).toLocaleString()}
               </span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                 {iconConfig.label}
               </span>
             </div>
-            <p className="text-sm text-slate-600 mt-0.5">{movimiento.motivo}</p>
+            <p className="text-sm text-slate-600 mt-0.5">{movimiento.motivo || movimiento.descripcion || '-'}</p>
           </div>
           <div className="text-right">
             <p className="text-sm font-medium text-slate-800">
-              Stock: {movimiento.stockResultante.toLocaleString()}
+              Stock: {(movimiento.stock_resultante || movimiento.stockResultante || 0).toLocaleString()}
             </p>
           </div>
         </div>
@@ -223,109 +201,136 @@ const MovimientoItem = ({ movimiento }) => {
         <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            {movimiento.fecha}
+            {new Date(movimiento.fecha || movimiento.created_at).toLocaleString('es-CO')}
           </span>
           <span className="flex items-center gap-1">
             <FileText className="w-3 h-3" />
-            {movimiento.documento}
+            {movimiento.documento_referencia || movimiento.documento || 'N/A'}
           </span>
-          <span>{movimiento.responsable}</span>
+          <span>{movimiento.usuario_nombre || movimiento.responsable || 'Sistema'}</span>
         </div>
       </div>
     </div>
   );
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
-const ProductoDetail = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
+var ProductoDetail = function() {
+  var params = useParams();
+  var id = params.id;
+  var navigate = useNavigate();
+  var authHook = useAuth();
+  var hasPermission = authHook.hasPermission;
+  var notif = useNotification();
+  var success = notif.success;
+  var apiError = notif.apiError;
+  var saved = notif.saved;
+  var deleted = notif.deleted;
 
-  // Estados
-  const [producto, setProducto] = useState(null);
-  const [movimientos, setMovimientos] = useState([]);
-  const [estadisticas, setEstadisticas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('info');
+  // ──────────────────────────────────────────────────────────────────────────
+  // HOOK DE INVENTARIO
+  // ──────────────────────────────────────────────────────────────────────────
+  var inventarioHook = useInventario({ autoFetch: false });
+  
+  var currentProducto = inventarioHook.currentProducto;
+  var loading = inventarioHook.loading;
+  var error = inventarioHook.error;
+  var movimientos = inventarioHook.movimientos;
+  var loadingMovimientos = inventarioHook.loadingMovimientos;
+  var estadisticas = inventarioHook.estadisticas;
+  var fetchById = inventarioHook.fetchById;
+  var fetchMovimientos = inventarioHook.fetchMovimientos;
+  var fetchEstadisticas = inventarioHook.fetchEstadisticas;
+  var updateProducto = inventarioHook.updateProducto;
+  var deleteProducto = inventarioHook.deleteProducto;
+  var registrarMovimiento = inventarioHook.registrarMovimiento;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // ESTADOS LOCALES
+  // ──────────────────────────────────────────────────────────────────────────
+  var _a = useState('info'), activeTab = _a[0], setActiveTab = _a[1];
 
   // Modals
-  const [editModal, setEditModal] = useState(false);
-  const [deleteModal, setDeleteModal] = useState(false);
-  const [movimientoModal, setMovimientoModal] = useState({ isOpen: false, tipo: 'entrada' });
-  const [formLoading, setFormLoading] = useState(false);
+  var _b = useState(false), editModal = _b[0], setEditModal = _b[1];
+  var _c = useState(false), deleteModal = _c[0], setDeleteModal = _c[1];
+  var _d = useState({ isOpen: false, tipo: 'entrada' }), movimientoModal = _d[0], setMovimientoModal = _d[1];
+  var _e = useState(false), formLoading = _e[0], setFormLoading = _e[1];
 
-  // Cargar datos
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
-      setProducto(MOCK_PRODUCTO);
-      setMovimientos(MOCK_MOVIMIENTOS);
-      setEstadisticas(MOCK_ESTADISTICAS);
-      setLoading(false);
-    };
-    fetchData();
-  }, [id]);
+  // Permisos
+  var canEdit = hasPermission('inventario', 'editar');
+  var canDelete = hasPermission('inventario', 'eliminar');
 
-  // Handlers
-  const handleEditProducto = async (data) => {
+  // ──────────────────────────────────────────────────────────────────────────
+  // CARGAR DATOS
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(function() {
+    if (id) {
+      fetchById(id);
+      fetchMovimientos(id);
+      fetchEstadisticas(id);
+    }
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var handleEditProducto = async function(data) {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setProducto((prev) => ({ ...prev, ...data }));
-    setFormLoading(false);
-    setEditModal(false);
+    try {
+      await updateProducto(id, data);
+      saved('Producto');
+      setEditModal(false);
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleDeleteProducto = async () => {
+  var handleDeleteProducto = async function() {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setFormLoading(false);
-    setDeleteModal(false);
-    navigate('/inventario');
+    try {
+      await deleteProducto(id);
+      deleted('Producto');
+      navigate('/inventario');
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleMovimientoSubmit = async (data) => {
+  var handleMovimientoSubmit = async function(data) {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    
-    const isEntrada = data.tipo === 'entrada';
-    const nuevoStock = isEntrada 
-      ? producto.stockActual + data.cantidad 
-      : producto.stockActual - data.cantidad;
-
-    // Agregar movimiento
-    const nuevoMovimiento = {
-      id: Date.now(),
-      tipo: data.tipo,
-      cantidad: data.cantidad,
-      motivo: data.motivo,
-      documento: data.documento || 'N/A',
-      fecha: new Date().toLocaleString('es-CO'),
-      responsable: data.responsable || 'Usuario',
-      stockResultante: nuevoStock,
-    };
-
-    setMovimientos((prev) => [nuevoMovimiento, ...prev]);
-    
-    // Actualizar producto
-    let nuevoEstado = 'disponible';
-    if (nuevoStock === 0) nuevoEstado = 'agotado';
-    else if (nuevoStock <= producto.stockMinimo) nuevoEstado = 'bajo_stock';
-
-    setProducto((prev) => ({
-      ...prev,
-      stockActual: nuevoStock,
-      estado: nuevoEstado,
-      ultimoMovimiento: new Date().toISOString().split('T')[0],
-    }));
-
-    setFormLoading(false);
-    setMovimientoModal({ isOpen: false, tipo: 'entrada' });
+    try {
+      await registrarMovimiento(id, {
+        tipo: movimientoModal.tipo,
+        cantidad: data.cantidad,
+        motivo: data.motivo,
+        documento_referencia: data.documento,
+        observaciones: data.observaciones,
+      });
+      success('Movimiento de ' + movimientoModal.tipo + ' registrado correctamente');
+      setMovimientoModal({ isOpen: false, tipo: 'entrada' });
+      // Refrescar datos
+      fetchById(id);
+      fetchMovimientos(id);
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const formatCurrency = (value) => {
+  // ──────────────────────────────────────────────────────────────────────────
+  // FORMATTERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var formatCurrency = function(value) {
+    if (!value) return '$0';
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
@@ -333,14 +338,10 @@ const ProductoDetail = () => {
     }).format(value);
   };
 
-  // Calcular KPIs
-  const kpis = {
-    valorStock: producto ? producto.stockActual * producto.costoUnitario : 0,
-    entradasMes: movimientos.filter(m => m.tipo === 'entrada').reduce((sum, m) => sum + m.cantidad, 0),
-    salidasMes: movimientos.filter(m => m.tipo === 'salida').reduce((sum, m) => sum + m.cantidad, 0),
-    rotacion: producto ? (movimientos.filter(m => m.tipo === 'salida').reduce((sum, m) => sum + m.cantidad, 0) / producto.stockActual * 100).toFixed(1) : 0,
-  };
-
+  // ──────────────────────────────────────────────────────────────────────────
+  // LOADING STATE
+  // ──────────────────────────────────────────────────────────────────────────
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -349,9 +350,9 @@ const ProductoDetail = () => {
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-48" />
             <div className="grid grid-cols-4 gap-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-32 bg-gray-200 rounded-2xl" />
-              ))}
+              {[0, 1, 2, 3].map(function(i) {
+                return <div key={i} className="h-32 bg-gray-200 rounded-2xl" />;
+              })}
             </div>
             <div className="h-96 bg-gray-200 rounded-2xl" />
           </div>
@@ -360,22 +361,83 @@ const ProductoDetail = () => {
     );
   }
 
-  const tabs = [
+  // ──────────────────────────────────────────────────────────────────────────
+  // ERROR STATE
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  if (error || !currentProducto) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <FloatingHeader />
+        <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Producto no encontrado</h2>
+            <p className="text-slate-500 mb-4">{error || 'El producto solicitado no existe'}</p>
+            <Button variant="primary" onClick={function() { navigate('/inventario'); }}>
+              Volver a Inventario
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // VARIABLES CALCULADAS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var producto = currentProducto;
+  
+  // KPIs calculados desde movimientos
+  var kpis = useMemo(function() {
+    var entradas = movimientos.filter(function(m) { return m.tipo === 'entrada'; });
+    var salidas = movimientos.filter(function(m) { return m.tipo === 'salida'; });
+    
+    var entradasMes = entradas.reduce(function(sum, m) { return sum + (m.cantidad || 0); }, 0);
+    var salidasMes = salidas.reduce(function(sum, m) { return sum + Math.abs(m.cantidad || 0); }, 0);
+    var stockActual = producto.stock_actual || producto.stockActual || 0;
+    var costoUnitario = producto.costo_unitario || producto.costoUnitario || 0;
+    
+    return {
+      valorStock: stockActual * costoUnitario,
+      entradasMes: entradasMes,
+      salidasMes: salidasMes,
+      rotacion: stockActual > 0 ? ((salidasMes / stockActual) * 100).toFixed(1) : '0',
+    };
+  }, [movimientos, producto]);
+
+  // Datos para gráfico (usar estadísticas de API o calcular)
+  var chartData = estadisticas || [];
+
+  var tabs = [
     { id: 'info', label: 'Información' },
-    { id: 'movimientos', label: `Movimientos (${movimientos.length})` },
+    { id: 'movimientos', label: 'Movimientos (' + movimientos.length + ')' },
     { id: 'estadisticas', label: 'Estadísticas' },
   ];
 
+  var stockActual = producto.stock_actual || producto.stockActual || 0;
+  var stockMinimo = producto.stock_minimo || producto.stockMinimo || 0;
+  var stockMaximo = producto.stock_maximo || producto.stockMaximo || stockMinimo * 20;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────────────────
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <FloatingHeader />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* Back & Header */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* HEADER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/inventario')}
+              onClick={function() { navigate('/inventario'); }}
               className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -389,37 +451,47 @@ const ProductoDetail = () => {
                   <h1 className="text-2xl font-bold text-slate-800">{producto.nombre}</h1>
                   <StatusChip status={producto.estado} />
                 </div>
-                <p className="text-slate-500">{producto.codigo} • {producto.clienteNombre}</p>
+                <p className="text-slate-500">
+                  {producto.codigo || producto.sku} • {producto.cliente_nombre || producto.clienteNombre}
+                </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button 
-              variant="success" 
-              icon={PackagePlus}
-              onClick={() => setMovimientoModal({ isOpen: true, tipo: 'entrada' })}
-            >
-              Entrada
-            </Button>
-            <Button 
-              variant="outline" 
-              icon={PackageMinus}
-              onClick={() => setMovimientoModal({ isOpen: true, tipo: 'salida' })}
-              disabled={producto.stockActual === 0}
-            >
-              Salida
-            </Button>
-            <Button variant="outline" icon={Pencil} onClick={() => setEditModal(true)}>
-              Editar
-            </Button>
-            <Button variant="danger" icon={Trash2} onClick={() => setDeleteModal(true)}>
-              Eliminar
-            </Button>
+            {canEdit && (
+              <>
+                <Button 
+                  variant="success" 
+                  icon={PackagePlus}
+                  onClick={function() { setMovimientoModal({ isOpen: true, tipo: 'entrada' }); }}
+                >
+                  Entrada
+                </Button>
+                <Button 
+                  variant="outline" 
+                  icon={PackageMinus}
+                  onClick={function() { setMovimientoModal({ isOpen: true, tipo: 'salida' }); }}
+                  disabled={stockActual === 0}
+                >
+                  Salida
+                </Button>
+                <Button variant="outline" icon={Pencil} onClick={function() { setEditModal(true); }}>
+                  Editar
+                </Button>
+              </>
+            )}
+            {canDelete && (
+              <Button variant="danger" icon={Trash2} onClick={function() { setDeleteModal(true); }}>
+                Eliminar
+              </Button>
+            )}
           </div>
         </div>
 
+        {/* ════════════════════════════════════════════════════════════════ */}
         {/* KPIs */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <KpiCard
             title="Valor en Stock"
@@ -430,35 +502,37 @@ const ProductoDetail = () => {
           />
           <KpiCard
             title="Entradas del Mes"
-            value={`+${kpis.entradasMes.toLocaleString()}`}
+            value={'+' + kpis.entradasMes.toLocaleString()}
             icon={TrendingUp}
             iconBg="bg-blue-100"
             iconColor="text-blue-600"
           />
           <KpiCard
             title="Salidas del Mes"
-            value={`-${kpis.salidasMes.toLocaleString()}`}
+            value={'-' + kpis.salidasMes.toLocaleString()}
             icon={TrendingDown}
             iconBg="bg-red-100"
             iconColor="text-red-600"
           />
           <KpiCard
             title="Rotación"
-            value={`${kpis.rotacion}%`}
+            value={kpis.rotacion + '%'}
             icon={Layers}
             iconBg="bg-violet-100"
             iconColor="text-violet-600"
           />
         </div>
 
-        {/* Main Content */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* MAIN CONTENT */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Stock Gauge */}
           <div className="lg:col-span-1">
             <StockGauge 
-              actual={producto.stockActual}
-              minimo={producto.stockMinimo}
-              maximo={producto.stockMaximo}
+              actual={stockActual}
+              minimo={stockMinimo}
+              maximo={stockMaximo}
             />
 
             {/* Alerta si stock bajo */}
@@ -494,24 +568,25 @@ const ProductoDetail = () => {
           {/* Right Column - Tabs */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-              {/* Tabs */}
               <div className="border-b border-gray-100">
                 <nav className="flex px-6">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`
-                        py-4 px-4 text-sm font-medium transition-colors relative
-                        ${activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'}
-                      `}
-                    >
-                      {tab.label}
-                      {activeTab === tab.id && (
-                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
-                      )}
-                    </button>
-                  ))}
+                  {tabs.map(function(tab) {
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={function() { setActiveTab(tab.id); }}
+                        className={
+                          'py-4 px-4 text-sm font-medium transition-colors relative ' +
+                          (activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700')
+                        }
+                      >
+                        {tab.label}
+                        {activeTab === tab.id && (
+                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </nav>
               </div>
 
@@ -525,22 +600,22 @@ const ProductoDetail = () => {
                         <div className="flex items-center gap-3 text-sm">
                           <Barcode className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Código:</span>
-                          <span className="text-slate-800 font-mono">{producto.codigo}</span>
+                          <span className="text-slate-800 font-mono">{producto.codigo || producto.sku}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Layers className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Categoría:</span>
-                          <span className="text-slate-800 capitalize">{producto.categoria}</span>
+                          <span className="text-slate-800 capitalize">{producto.categoria || '-'}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Package className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Unidad:</span>
-                          <span className="text-slate-800 capitalize">{producto.unidadMedida}</span>
+                          <span className="text-slate-800 capitalize">{producto.unidad_medida || producto.unidadMedida || '-'}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Calendar className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Vencimiento:</span>
-                          <span className="text-slate-800">{producto.fechaVencimiento || 'N/A'}</span>
+                          <span className="text-slate-800">{producto.fecha_vencimiento || producto.fechaVencimiento || 'N/A'}</span>
                         </div>
                       </div>
                     </div>
@@ -551,17 +626,17 @@ const ProductoDetail = () => {
                         <div className="flex items-center gap-3 text-sm">
                           <Building2 className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Cliente:</span>
-                          <span className="text-slate-800">{producto.clienteNombre}</span>
+                          <span className="text-slate-800">{producto.cliente_nombre || producto.clienteNombre}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Warehouse className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Bodega:</span>
-                          <span className="text-slate-800">{producto.bodegaNombre}</span>
+                          <span className="text-slate-800">{producto.bodega_nombre || producto.bodegaNombre || producto.bodega}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <MapPin className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Ubicación:</span>
-                          <span className="text-slate-800 font-mono">{producto.ubicacion}</span>
+                          <span className="text-slate-800 font-mono">{producto.ubicacion || '-'}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <FileText className="w-5 h-5 text-slate-400" />
@@ -577,12 +652,16 @@ const ProductoDetail = () => {
                         <div className="flex items-center gap-3 text-sm">
                           <DollarSign className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Costo Unit.:</span>
-                          <span className="text-slate-800 font-medium">{formatCurrency(producto.costoUnitario)}</span>
+                          <span className="text-slate-800 font-medium">
+                            {formatCurrency(producto.costo_unitario || producto.costoUnitario)}
+                          </span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <DollarSign className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Precio Venta:</span>
-                          <span className="text-slate-800 font-medium">{formatCurrency(producto.precioVenta)}</span>
+                          <span className="text-slate-800 font-medium">
+                            {formatCurrency(producto.precio_venta || producto.precioVenta)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -601,15 +680,21 @@ const ProductoDetail = () => {
                 {/* Tab: Movimientos */}
                 {activeTab === 'movimientos' && (
                   <div className="space-y-0">
-                    {movimientos.length === 0 ? (
+                    {loadingMovimientos ? (
+                      <div className="space-y-3">
+                        {[0, 1, 2, 3].map(function(i) {
+                          return <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />;
+                        })}
+                      </div>
+                    ) : movimientos.length === 0 ? (
                       <div className="py-12 text-center">
                         <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                         <p className="text-slate-500">No hay movimientos registrados</p>
                       </div>
                     ) : (
-                      movimientos.map((movimiento) => (
-                        <MovimientoItem key={movimiento.id} movimiento={movimiento} />
-                      ))
+                      movimientos.map(function(movimiento) {
+                        return <MovimientoItem key={movimiento.id} movimiento={movimiento} />;
+                      })
                     )}
                   </div>
                 )}
@@ -617,16 +702,23 @@ const ProductoDetail = () => {
                 {/* Tab: Estadísticas */}
                 {activeTab === 'estadisticas' && (
                   <div>
-                    <BarChart
-                      title="Entradas vs Salidas"
-                      subtitle="Últimos 6 meses"
-                      data={estadisticas}
-                      legend={[
-                        { label: 'Entradas', color: '#10b981' },
-                        { label: 'Salidas', color: '#ef4444' },
-                      ]}
-                      height={300}
-                    />
+                    {chartData.length > 0 ? (
+                      <BarChart
+                        title="Entradas vs Salidas"
+                        subtitle="Últimos 6 meses"
+                        data={chartData}
+                        legend={[
+                          { label: 'Entradas', color: '#10b981' },
+                          { label: 'Salidas', color: '#ef4444' },
+                        ]}
+                        height={300}
+                      />
+                    ) : (
+                      <div className="py-12 text-center">
+                        <TrendingUp className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-500">No hay suficientes datos para mostrar estadísticas</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -635,10 +727,13 @@ const ProductoDetail = () => {
         </div>
       </main>
 
-      {/* Modals */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* MODALS */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      
       <ProductoForm
         isOpen={editModal}
-        onClose={() => setEditModal(false)}
+        onClose={function() { setEditModal(false); }}
         onSubmit={handleEditProducto}
         producto={producto}
         loading={formLoading}
@@ -646,7 +741,7 @@ const ProductoDetail = () => {
 
       <MovimientoForm
         isOpen={movimientoModal.isOpen}
-        onClose={() => setMovimientoModal({ isOpen: false, tipo: 'entrada' })}
+        onClose={function() { setMovimientoModal({ isOpen: false, tipo: 'entrada' }); }}
         onSubmit={handleMovimientoSubmit}
         tipo={movimientoModal.tipo}
         producto={producto}
@@ -655,10 +750,10 @@ const ProductoDetail = () => {
 
       <ConfirmDialog
         isOpen={deleteModal}
-        onClose={() => setDeleteModal(false)}
+        onClose={function() { setDeleteModal(false); }}
         onConfirm={handleDeleteProducto}
         title="Eliminar Producto"
-        message={`¿Estás seguro de eliminar "${producto?.nombre}"? Se perderá todo el historial de movimientos.`}
+        message={'¿Estás seguro de eliminar "' + producto.nombre + '"? Se perderá todo el historial de movimientos.'}
         confirmText="Eliminar"
         type="danger"
         loading={formLoading}

@@ -1,8 +1,17 @@
 /**
- * ISTHO CRM - AlertasInventario Page
- * Gestión de alertas de inventario (bajo stock, agotados, vencimientos)
+ * ============================================================================
+ * ISTHO CRM - AlertasInventario (Fase 5 - Integración Completa)
+ * ============================================================================
+ * Gestión de alertas de inventario conectada al backend real.
+ * 
+ * CAMBIOS vs versión anterior:
+ * - Eliminado MOCK_ALERTAS
+ * - Conectado con useInventario hook (fetchAlertas)
+ * - Acciones de atender/descartar conectadas a API
+ * - Movimientos de entrada conectados a API
  * 
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Enero 2026
  */
 
@@ -18,6 +27,7 @@ import {
   CheckCircle,
   XCircle,
   Filter,
+  RefreshCw,
 } from 'lucide-react';
 
 // Layout
@@ -29,20 +39,17 @@ import { Button, StatusChip, FilterDropdown, KpiCard } from '../../components/co
 // Local Components
 import MovimientoForm from './components/MovimientoForm';
 
-// ============================================
-// DATOS MOCK
-// ============================================
-const MOCK_ALERTAS = [
-  { id: 1, tipo: 'agotado', productoId: 'PRD-007', codigo: 'SKU-CEM-001', nombre: 'Cemento Gris x50kg', cliente: 'Eternit Colombia', stockActual: 0, stockMinimo: 200, bodega: 'Área 04 - Construcción', ubicacion: 'B-02-01', fechaAlerta: '2026-01-05', prioridad: 'alta', estado: 'pendiente' },
-  { id: 2, tipo: 'bajo_stock', productoId: 'PRD-003', codigo: 'SKU-TEJ-001', nombre: 'Tejas Onduladas', cliente: 'Eternit Colombia', stockActual: 450, stockMinimo: 500, bodega: 'Área 04 - Construcción', ubicacion: 'B-01-05', fechaAlerta: '2026-01-06', prioridad: 'alta', estado: 'pendiente' },
-  { id: 3, tipo: 'bajo_stock', productoId: 'PRD-009', codigo: 'SKU-DES-001', nombre: 'Desinfectante 5L', cliente: 'Klar Colombia', stockActual: 150, stockMinimo: 200, bodega: 'Área 03 - Químicos', ubicacion: 'D-01-03', fechaAlerta: '2026-01-06', prioridad: 'media', estado: 'pendiente' },
-  { id: 4, tipo: 'vencimiento', productoId: 'PRD-011', codigo: 'SKU-YGT-002', nombre: 'Yogurt Natural x6', cliente: 'Lácteos Betania', stockActual: 320, stockMinimo: 100, bodega: 'Área 01 - Refrigerados', ubicacion: 'A-02-04', fechaVencimiento: '2026-01-20', fechaAlerta: '2026-01-08', prioridad: 'alta', estado: 'pendiente' },
-  { id: 5, tipo: 'bajo_stock', productoId: 'PRD-012', codigo: 'SKU-ENV-002', nombre: 'Envases Vidrio 750ml', cliente: 'Prodenvases', stockActual: 800, stockMinimo: 1000, bodega: 'Área 02 - Secos', ubicacion: 'C-02-01', fechaAlerta: '2026-01-07', prioridad: 'baja', estado: 'atendida' },
-  { id: 6, tipo: 'vencimiento', productoId: 'PRD-013', codigo: 'SKU-QSO-002', nombre: 'Queso Campesino x1kg', cliente: 'Lácteos Betania', stockActual: 180, stockMinimo: 50, bodega: 'Área 01 - Refrigerados', ubicacion: 'A-03-01', fechaVencimiento: '2026-02-05', fechaAlerta: '2026-01-08', prioridad: 'media', estado: 'pendiente' },
-];
+// ════════════════════════════════════════════════════════════════════════════
+// HOOKS INTEGRADOS
+// ════════════════════════════════════════════════════════════════════════════
+import useInventario from '../../hooks/useInventario';
+import useNotification from '../../hooks/useNotification';
+import { useAuth } from '../../context/AuthContext';
 
-// Opciones de filtros
-const FILTER_OPTIONS = {
+// ════════════════════════════════════════════════════════════════════════════
+// OPCIONES DE FILTROS
+// ════════════════════════════════════════════════════════════════════════════
+var FILTER_OPTIONS = {
   tipo: [
     { value: 'agotado', label: 'Agotado' },
     { value: 'bajo_stock', label: 'Stock Bajo' },
@@ -59,13 +66,23 @@ const FILTER_OPTIONS = {
   ],
 };
 
-// ============================================
-// ALERTA CARD COMPONENT
-// ============================================
-const AlertaCard = ({ alerta, onAction, onAtender, onDescartar }) => {
-  const navigate = useNavigate();
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTES INTERNOS
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Tarjeta de alerta
+ */
+var AlertaCard = function(props) {
+  var alerta = props.alerta;
+  var onAction = props.onAction;
+  var onAtender = props.onAtender;
+  var onDescartar = props.onDescartar;
+  var canEdit = props.canEdit;
   
-  const tipoConfig = {
+  var navigate = useNavigate();
+  
+  var tipoConfig = {
     agotado: {
       icon: XCircle,
       bg: 'bg-red-50',
@@ -95,26 +112,26 @@ const AlertaCard = ({ alerta, onAction, onAtender, onDescartar }) => {
     },
   };
 
-  const prioridadConfig = {
+  var prioridadConfig = {
     alta: { color: 'text-red-600', bg: 'bg-red-100' },
     media: { color: 'text-amber-600', bg: 'bg-amber-100' },
     baja: { color: 'text-slate-600', bg: 'bg-slate-100' },
   };
 
-  const config = tipoConfig[alerta.tipo];
-  const prioridad = prioridadConfig[alerta.prioridad];
-  const Icon = config.icon;
-  const isAtendida = alerta.estado === 'atendida';
+  var config = tipoConfig[alerta.tipo] || tipoConfig.bajo_stock;
+  var prioridad = prioridadConfig[alerta.prioridad] || prioridadConfig.media;
+  var Icon = config.icon;
+  var isAtendida = alerta.estado === 'atendida';
 
   return (
-    <div className={`
-      rounded-2xl border p-5 transition-all duration-200
-      ${isAtendida ? 'bg-slate-50 border-slate-200 opacity-60' : `${config.bg} ${config.border}`}
-    `}>
+    <div className={
+      'rounded-2xl border p-5 transition-all duration-200 ' +
+      (isAtendida ? 'bg-slate-50 border-slate-200 opacity-60' : config.bg + ' ' + config.border)
+    }>
       <div className="flex items-start gap-4">
         {/* Icon */}
-        <div className={`w-12 h-12 ${config.iconBg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-          <Icon className={`w-6 h-6 ${config.iconColor}`} />
+        <div className={'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ' + config.iconBg}>
+          <Icon className={'w-6 h-6 ' + config.iconColor} />
         </div>
 
         {/* Content */}
@@ -122,12 +139,12 @@ const AlertaCard = ({ alerta, onAction, onAtender, onDescartar }) => {
           {/* Header */}
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${config.labelBg}`}>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className={'text-xs font-medium px-2 py-0.5 rounded-full ' + config.labelBg}>
                   {config.label}
                 </span>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${prioridad.bg} ${prioridad.color}`}>
-                  {alerta.prioridad.toUpperCase()}
+                <span className={'text-xs font-medium px-2 py-0.5 rounded-full ' + prioridad.bg + ' ' + prioridad.color}>
+                  {(alerta.prioridad || 'media').toUpperCase()}
                 </span>
                 {isAtendida && (
                   <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
@@ -137,11 +154,13 @@ const AlertaCard = ({ alerta, onAction, onAtender, onDescartar }) => {
               </div>
               <h3 
                 className="font-semibold text-slate-800 hover:text-orange-600 cursor-pointer"
-                onClick={() => navigate(`/inventario/productos/${alerta.productoId}`)}
+                onClick={function() { navigate('/inventario/productos/' + alerta.producto_id); }}
               >
-                {alerta.nombre}
+                {alerta.producto_nombre || alerta.nombre}
               </h3>
-              <p className="text-sm text-slate-500 mt-0.5">{alerta.codigo} • {alerta.cliente}</p>
+              <p className="text-sm text-slate-500 mt-0.5">
+                {alerta.producto_codigo || alerta.codigo} • {alerta.cliente_nombre || alerta.cliente}
+              </p>
             </div>
           </div>
 
@@ -149,37 +168,40 @@ const AlertaCard = ({ alerta, onAction, onAtender, onDescartar }) => {
           <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             <div>
               <p className="text-slate-400 text-xs">Stock Actual</p>
-              <p className={`font-semibold ${alerta.stockActual === 0 ? 'text-red-600' : 'text-slate-800'}`}>
-                {alerta.stockActual.toLocaleString()}
+              <p className={'font-semibold ' + ((alerta.stock_actual || alerta.stockActual || 0) === 0 ? 'text-red-600' : 'text-slate-800')}>
+                {(alerta.stock_actual || alerta.stockActual || 0).toLocaleString()}
               </p>
             </div>
             <div>
               <p className="text-slate-400 text-xs">Stock Mínimo</p>
-              <p className="font-semibold text-slate-800">{alerta.stockMinimo.toLocaleString()}</p>
+              <p className="font-semibold text-slate-800">{(alerta.stock_minimo || alerta.stockMinimo || 0).toLocaleString()}</p>
             </div>
             <div>
               <p className="text-slate-400 text-xs">Ubicación</p>
-              <p className="font-medium text-slate-600">{alerta.ubicacion}</p>
+              <p className="font-medium text-slate-600">{alerta.ubicacion || '-'}</p>
             </div>
             <div>
               <p className="text-slate-400 text-xs">
                 {alerta.tipo === 'vencimiento' ? 'Vence' : 'Fecha Alerta'}
               </p>
               <p className="font-medium text-slate-600">
-                {alerta.tipo === 'vencimiento' ? alerta.fechaVencimiento : alerta.fechaAlerta}
+                {alerta.tipo === 'vencimiento' 
+                  ? (alerta.fecha_vencimiento || alerta.fechaVencimiento)
+                  : (alerta.fecha_alerta || alerta.fechaAlerta || new Date(alerta.created_at).toLocaleDateString('es-CO'))
+                }
               </p>
             </div>
           </div>
 
           {/* Actions */}
-          {!isAtendida && (
-            <div className="mt-4 flex items-center gap-2">
+          {!isAtendida && canEdit && (
+            <div className="mt-4 flex items-center gap-2 flex-wrap">
               {(alerta.tipo === 'agotado' || alerta.tipo === 'bajo_stock') && (
                 <Button 
                   variant="success" 
                   size="sm" 
                   icon={PackagePlus}
-                  onClick={() => onAction(alerta)}
+                  onClick={function() { onAction(alerta); }}
                 >
                   Registrar Entrada
                 </Button>
@@ -188,14 +210,14 @@ const AlertaCard = ({ alerta, onAction, onAtender, onDescartar }) => {
                 variant="outline" 
                 size="sm"
                 icon={CheckCircle}
-                onClick={() => onAtender(alerta)}
+                onClick={function() { onAtender(alerta); }}
               >
                 Marcar Atendida
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => onDescartar(alerta)}
+                onClick={function() { onDescartar(alerta); }}
               >
                 Descartar
               </Button>
@@ -207,36 +229,57 @@ const AlertaCard = ({ alerta, onAction, onAtender, onDescartar }) => {
   );
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
-const AlertasInventario = () => {
-  const navigate = useNavigate();
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
+var AlertasInventario = function() {
+  var navigate = useNavigate();
+  var authHook = useAuth();
+  var user = authHook.user;
+  var hasPermission = authHook.hasPermission;
+  var notif = useNotification();
+  var success = notif.success;
+  var apiError = notif.apiError;
 
-  // Estados
-  const [alertas, setAlertas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({});
-  const [showFilters, setShowFilters] = useState(false);
+  // ──────────────────────────────────────────────────────────────────────────
+  // HOOK DE INVENTARIO
+  // ──────────────────────────────────────────────────────────────────────────
+  var inventarioHook = useInventario({ autoFetch: false });
+  
+  var alertas = inventarioHook.alertas;
+  var loadingAlertas = inventarioHook.loadingAlertas;
+  var fetchAlertas = inventarioHook.fetchAlertas;
+  var atenderAlerta = inventarioHook.atenderAlerta;
+  var descartarAlerta = inventarioHook.descartarAlerta;
+  var registrarMovimiento = inventarioHook.registrarMovimiento;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // ESTADOS LOCALES
+  // ──────────────────────────────────────────────────────────────────────────
+  var _a = useState({}), filters = _a[0], setFilters = _a[1];
+  var _b = useState(false), showFilters = _b[0], setShowFilters = _b[1];
+  var _c = useState(false), isRefreshing = _c[0], setIsRefreshing = _c[1];
 
   // Modal
-  const [movimientoModal, setMovimientoModal] = useState({ isOpen: false, producto: null });
-  const [formLoading, setFormLoading] = useState(false);
+  var _d = useState({ isOpen: false, producto: null }), movimientoModal = _d[0], setMovimientoModal = _d[1];
+  var _e = useState(false), formLoading = _e[0], setFormLoading = _e[1];
 
-  // Cargar datos
-  useEffect(() => {
-    const fetchAlertas = async () => {
-      setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
-      setAlertas(MOCK_ALERTAS);
-      setLoading(false);
-    };
-    fetchAlertas();
-  }, []);
+  // Permisos
+  var canEdit = hasPermission('inventario', 'editar');
 
-  // Filtrar alertas
-  const filteredAlertas = useMemo(() => {
-    return alertas.filter((alerta) => {
+  // ──────────────────────────────────────────────────────────────────────────
+  // CARGAR DATOS
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(function() {
+    var clienteFilter = user && user.rol === 'cliente' ? { cliente_id: user.cliente_id } : {};
+    fetchAlertas(clienteFilter);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FILTRAR ALERTAS
+  // ──────────────────────────────────────────────────────────────────────────
+  var filteredAlertas = useMemo(function() {
+    return alertas.filter(function(alerta) {
       if (filters.tipo && alerta.tipo !== filters.tipo) return false;
       if (filters.prioridad && alerta.prioridad !== filters.prioridad) return false;
       if (filters.estado && alerta.estado !== filters.estado) return false;
@@ -244,74 +287,122 @@ const AlertasInventario = () => {
     });
   }, [alertas, filters]);
 
-  // KPIs calculados
-  const kpis = useMemo(() => {
-    const pendientes = alertas.filter(a => a.estado === 'pendiente').length;
-    const agotados = alertas.filter(a => a.tipo === 'agotado' && a.estado === 'pendiente').length;
-    const bajoStock = alertas.filter(a => a.tipo === 'bajo_stock' && a.estado === 'pendiente').length;
-    const porVencer = alertas.filter(a => a.tipo === 'vencimiento' && a.estado === 'pendiente').length;
+  // ──────────────────────────────────────────────────────────────────────────
+  // KPIs
+  // ──────────────────────────────────────────────────────────────────────────
+  var kpis = useMemo(function() {
+    var pendientes = alertas.filter(function(a) { return a.estado === 'pendiente'; }).length;
+    var agotados = alertas.filter(function(a) { return a.tipo === 'agotado' && a.estado === 'pendiente'; }).length;
+    var bajoStock = alertas.filter(function(a) { return a.tipo === 'bajo_stock' && a.estado === 'pendiente'; }).length;
+    var porVencer = alertas.filter(function(a) { return a.tipo === 'vencimiento' && a.estado === 'pendiente'; }).length;
     
-    return { pendientes, agotados, bajoStock, porVencer };
+    return { pendientes: pendientes, agotados: agotados, bajoStock: bajoStock, porVencer: porVencer };
   }, [alertas]);
 
-  // Handlers
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  var handleRefresh = async function() {
+    setIsRefreshing(true);
+    try {
+      var clienteFilter = user && user.rol === 'cliente' ? { cliente_id: user.cliente_id } : {};
+      await fetchAlertas(clienteFilter);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
-  const handleClearFilters = () => {
+  var handleFilterChange = function(key, value) {
+    var newFilters = Object.assign({}, filters);
+    if (value) {
+      newFilters[key] = value;
+    } else {
+      delete newFilters[key];
+    }
+    setFilters(newFilters);
+  };
+
+  var handleClearFilters = function() {
     setFilters({});
   };
 
-  const handleAction = (alerta) => {
+  var handleAction = function(alerta) {
     // Abrir modal de entrada con el producto
     setMovimientoModal({ 
       isOpen: true, 
       producto: {
-        id: alerta.productoId,
-        nombre: alerta.nombre,
-        stockActual: alerta.stockActual,
-        unidadMedida: 'unidad',
+        id: alerta.producto_id,
+        nombre: alerta.producto_nombre || alerta.nombre,
+        stock_actual: alerta.stock_actual || alerta.stockActual,
+        unidad_medida: alerta.unidad_medida || 'unidad',
       }
     });
   };
 
-  const handleAtender = async (alerta) => {
-    setAlertas((prev) =>
-      prev.map((a) => (a.id === alerta.id ? { ...a, estado: 'atendida' } : a))
-    );
-  };
-
-  const handleDescartar = async (alerta) => {
-    setAlertas((prev) => prev.filter((a) => a.id !== alerta.id));
-  };
-
-  const handleMovimientoSubmit = async (data) => {
-    setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    
-    // Marcar la alerta como atendida
-    const alertaRelacionada = alertas.find(a => a.productoId === movimientoModal.producto.id);
-    if (alertaRelacionada) {
-      setAlertas((prev) =>
-        prev.map((a) => (a.id === alertaRelacionada.id ? { ...a, estado: 'atendida' } : a))
-      );
+  var handleAtender = async function(alerta) {
+    try {
+      if (atenderAlerta) {
+        await atenderAlerta(alerta.id);
+      }
+      success('Alerta marcada como atendida');
+      handleRefresh();
+    } catch (err) {
+      apiError(err);
     }
-
-    setFormLoading(false);
-    setMovimientoModal({ isOpen: false, producto: null });
   };
 
+  var handleDescartar = async function(alerta) {
+    try {
+      if (descartarAlerta) {
+        await descartarAlerta(alerta.id);
+      }
+      success('Alerta descartada');
+      handleRefresh();
+    } catch (err) {
+      apiError(err);
+    }
+  };
+
+  var handleMovimientoSubmit = async function(data) {
+    setFormLoading(true);
+    try {
+      await registrarMovimiento(movimientoModal.producto.id, {
+        tipo: 'entrada',
+        cantidad: data.cantidad,
+        motivo: data.motivo || 'Reposición de stock',
+        documento_referencia: data.documento,
+        observaciones: data.observaciones,
+      });
+      
+      success('Entrada registrada correctamente');
+      setMovimientoModal({ isOpen: false, producto: null });
+      
+      // Refrescar alertas
+      handleRefresh();
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────────────────
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <FloatingHeader notificationCount={kpis.pendientes} />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* Back & Header */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* HEADER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/inventario')}
+              onClick={function() { navigate('/inventario'); }}
               className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -323,9 +414,19 @@ const AlertasInventario = () => {
               </p>
             </div>
           </div>
+          
+          <Button 
+            variant="ghost" 
+            icon={RefreshCw} 
+            onClick={handleRefresh}
+            loading={isRefreshing}
+            title="Actualizar alertas"
+          />
         </div>
 
+        {/* ════════════════════════════════════════════════════════════════ */}
         {/* KPIs */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <KpiCard
             title="Alertas Pendientes"
@@ -340,6 +441,8 @@ const AlertasInventario = () => {
             icon={XCircle}
             iconBg="bg-red-100"
             iconColor="text-red-600"
+            onClick={function() { handleFilterChange('tipo', 'agotado'); }}
+            className="cursor-pointer hover:shadow-md transition-shadow"
           />
           <KpiCard
             title="Stock Bajo"
@@ -347,6 +450,8 @@ const AlertasInventario = () => {
             icon={AlertTriangle}
             iconBg="bg-amber-100"
             iconColor="text-amber-600"
+            onClick={function() { handleFilterChange('tipo', 'bajo_stock'); }}
+            className="cursor-pointer hover:shadow-md transition-shadow"
           />
           <KpiCard
             title="Por Vencer"
@@ -354,20 +459,24 @@ const AlertasInventario = () => {
             icon={Clock}
             iconBg="bg-orange-100"
             iconColor="text-orange-600"
+            onClick={function() { handleFilterChange('tipo', 'vencimiento'); }}
+            className="cursor-pointer hover:shadow-md transition-shadow"
           />
         </div>
 
-        {/* Filters */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* FILTERS */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-500">
-              {filteredAlertas.length} alerta{filteredAlertas.length !== 1 && 's'} encontrada{filteredAlertas.length !== 1 && 's'}
+              {filteredAlertas.length} alerta{filteredAlertas.length !== 1 ? 's' : ''} encontrada{filteredAlertas.length !== 1 ? 's' : ''}
             </p>
             <Button
               variant={showFilters ? 'secondary' : 'outline'}
               icon={Filter}
               size="sm"
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={function() { setShowFilters(!showFilters); }}
             >
               Filtros
               {Object.keys(filters).length > 0 && (
@@ -385,21 +494,21 @@ const AlertasInventario = () => {
                   label="Tipo"
                   options={FILTER_OPTIONS.tipo}
                   value={filters.tipo}
-                  onChange={(v) => handleFilterChange('tipo', v)}
+                  onChange={function(v) { handleFilterChange('tipo', v); }}
                   placeholder="Todos los tipos"
                 />
                 <FilterDropdown
                   label="Prioridad"
                   options={FILTER_OPTIONS.prioridad}
                   value={filters.prioridad}
-                  onChange={(v) => handleFilterChange('prioridad', v)}
+                  onChange={function(v) { handleFilterChange('prioridad', v); }}
                   placeholder="Todas las prioridades"
                 />
                 <FilterDropdown
                   label="Estado"
                   options={FILTER_OPTIONS.estado}
                   value={filters.estado}
-                  onChange={(v) => handleFilterChange('estado', v)}
+                  onChange={function(v) { handleFilterChange('estado', v); }}
                   placeholder="Todos los estados"
                 />
               </div>
@@ -415,21 +524,25 @@ const AlertasInventario = () => {
           )}
         </div>
 
-        {/* Alertas List */}
-        {loading ? (
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* ALERTAS LIST */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {loadingAlertas ? (
           <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl p-6 animate-pulse">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 bg-gray-200 rounded-xl" />
-                  <div className="flex-1 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-1/3" />
-                    <div className="h-3 bg-gray-100 rounded w-1/4" />
-                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+            {[0, 1, 2].map(function(i) {
+              return (
+                <div key={i} className="bg-white rounded-2xl p-6 animate-pulse">
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 bg-gray-200 rounded-xl" />
+                    <div className="flex-1 space-y-3">
+                      <div className="h-4 bg-gray-200 rounded w-1/3" />
+                      <div className="h-3 bg-gray-100 rounded w-1/4" />
+                      <div className="h-3 bg-gray-100 rounded w-1/2" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : filteredAlertas.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 py-16 text-center">
@@ -447,23 +560,35 @@ const AlertasInventario = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredAlertas.map((alerta) => (
-              <AlertaCard
-                key={alerta.id}
-                alerta={alerta}
-                onAction={handleAction}
-                onAtender={handleAtender}
-                onDescartar={handleDescartar}
-              />
-            ))}
+            {filteredAlertas.map(function(alerta) {
+              return (
+                <AlertaCard
+                  key={alerta.id}
+                  alerta={alerta}
+                  canEdit={canEdit}
+                  onAction={handleAction}
+                  onAtender={handleAtender}
+                  onDescartar={handleDescartar}
+                />
+              );
+            })}
           </div>
         )}
+
+        {/* Footer */}
+        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
+          © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
+          Centro Logístico Industrial del Norte, Girardota, Antioquia
+        </footer>
       </main>
 
-      {/* Modal */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* MODAL */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      
       <MovimientoForm
         isOpen={movimientoModal.isOpen}
-        onClose={() => setMovimientoModal({ isOpen: false, producto: null })}
+        onClose={function() { setMovimientoModal({ isOpen: false, producto: null }); }}
         onSubmit={handleMovimientoSubmit}
         tipo="entrada"
         producto={movimientoModal.producto}

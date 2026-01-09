@@ -1,13 +1,22 @@
 /**
- * ISTHO CRM - ClientesList Page
- * Listado de clientes con búsqueda, filtros y paginación
+ * ============================================================================
+ * ISTHO CRM - ClientesList (Fase 5 - Integración Completa)
+ * ============================================================================
+ * Lista de clientes conectada al backend real mediante hooks.
+ * 
+ * CAMBIOS vs versión anterior:
+ * - Eliminados datos MOCK
+ * - Conectado con useClientes hook
+ * - Integrado con sistema de notificaciones
+ * - CRUD completo conectado a API
  * 
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Enero 2026
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Filter,
@@ -18,6 +27,7 @@ import {
   Pencil,
   Trash2,
   Building2,
+  RefreshCw,
 } from 'lucide-react';
 
 // Layout
@@ -36,25 +46,19 @@ import {
 // Local Components
 import ClienteForm from './components/ClienteForm';
 
-// ============================================
-// DATOS MOCK
-// ============================================
-const MOCK_CLIENTES = [
-  { id: 'CLI-001', razonSocial: 'Lácteos Betania S.A.S', nit: '900.123.456-1', tipoCliente: 'corporativo', sector: 'alimentos', ciudad: 'Medellín', telefono: '+57 300 123 4567', email: 'contacto@lacteosb.com', estado: 'activo', despachosMes: 45, facturacionMes: 125400000 },
-  { id: 'CLI-002', razonSocial: 'Almacenes Éxito S.A', nit: '890.900.123-4', tipoCliente: 'corporativo', sector: 'retail', ciudad: 'Bogotá', telefono: '+57 310 234 5678', email: 'proveedor@exito.com', estado: 'activo', despachosMes: 32, facturacionMes: 89200000 },
-  { id: 'CLI-003', razonSocial: 'Eternit Colombia S.A', nit: '800.456.789-2', tipoCliente: 'corporativo', sector: 'construccion', ciudad: 'Cali', telefono: '+57 320 345 6789', email: 'logistica@eternit.co', estado: 'activo', despachosMes: 18, facturacionMes: 67800000 },
-  { id: 'CLI-004', razonSocial: 'Prodenvases S.A.S', nit: '901.234.567-8', tipoCliente: 'pyme', sector: 'manufactura', ciudad: 'Barranquilla', telefono: '+57 315 456 7890', email: 'compras@prodenvases.com', estado: 'activo', despachosMes: 25, facturacionMes: 45600000 },
-  { id: 'CLI-005', razonSocial: 'Klar Colombia S.A.S', nit: '900.987.654-3', tipoCliente: 'distribuidor', sector: 'manufactura', ciudad: 'Cartagena', telefono: '+57 318 567 8901', email: 'ventas@klar.co', estado: 'inactivo', despachosMes: 0, facturacionMes: 0 },
-  { id: 'CLI-006', razonSocial: 'Distribuidora Nacional LTDA', nit: '800.111.222-3', tipoCliente: 'distribuidor', sector: 'retail', ciudad: 'Bucaramanga', telefono: '+57 311 678 9012', email: 'info@distnacional.com', estado: 'activo', despachosMes: 15, facturacionMes: 34500000 },
-  { id: 'CLI-007', razonSocial: 'FarmaCorp S.A', nit: '900.333.444-5', tipoCliente: 'corporativo', sector: 'farmaceutico', ciudad: 'Medellín', telefono: '+57 312 789 0123', email: 'logistica@farmacorp.com', estado: 'activo', despachosMes: 28, facturacionMes: 78900000 },
-  { id: 'CLI-008', razonSocial: 'Construcciones del Valle S.A.S', nit: '901.555.666-7', tipoCliente: 'pyme', sector: 'construccion', ciudad: 'Cali', telefono: '+57 313 890 1234', email: 'compras@consvalle.com', estado: 'suspendido', despachosMes: 0, facturacionMes: 0 },
-  { id: 'CLI-009', razonSocial: 'Alimentos del Caribe S.A', nit: '800.777.888-9', tipoCliente: 'corporativo', sector: 'alimentos', ciudad: 'Barranquilla', telefono: '+57 314 901 2345', email: 'operaciones@alicaribe.com', estado: 'activo', despachosMes: 22, facturacionMes: 56700000 },
-  { id: 'CLI-010', razonSocial: 'Minimarket Express', nit: '900.999.000-1', tipoCliente: 'minorista', sector: 'retail', ciudad: 'Pereira', telefono: '+57 316 012 3456', email: 'pedidos@miniexpress.com', estado: 'activo', despachosMes: 8, facturacionMes: 12300000 },
-];
+// ════════════════════════════════════════════════════════════════════════════
+// HOOKS INTEGRADOS
+// ════════════════════════════════════════════════════════════════════════════
+import useClientes from '../../hooks/useClientes';
+import useNotification from '../../hooks/useNotification';
+import { useAuth } from '../../context/AuthContext';
+import { ProtectedAction } from '../../components/auth/PrivateRoute';
 
-// Opciones de filtros
+// ════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN DE FILTROS
+// ════════════════════════════════════════════════════════════════════════════
 const FILTER_OPTIONS = {
-  tipoCliente: [
+  tipo_cliente: [
     { value: 'corporativo', label: 'Corporativo' },
     { value: 'pyme', label: 'PyME' },
     { value: 'distribuidor', label: 'Distribuidor' },
@@ -66,6 +70,7 @@ const FILTER_OPTIONS = {
     { value: 'manufactura', label: 'Manufactura' },
     { value: 'retail', label: 'Retail' },
     { value: 'farmaceutico', label: 'Farmacéutico' },
+    { value: 'quimico', label: 'Químico' },
   ],
   estado: [
     { value: 'activo', label: 'Activo' },
@@ -74,10 +79,10 @@ const FILTER_OPTIONS = {
   ],
 };
 
-// ============================================
+// ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE ROW ACTIONS
-// ============================================
-const RowActions = ({ cliente, onView, onEdit, onDelete }) => {
+// ════════════════════════════════════════════════════════════════════════════
+const RowActions = ({ cliente, onView, onEdit, onDelete, onChangeStatus }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -95,7 +100,7 @@ const RowActions = ({ cliente, onView, onEdit, onDelete }) => {
             className="fixed inset-0 z-10" 
             onClick={() => setIsOpen(false)} 
           />
-          <div className="absolute right-0 mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20">
+          <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20">
             <button
               onClick={() => { onView(cliente); setIsOpen(false); }}
               className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -103,20 +108,39 @@ const RowActions = ({ cliente, onView, onEdit, onDelete }) => {
               <Eye className="w-4 h-4" />
               Ver detalle
             </button>
-            <button
-              onClick={() => { onEdit(cliente); setIsOpen(false); }}
-              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              <Pencil className="w-4 h-4" />
-              Editar
-            </button>
-            <button
-              onClick={() => { onDelete(cliente); setIsOpen(false); }}
-              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="w-4 h-4" />
-              Eliminar
-            </button>
+            
+            {/* Solo admin y supervisor pueden editar */}
+            <ProtectedAction module="clientes" action="editar">
+              <button
+                onClick={() => { onEdit(cliente); setIsOpen(false); }}
+                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <Pencil className="w-4 h-4" />
+                Editar
+              </button>
+            </ProtectedAction>
+
+            {/* Solo admin puede cambiar estado */}
+            <ProtectedAction module="clientes" action="cambiar_estado">
+              <button
+                onClick={() => { onChangeStatus(cliente); setIsOpen(false); }}
+                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-amber-600 hover:bg-amber-50"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Cambiar Estado
+              </button>
+            </ProtectedAction>
+            
+            {/* Solo admin puede eliminar */}
+            <ProtectedAction module="clientes" action="eliminar">
+              <button
+                onClick={() => { onDelete(cliente); setIsOpen(false); }}
+                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                Eliminar
+              </button>
+            </ProtectedAction>
           </div>
         </>
       )}
@@ -124,85 +148,102 @@ const RowActions = ({ cliente, onView, onEdit, onDelete }) => {
   );
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
 const ClientesList = () => {
   const navigate = useNavigate();
-
-  // Estados
-  const [clientes, setClientes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({});
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
   
-  // Modals
+  // ──────────────────────────────────────────────────────────────────────────
+  // HOOKS
+  // ──────────────────────────────────────────────────────────────────────────
+  const { success, error: showError, apiError, saved, deleted } = useNotification();
+  
+  // Hook de clientes con autoFetch
+  const {
+    // Lista
+    clientes,
+    pagination,
+    loading,
+    error,
+    // Acciones CRUD
+    fetchClientes,
+    createCliente,
+    updateCliente,
+    deleteCliente,
+    changeStatus,
+    // Paginación
+    goToPage,
+    setPageSize,
+    // Filtros
+    applyFilters,
+    clearFilters,
+    search,
+    // Utilidades
+    refresh,
+  } = useClientes({ 
+    autoFetch: true,
+    initialFilters: {
+      // Aplicar filtros de URL si existen
+      estado: searchParams.get('estado') || undefined,
+      sector: searchParams.get('sector') || undefined,
+    }
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // ESTADOS LOCALES
+  // ──────────────────────────────────────────────────────────────────────────
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    tipo_cliente: searchParams.get('tipo') || '',
+    sector: searchParams.get('sector') || '',
+    estado: searchParams.get('estado') || '',
+  });
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modales
   const [formModal, setFormModal] = useState({ isOpen: false, cliente: null });
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, cliente: null });
+  const [statusModal, setStatusModal] = useState({ isOpen: false, cliente: null });
   const [formLoading, setFormLoading] = useState(false);
 
-  const itemsPerPage = 8;
-
-  // Cargar datos
-  useEffect(() => {
-    const fetchClientes = async () => {
-      setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
-      setClientes(MOCK_CLIENTES);
-      setLoading(false);
-    };
-    fetchClientes();
-  }, []);
-
-  // Filtrar clientes
-  const filteredClientes = useMemo(() => {
-    return clientes.filter((cliente) => {
-      // Búsqueda
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
-        const matchSearch = 
-          cliente.razonSocial.toLowerCase().includes(search) ||
-          cliente.nit.includes(search) ||
-          cliente.ciudad.toLowerCase().includes(search);
-        if (!matchSearch) return false;
-      }
-
-      // Filtros
-      if (filters.tipoCliente && cliente.tipoCliente !== filters.tipoCliente) return false;
-      if (filters.sector && cliente.sector !== filters.sector) return false;
-      if (filters.estado && cliente.estado !== filters.estado) return false;
-
-      return true;
-    });
-  }, [clientes, searchTerm, filters]);
-
-  // Paginar
-  const paginatedClientes = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredClientes.slice(start, start + itemsPerPage);
-  }, [filteredClientes, currentPage]);
-
-  const totalPages = Math.ceil(filteredClientes.length / itemsPerPage);
-
-  // Handlers
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS DE BÚSQUEDA Y FILTROS
+  // ──────────────────────────────────────────────────────────────────────────
+  
   const handleSearch = (value) => {
     setSearchTerm(value);
-    setCurrentPage(1);
+    search(value);
   };
 
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
-    setCurrentPage(1);
+    const newFilters = { ...filters, [key]: value || undefined };
+    setFilters(newFilters);
+    
+    // Aplicar filtros al hook
+    applyFilters(newFilters);
+    
+    // Actualizar URL
+    const params = new URLSearchParams();
+    Object.entries(newFilters).forEach(([k, v]) => {
+      if (v) params.set(k, v);
+    });
+    setSearchParams(params);
   };
 
   const handleClearFilters = () => {
     setFilters({});
     setSearchTerm('');
-    setCurrentPage(1);
+    clearFilters();
+    setSearchParams({});
   };
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS CRUD
+  // ──────────────────────────────────────────────────────────────────────────
+  
   const handleCreate = () => {
     setFormModal({ isOpen: true, cliente: null });
   };
@@ -219,40 +260,65 @@ const ClientesList = () => {
     setDeleteModal({ isOpen: true, cliente });
   };
 
+  const handleChangeStatus = (cliente) => {
+    setStatusModal({ isOpen: true, cliente });
+  };
+
+  // Submit del formulario (crear/editar)
   const handleFormSubmit = async (data) => {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    
-    if (formModal.cliente) {
-      // Editar
-      setClientes((prev) =>
-        prev.map((c) => (c.id === formModal.cliente.id ? { ...c, ...data } : c))
-      );
-    } else {
-      // Crear
-      const newCliente = {
-        ...data,
-        id: `CLI-${String(clientes.length + 1).padStart(3, '0')}`,
-        despachosMes: 0,
-        facturacionMes: 0,
-      };
-      setClientes((prev) => [newCliente, ...prev]);
+    try {
+      if (formModal.cliente) {
+        // Editar cliente existente
+        await updateCliente(formModal.cliente.id, data);
+        saved('Cliente');
+      } else {
+        // Crear nuevo cliente
+        await createCliente(data);
+        saved('Cliente');
+      }
+      setFormModal({ isOpen: false, cliente: null });
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
     }
-
-    setFormLoading(false);
-    setFormModal({ isOpen: false, cliente: null });
   };
 
+  // Confirmar eliminación
   const handleConfirmDelete = async () => {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setClientes((prev) => prev.filter((c) => c.id !== deleteModal.cliente.id));
-    setFormLoading(false);
-    setDeleteModal({ isOpen: false, cliente: null });
+    try {
+      await deleteCliente(deleteModal.cliente.id);
+      deleted('Cliente');
+      setDeleteModal({ isOpen: false, cliente: null });
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  // Formatear moneda
+  // Confirmar cambio de estado
+  const handleConfirmStatusChange = async (nuevoEstado) => {
+    setFormLoading(true);
+    try {
+      await changeStatus(statusModal.cliente.id, nuevoEstado);
+      success(`Estado cambiado a ${nuevoEstado}`);
+      setStatusModal({ isOpen: false, cliente: null });
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FORMATTERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
   const formatCurrency = (value) => {
+    if (!value) return '$0';
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
@@ -261,12 +327,18 @@ const ClientesList = () => {
     }).format(value);
   };
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────────────────
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader notificationCount={3} />
+      <FloatingHeader />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* Page Header */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* PAGE HEADER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">Clientes</h1>
@@ -276,19 +348,48 @@ const ClientesList = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" icon={Download} size="md">
-              Exportar
-            </Button>
-            <Button variant="outline" icon={Upload} size="md">
-              Importar
-            </Button>
-            <Button variant="primary" icon={Plus} onClick={handleCreate}>
-              Nuevo Cliente
-            </Button>
+            {/* Exportar - Solo supervisor y admin */}
+            <ProtectedAction module="clientes" action="exportar">
+              <Button variant="outline" icon={Download} size="md">
+                Exportar
+              </Button>
+            </ProtectedAction>
+
+            {/* Importar - Solo admin */}
+            <ProtectedAction module="clientes" action="importar">
+              <Button variant="outline" icon={Upload} size="md">
+                Importar
+              </Button>
+            </ProtectedAction>
+
+            {/* Crear - Admin y Supervisor */}
+            <ProtectedAction module="clientes" action="crear">
+              <Button variant="primary" icon={Plus} onClick={handleCreate}>
+                Nuevo Cliente
+              </Button>
+            </ProtectedAction>
           </div>
         </div>
 
-        {/* Search & Filters Bar */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* ERROR STATE */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+            <p className="font-medium">Error al cargar clientes</p>
+            <p className="text-sm">{error}</p>
+            <button 
+              onClick={refresh}
+              className="mt-2 text-sm underline hover:no-underline"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* SEARCH & FILTERS BAR */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search */}
@@ -308,11 +409,21 @@ const ClientesList = () => {
               onClick={() => setShowFilters(!showFilters)}
             >
               Filtros
-              {Object.keys(filters).length > 0 && (
+              {Object.values(filters).filter(Boolean).length > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded-full">
-                  {Object.keys(filters).length}
+                  {Object.values(filters).filter(Boolean).length}
                 </span>
               )}
+            </Button>
+
+            {/* Refresh */}
+            <Button
+              variant="outline"
+              icon={RefreshCw}
+              onClick={refresh}
+              loading={loading}
+            >
+              <span className="hidden sm:inline">Actualizar</span>
             </Button>
           </div>
 
@@ -322,9 +433,9 @@ const ClientesList = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FilterDropdown
                   label="Tipo de Cliente"
-                  options={FILTER_OPTIONS.tipoCliente}
-                  value={filters.tipoCliente}
-                  onChange={(v) => handleFilterChange('tipoCliente', v)}
+                  options={FILTER_OPTIONS.tipo_cliente}
+                  value={filters.tipo_cliente}
+                  onChange={(v) => handleFilterChange('tipo_cliente', v)}
                   placeholder="Todos los tipos"
                 />
                 <FilterDropdown
@@ -343,7 +454,7 @@ const ClientesList = () => {
                 />
               </div>
               
-              {Object.keys(filters).length > 0 && (
+              {Object.values(filters).filter(Boolean).length > 0 && (
                 <div className="mt-4 flex justify-end">
                   <Button variant="ghost" size="sm" onClick={handleClearFilters}>
                     Limpiar filtros
@@ -354,14 +465,18 @@ const ClientesList = () => {
           )}
         </div>
 
-        {/* Results Count */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* RESULTS COUNT */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="mb-4">
           <p className="text-sm text-slate-500">
-            {filteredClientes.length} cliente{filteredClientes.length !== 1 && 's'} encontrado{filteredClientes.length !== 1 && 's'}
+            {pagination.total} cliente{pagination.total !== 1 && 's'} encontrado{pagination.total !== 1 && 's'}
           </p>
         </div>
 
-        {/* Table */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* TABLE */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
             // Loading skeleton
@@ -377,7 +492,7 @@ const ClientesList = () => {
                 </div>
               ))}
             </div>
-          ) : paginatedClientes.length === 0 ? (
+          ) : clientes.length === 0 ? (
             // Empty state
             <div className="py-16 text-center">
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -387,14 +502,16 @@ const ClientesList = () => {
                 No se encontraron clientes
               </h3>
               <p className="text-slate-500 mb-4">
-                {searchTerm || Object.keys(filters).length > 0
+                {searchTerm || Object.values(filters).filter(Boolean).length > 0
                   ? 'Intenta ajustar los filtros de búsqueda'
                   : 'Comienza agregando tu primer cliente'}
               </p>
-              {!searchTerm && Object.keys(filters).length === 0 && (
-                <Button variant="primary" icon={Plus} onClick={handleCreate}>
-                  Nuevo Cliente
-                </Button>
+              {!searchTerm && Object.values(filters).filter(Boolean).length === 0 && (
+                <ProtectedAction module="clientes" action="crear">
+                  <Button variant="primary" icon={Plus} onClick={handleCreate}>
+                    Nuevo Cliente
+                  </Button>
+                </ProtectedAction>
               )}
             </div>
           ) : (
@@ -416,12 +533,6 @@ const ClientesList = () => {
                       Ciudad
                     </th>
                     <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Despachos/Mes
-                    </th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Facturación/Mes
-                    </th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       Estado
                     </th>
                     <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -430,7 +541,7 @@ const ClientesList = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedClientes.map((cliente) => (
+                  {clientes.map((cliente) => (
                     <tr
                       key={cliente.id}
                       className="border-b border-gray-50 hover:bg-slate-50 transition-colors"
@@ -445,7 +556,7 @@ const ClientesList = () => {
                               className="text-sm font-medium text-slate-800 hover:text-orange-600 cursor-pointer"
                               onClick={() => handleView(cliente)}
                             >
-                              {cliente.razonSocial}
+                              {cliente.razon_social}
                             </p>
                             <p className="text-xs text-slate-500">{cliente.email}</p>
                           </div>
@@ -455,16 +566,10 @@ const ClientesList = () => {
                         {cliente.nit}
                       </td>
                       <td className="py-4 px-4 text-sm text-slate-600 capitalize">
-                        {cliente.tipoCliente}
+                        {cliente.tipo_cliente || '-'}
                       </td>
                       <td className="py-4 px-4 text-sm text-slate-600">
                         {cliente.ciudad}
-                      </td>
-                      <td className="py-4 px-4 text-sm text-slate-600 text-center">
-                        {cliente.despachosMes}
-                      </td>
-                      <td className="py-4 px-4 text-sm text-slate-800 text-right font-medium">
-                        {formatCurrency(cliente.facturacionMes)}
                       </td>
                       <td className="py-4 px-4 text-center">
                         <StatusChip status={cliente.estado} />
@@ -475,6 +580,7 @@ const ClientesList = () => {
                           onView={handleView}
                           onEdit={handleEdit}
                           onDelete={handleDelete}
+                          onChangeStatus={handleChangeStatus}
                         />
                       </td>
                     </tr>
@@ -485,25 +591,31 @@ const ClientesList = () => {
           )}
 
           {/* Pagination */}
-          {!loading && totalPages > 1 && (
+          {!loading && pagination.totalPages > 1 && (
             <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={filteredClientes.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              itemsPerPage={pagination.limit}
+              onPageChange={goToPage}
             />
           )}
         </div>
 
-        {/* Footer */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* FOOTER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
           © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
           Centro Logístico Industrial del Norte, Girardota, Antioquia
         </footer>
       </main>
 
-      {/* Form Modal */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* MODALS */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      
+      {/* Form Modal (Crear/Editar) */}
       <ClienteForm
         isOpen={formModal.isOpen}
         onClose={() => setFormModal({ isOpen: false, cliente: null })}
@@ -518,11 +630,46 @@ const ClientesList = () => {
         onClose={() => setDeleteModal({ isOpen: false, cliente: null })}
         onConfirm={handleConfirmDelete}
         title="Eliminar Cliente"
-        message={`¿Estás seguro de eliminar a "${deleteModal.cliente?.razonSocial}"? Esta acción no se puede deshacer.`}
+        message={`¿Estás seguro de eliminar a "${deleteModal.cliente?.razon_social}"? Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         type="danger"
         loading={formLoading}
       />
+
+      {/* Status Change Modal */}
+      {statusModal.isOpen && (
+        <ConfirmDialog
+          isOpen={statusModal.isOpen}
+          onClose={() => setStatusModal({ isOpen: false, cliente: null })}
+          title="Cambiar Estado"
+          message={`Selecciona el nuevo estado para "${statusModal.cliente?.razon_social}"`}
+          loading={formLoading}
+          customContent={
+            <div className="space-y-2 mt-4">
+              {FILTER_OPTIONS.estado.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleConfirmStatusChange(opt.value)}
+                  disabled={statusModal.cliente?.estado === opt.value}
+                  className={`
+                    w-full p-3 text-left rounded-xl border transition-colors
+                    ${statusModal.cliente?.estado === opt.value 
+                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' 
+                      : 'bg-white border-slate-200 hover:border-orange-500 hover:bg-orange-50'
+                    }
+                  `}
+                >
+                  {opt.label}
+                  {statusModal.cliente?.estado === opt.value && (
+                    <span className="text-xs ml-2">(actual)</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          }
+          hideConfirmButton
+        />
+      )}
     </div>
   );
 };

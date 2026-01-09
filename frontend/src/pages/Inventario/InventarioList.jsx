@@ -1,13 +1,23 @@
 /**
- * ISTHO CRM - InventarioList Page
- * Listado de productos con búsqueda, filtros y paginación
+ * ============================================================================
+ * ISTHO CRM - InventarioList (Fase 5 - Integración Completa)
+ * ============================================================================
+ * Listado de productos conectado al backend real.
+ * 
+ * CAMBIOS vs versión anterior:
+ * - Eliminado MOCK_PRODUCTOS
+ * - Conectado con useInventario hook
+ * - CRUD real de productos
+ * - Movimientos (entrada/salida) conectados a API
+ * - Control de permisos con ProtectedAction
  * 
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Enero 2026
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Filter,
@@ -22,6 +32,7 @@ import {
   PackageMinus,
   AlertTriangle,
   Warehouse,
+  RefreshCw,
 } from 'lucide-react';
 
 // Layout
@@ -42,23 +53,17 @@ import {
 import ProductoForm from './components/ProductoForm';
 import MovimientoForm from './components/MovimientoForm';
 
-// ============================================
-// DATOS MOCK
-// ============================================
-const MOCK_PRODUCTOS = [
-  { id: 'PRD-001', codigo: 'SKU-LCH-001', nombre: 'Leche UHT x24', categoria: 'lacteos', clientePropietario: 'CLI-001', clienteNombre: 'Lácteos Betania', bodega: 'BOD-01', ubicacion: 'A-01-03', stockActual: 12500, stockMinimo: 1000, unidadMedida: 'caja', estado: 'disponible', costoUnitario: 48000, ultimoMovimiento: '2026-01-08' },
-  { id: 'PRD-002', codigo: 'SKU-YGT-001', nombre: 'Yogurt Griego x12', categoria: 'lacteos', clientePropietario: 'CLI-001', clienteNombre: 'Lácteos Betania', bodega: 'BOD-01', ubicacion: 'A-02-01', stockActual: 8200, stockMinimo: 500, unidadMedida: 'caja', estado: 'disponible', costoUnitario: 72000, ultimoMovimiento: '2026-01-07' },
-  { id: 'PRD-003', codigo: 'SKU-TEJ-001', nombre: 'Tejas Onduladas', categoria: 'construccion', clientePropietario: 'CLI-003', clienteNombre: 'Eternit Colombia', bodega: 'BOD-04', ubicacion: 'B-01-05', stockActual: 450, stockMinimo: 500, unidadMedida: 'unidad', estado: 'bajo_stock', costoUnitario: 35000, ultimoMovimiento: '2026-01-06' },
-  { id: 'PRD-004', codigo: 'SKU-ENV-001', nombre: 'Envases PET 500ml', categoria: 'envases', clientePropietario: 'CLI-004', clienteNombre: 'Prodenvases', bodega: 'BOD-02', ubicacion: 'C-03-02', stockActual: 45000, stockMinimo: 5000, unidadMedida: 'unidad', estado: 'disponible', costoUnitario: 850, ultimoMovimiento: '2026-01-08' },
-  { id: 'PRD-005', codigo: 'SKU-DET-001', nombre: 'Detergente Industrial 20L', categoria: 'quimicos', clientePropietario: 'CLI-005', clienteNombre: 'Klar Colombia', bodega: 'BOD-03', ubicacion: 'D-02-01', stockActual: 320, stockMinimo: 100, unidadMedida: 'unidad', estado: 'disponible', costoUnitario: 125000, ultimoMovimiento: '2026-01-07' },
-  { id: 'PRD-006', codigo: 'SKU-QSO-001', nombre: 'Queso Doble Crema x5kg', categoria: 'lacteos', clientePropietario: 'CLI-001', clienteNombre: 'Lácteos Betania', bodega: 'BOD-01', ubicacion: 'A-03-02', stockActual: 890, stockMinimo: 200, unidadMedida: 'unidad', estado: 'disponible', costoUnitario: 85000, ultimoMovimiento: '2026-01-08' },
-  { id: 'PRD-007', codigo: 'SKU-CEM-001', nombre: 'Cemento Gris x50kg', categoria: 'construccion', clientePropietario: 'CLI-003', clienteNombre: 'Eternit Colombia', bodega: 'BOD-04', ubicacion: 'B-02-01', stockActual: 0, stockMinimo: 200, unidadMedida: 'bulto', estado: 'agotado', costoUnitario: 28000, ultimoMovimiento: '2026-01-05' },
-  { id: 'PRD-008', codigo: 'SKU-BOT-001', nombre: 'Botellones Agua 20L', categoria: 'envases', clientePropietario: 'CLI-004', clienteNombre: 'Prodenvases', bodega: 'BOD-02', ubicacion: 'C-01-04', stockActual: 2800, stockMinimo: 500, unidadMedida: 'unidad', estado: 'disponible', costoUnitario: 12000, ultimoMovimiento: '2026-01-08' },
-  { id: 'PRD-009', codigo: 'SKU-DES-001', nombre: 'Desinfectante 5L', categoria: 'quimicos', clientePropietario: 'CLI-005', clienteNombre: 'Klar Colombia', bodega: 'BOD-03', ubicacion: 'D-01-03', stockActual: 150, stockMinimo: 200, unidadMedida: 'unidad', estado: 'bajo_stock', costoUnitario: 45000, ultimoMovimiento: '2026-01-06' },
-  { id: 'PRD-010', codigo: 'SKU-MNT-001', nombre: 'Mantequilla x500g', categoria: 'lacteos', clientePropietario: 'CLI-001', clienteNombre: 'Lácteos Betania', bodega: 'BOD-01', ubicacion: 'A-01-05', stockActual: 3200, stockMinimo: 800, unidadMedida: 'unidad', estado: 'disponible', costoUnitario: 18000, ultimoMovimiento: '2026-01-08' },
-];
+// ════════════════════════════════════════════════════════════════════════════
+// HOOKS INTEGRADOS
+// ════════════════════════════════════════════════════════════════════════════
+import useInventario from '../../hooks/useInventario';
+import useNotification from '../../hooks/useNotification';
+import { useAuth } from '../../context/AuthContext';
+import { ProtectedAction } from '../../components/auth/PrivateRoute';
 
-// Opciones de filtros
+// ════════════════════════════════════════════════════════════════════════════
+// OPCIONES DE FILTROS
+// ════════════════════════════════════════════════════════════════════════════
 const FILTER_OPTIONS = {
   categoria: [
     { value: 'lacteos', label: 'Lácteos' },
@@ -82,16 +87,20 @@ const FILTER_OPTIONS = {
   ],
 };
 
-// ============================================
-// COMPONENTE ROW ACTIONS
-// ============================================
-const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida }) => {
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTES INTERNOS
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Menú de acciones por fila
+ */
+const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, canEdit, canDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={function() { setIsOpen(!isOpen); }}
         className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
       >
         <MoreVertical className="w-4 h-4" />
@@ -99,46 +108,56 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida })
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="fixed inset-0 z-10" onClick={function() { setIsOpen(false); }} />
           <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20">
             <button
-              onClick={() => { onView(producto); setIsOpen(false); }}
+              onClick={function() { onView(producto); setIsOpen(false); }}
               className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
               <Eye className="w-4 h-4" />
               Ver detalle
             </button>
-            <button
-              onClick={() => { onEdit(producto); setIsOpen(false); }}
-              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              <Pencil className="w-4 h-4" />
-              Editar
-            </button>
-            <div className="border-t border-gray-100 my-1" />
-            <button
-              onClick={() => { onEntrada(producto); setIsOpen(false); }}
-              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50"
-            >
-              <PackagePlus className="w-4 h-4" />
-              Registrar Entrada
-            </button>
-            <button
-              onClick={() => { onSalida(producto); setIsOpen(false); }}
-              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-blue-600 hover:bg-blue-50"
-              disabled={producto.stockActual === 0}
-            >
-              <PackageMinus className="w-4 h-4" />
-              Registrar Salida
-            </button>
-            <div className="border-t border-gray-100 my-1" />
-            <button
-              onClick={() => { onDelete(producto); setIsOpen(false); }}
-              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="w-4 h-4" />
-              Eliminar
-            </button>
+            {canEdit && (
+              <button
+                onClick={function() { onEdit(producto); setIsOpen(false); }}
+                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <Pencil className="w-4 h-4" />
+                Editar
+              </button>
+            )}
+            {canEdit && (
+              <>
+                <div className="border-t border-gray-100 my-1" />
+                <button
+                  onClick={function() { onEntrada(producto); setIsOpen(false); }}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50"
+                >
+                  <PackagePlus className="w-4 h-4" />
+                  Registrar Entrada
+                </button>
+                <button
+                  onClick={function() { onSalida(producto); setIsOpen(false); }}
+                  className={'flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-blue-50 ' + (producto.stock_actual === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600')}
+                  disabled={producto.stock_actual === 0}
+                >
+                  <PackageMinus className="w-4 h-4" />
+                  Registrar Salida
+                </button>
+              </>
+            )}
+            {canDelete && (
+              <>
+                <div className="border-t border-gray-100 my-1" />
+                <button
+                  onClick={function() { onDelete(producto); setIsOpen(false); }}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Eliminar
+                </button>
+              </>
+            )}
           </div>
         </>
       )}
@@ -146,9 +165,9 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida })
   );
 };
 
-// ============================================
-// STOCK INDICATOR
-// ============================================
+/**
+ * Indicador visual de stock
+ */
 const StockIndicator = ({ actual, minimo }) => {
   const porcentaje = minimo > 0 ? (actual / minimo) * 100 : 100;
   let colorClass = 'bg-emerald-500';
@@ -163,8 +182,8 @@ const StockIndicator = ({ actual, minimo }) => {
     <div className="flex items-center gap-2">
       <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
         <div 
-          className={`h-full ${colorClass} transition-all duration-300`}
-          style={{ width: `${Math.min(porcentaje, 100)}%` }}
+          className={'h-full transition-all duration-300 ' + colorClass}
+          style={{ width: Math.min(porcentaje, 100) + '%' }}
         />
       </div>
       <span className="text-sm font-medium text-slate-700">
@@ -174,18 +193,45 @@ const StockIndicator = ({ actual, minimo }) => {
   );
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
 const InventarioList = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user, hasPermission } = useAuth();
+  const { success, apiError, saved, deleted, stockAlert } = useNotification();
 
-  // Estados
-  const [productos, setProductos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // ──────────────────────────────────────────────────────────────────────────
+  // HOOK DE INVENTARIO
+  // ──────────────────────────────────────────────────────────────────────────
+  const {
+    productos,
+    loading,
+    error,
+    pagination,
+    kpis,
+    isRefreshing,
+    // Acciones
+    refresh,
+    search,
+    applyFilters,
+    goToPage,
+    createProducto,
+    updateProducto,
+    deleteProducto,
+    registrarMovimiento,
+  } = useInventario({ 
+    autoFetch: true,
+    // Si es cliente, filtrar por su cliente_id
+    initialFilters: user?.rol === 'cliente' ? { cliente_id: user.cliente_id } : {},
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // ESTADOS LOCALES
+  // ──────────────────────────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({});
-  const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   
   // Modals
@@ -194,161 +240,143 @@ const InventarioList = () => {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, producto: null });
   const [formLoading, setFormLoading] = useState(false);
 
-  const itemsPerPage = 8;
+  // Permisos
+  const canCreate = hasPermission('inventario', 'crear');
+  const canEdit = hasPermission('inventario', 'editar');
+  const canDelete = hasPermission('inventario', 'eliminar');
+  const canExport = hasPermission('inventario', 'exportar');
+  const canImport = hasPermission('inventario', 'importar');
 
-  // Cargar datos
-  useEffect(() => {
-    const fetchProductos = async () => {
-      setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
-      setProductos(MOCK_PRODUCTOS);
-      setLoading(false);
-    };
-    fetchProductos();
-  }, []);
+  // ──────────────────────────────────────────────────────────────────────────
+  // APLICAR FILTRO DE URL
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(function() {
+    const filterParam = searchParams.get('filter');
+    if (filterParam === 'alertas') {
+      setFilters({ estado: 'bajo_stock' });
+      applyFilters({ estado: 'bajo_stock' });
+    } else if (filterParam === 'agotados') {
+      setFilters({ estado: 'agotado' });
+      applyFilters({ estado: 'agotado' });
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // KPIs calculados
-  const kpis = useMemo(() => {
-    const total = productos.length;
-    const disponibles = productos.filter(p => p.estado === 'disponible').length;
-    const bajoStock = productos.filter(p => p.estado === 'bajo_stock').length;
-    const agotados = productos.filter(p => p.estado === 'agotado').length;
-    const valorTotal = productos.reduce((sum, p) => sum + (p.stockActual * p.costoUnitario), 0);
+  // ──────────────────────────────────────────────────────────────────────────
+  // NOTIFICAR ALERTAS AL CARGAR
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(function() {
+    if (kpis && (kpis.bajoStock + kpis.agotados) > 0 && !loading) {
+      stockAlert(kpis.bajoStock + kpis.agotados);
+    }
+  }, [kpis?.bajoStock, kpis?.agotados]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    return { total, disponibles, bajoStock, agotados, valorTotal };
-  }, [productos]);
-
-  // Filtrar productos
-  const filteredProductos = useMemo(() => {
-    return productos.filter((producto) => {
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
-        const matchSearch = 
-          producto.nombre.toLowerCase().includes(search) ||
-          producto.codigo.toLowerCase().includes(search) ||
-          producto.clienteNombre.toLowerCase().includes(search);
-        if (!matchSearch) return false;
-      }
-
-      if (filters.categoria && producto.categoria !== filters.categoria) return false;
-      if (filters.bodega && producto.bodega !== filters.bodega) return false;
-      if (filters.estado && producto.estado !== filters.estado) return false;
-
-      return true;
-    });
-  }, [productos, searchTerm, filters]);
-
-  // Paginar
-  const paginatedProductos = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredProductos.slice(start, start + itemsPerPage);
-  }, [filteredProductos, currentPage]);
-
-  const totalPages = Math.ceil(filteredProductos.length / itemsPerPage);
-
-  // Handlers
-  const handleSearch = (value) => {
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const handleSearch = function(value) {
     setSearchTerm(value);
-    setCurrentPage(1);
+    search(value);
   };
 
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
-    setCurrentPage(1);
+  const handleFilterChange = function(key, value) {
+    var newFilters = Object.assign({}, filters);
+    if (value) {
+      newFilters[key] = value;
+    } else {
+      delete newFilters[key];
+    }
+    setFilters(newFilters);
+    applyFilters(newFilters);
   };
 
-  const handleClearFilters = () => {
+  const handleClearFilters = function() {
     setFilters({});
     setSearchTerm('');
-    setCurrentPage(1);
+    applyFilters({});
+    search('');
   };
 
-  const handleCreate = () => {
+  const handleCreate = function() {
     setFormModal({ isOpen: true, producto: null });
   };
 
-  const handleEdit = (producto) => {
-    setFormModal({ isOpen: true, producto });
+  const handleEdit = function(producto) {
+    setFormModal({ isOpen: true, producto: producto });
   };
 
-  const handleView = (producto) => {
-    navigate(`/inventario/productos/${producto.id}`);
+  const handleView = function(producto) {
+    navigate('/inventario/productos/' + producto.id);
   };
 
-  const handleDelete = (producto) => {
-    setDeleteModal({ isOpen: true, producto });
+  const handleDelete = function(producto) {
+    setDeleteModal({ isOpen: true, producto: producto });
   };
 
-  const handleEntrada = (producto) => {
-    setMovimientoModal({ isOpen: true, tipo: 'entrada', producto });
+  const handleEntrada = function(producto) {
+    setMovimientoModal({ isOpen: true, tipo: 'entrada', producto: producto });
   };
 
-  const handleSalida = (producto) => {
-    setMovimientoModal({ isOpen: true, tipo: 'salida', producto });
+  const handleSalida = function(producto) {
+    setMovimientoModal({ isOpen: true, tipo: 'salida', producto: producto });
   };
 
-  const handleFormSubmit = async (data) => {
+  const handleFormSubmit = async function(data) {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    
-    if (formModal.producto) {
-      setProductos((prev) =>
-        prev.map((p) => (p.id === formModal.producto.id ? { ...p, ...data } : p))
-      );
-    } else {
-      const newProducto = {
-        ...data,
-        id: `PRD-${String(productos.length + 1).padStart(3, '0')}`,
-        ultimoMovimiento: new Date().toISOString().split('T')[0],
-      };
-      setProductos((prev) => [newProducto, ...prev]);
+    try {
+      if (formModal.producto) {
+        await updateProducto(formModal.producto.id, data);
+        saved('Producto');
+      } else {
+        await createProducto(data);
+        saved('Producto');
+      }
+      setFormModal({ isOpen: false, producto: null });
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
     }
-
-    setFormLoading(false);
-    setFormModal({ isOpen: false, producto: null });
   };
 
-  const handleMovimientoSubmit = async (data) => {
+  const handleMovimientoSubmit = async function(data) {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    
-    // Actualizar stock
-    const isEntrada = data.tipo === 'entrada';
-    setProductos((prev) =>
-      prev.map((p) => {
-        if (p.id === movimientoModal.producto.id) {
-          const nuevoStock = isEntrada 
-            ? p.stockActual + data.cantidad 
-            : p.stockActual - data.cantidad;
-          
-          let nuevoEstado = 'disponible';
-          if (nuevoStock === 0) nuevoEstado = 'agotado';
-          else if (nuevoStock <= p.stockMinimo) nuevoEstado = 'bajo_stock';
-
-          return {
-            ...p,
-            stockActual: nuevoStock,
-            estado: nuevoEstado,
-            ultimoMovimiento: data.fecha,
-          };
-        }
-        return p;
-      })
-    );
-
-    setFormLoading(false);
-    setMovimientoModal({ isOpen: false, tipo: 'entrada', producto: null });
+    try {
+      await registrarMovimiento(movimientoModal.producto.id, {
+        tipo: movimientoModal.tipo,
+        cantidad: data.cantidad,
+        motivo: data.motivo,
+        documento_referencia: data.documento_referencia,
+        observaciones: data.observaciones,
+      });
+      success('Movimiento de ' + movimientoModal.tipo + ' registrado correctamente');
+      setMovimientoModal({ isOpen: false, tipo: 'entrada', producto: null });
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async function() {
     setFormLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setProductos((prev) => prev.filter((p) => p.id !== deleteModal.producto.id));
-    setFormLoading(false);
-    setDeleteModal({ isOpen: false, producto: null });
+    try {
+      await deleteProducto(deleteModal.producto.id);
+      deleted('Producto');
+      setDeleteModal({ isOpen: false, producto: null });
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const formatCurrency = (value) => {
+  // ──────────────────────────────────────────────────────────────────────────
+  // FORMATTERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const formatCurrency = function(value) {
+    if (!value) return '$0';
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
@@ -356,12 +384,32 @@ const InventarioList = () => {
     }).format(value);
   };
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // KPIs LOCALES (fallback si API no provee)
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const displayKpis = kpis || {
+    total: productos.length,
+    disponibles: productos.filter(function(p) { return p.estado === 'disponible'; }).length,
+    bajoStock: productos.filter(function(p) { return p.estado === 'bajo_stock'; }).length,
+    agotados: productos.filter(function(p) { return p.estado === 'agotado'; }).length,
+    valorTotal: productos.reduce(function(sum, p) { 
+      return sum + ((p.stock_actual || 0) * (p.costo_unitario || 0)); 
+    }, 0),
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────────────────
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader notificationCount={kpis.bajoStock + kpis.agotados} />
+      <FloatingHeader notificationCount={displayKpis.bajoStock + displayKpis.agotados} />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* Page Header */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* PAGE HEADER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">Inventario</h1>
@@ -371,31 +419,49 @@ const InventarioList = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" icon={Download} size="md">
-              Exportar
-            </Button>
-            <Button variant="outline" icon={Upload} size="md">
-              Importar
-            </Button>
-            <Button variant="primary" icon={Plus} onClick={handleCreate}>
-              Nuevo Producto
-            </Button>
+            <Button 
+              variant="ghost" 
+              icon={RefreshCw} 
+              onClick={refresh}
+              loading={isRefreshing}
+              title="Actualizar datos"
+            />
+            
+            <ProtectedAction module="inventario" action="exportar">
+              <Button variant="outline" icon={Download} size="md">
+                Exportar
+              </Button>
+            </ProtectedAction>
+            
+            <ProtectedAction module="inventario" action="importar">
+              <Button variant="outline" icon={Upload} size="md">
+                Importar
+              </Button>
+            </ProtectedAction>
+            
+            <ProtectedAction module="inventario" action="crear">
+              <Button variant="primary" icon={Plus} onClick={handleCreate}>
+                Nuevo Producto
+              </Button>
+            </ProtectedAction>
           </div>
         </div>
 
+        {/* ════════════════════════════════════════════════════════════════ */}
         {/* KPIs */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <KpiCard
             title="Total Productos"
-            value={kpis.total}
+            value={displayKpis.total}
             icon={Package}
             iconBg="bg-blue-100"
             iconColor="text-blue-600"
           />
           <KpiCard
             title="Disponibles"
-            value={kpis.disponibles}
-            change={`${((kpis.disponibles / kpis.total) * 100).toFixed(0)}% del total`}
+            value={displayKpis.disponibles}
+            change={displayKpis.total > 0 ? Math.round((displayKpis.disponibles / displayKpis.total) * 100) + '% del total' : '0%'}
             positive={true}
             icon={Warehouse}
             iconBg="bg-emerald-100"
@@ -403,23 +469,27 @@ const InventarioList = () => {
           />
           <KpiCard
             title="Stock Bajo / Agotado"
-            value={kpis.bajoStock + kpis.agotados}
-            change={kpis.agotados > 0 ? `${kpis.agotados} agotados` : 'Sin agotados'}
-            positive={kpis.agotados === 0}
+            value={displayKpis.bajoStock + displayKpis.agotados}
+            change={displayKpis.agotados > 0 ? displayKpis.agotados + ' agotados' : 'Sin agotados'}
+            positive={displayKpis.agotados === 0}
             icon={AlertTriangle}
             iconBg="bg-amber-100"
             iconColor="text-amber-600"
+            onClick={function() { handleFilterChange('estado', 'bajo_stock'); }}
+            className="cursor-pointer hover:shadow-md transition-shadow"
           />
           <KpiCard
             title="Valor Total"
-            value={formatCurrency(kpis.valorTotal)}
+            value={formatCurrency(displayKpis.valorTotal)}
             icon={Package}
             iconBg="bg-violet-100"
             iconColor="text-violet-600"
           />
         </div>
 
-        {/* Search & Filters Bar */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* SEARCH & FILTERS */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
@@ -427,14 +497,14 @@ const InventarioList = () => {
                 placeholder="Buscar por nombre, SKU o cliente..."
                 value={searchTerm}
                 onChange={handleSearch}
-                onClear={() => handleSearch('')}
+                onClear={function() { handleSearch(''); }}
               />
             </div>
 
             <Button
               variant={showFilters ? 'secondary' : 'outline'}
               icon={Filter}
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={function() { setShowFilters(!showFilters); }}
             >
               Filtros
               {Object.keys(filters).length > 0 && (
@@ -452,21 +522,21 @@ const InventarioList = () => {
                   label="Categoría"
                   options={FILTER_OPTIONS.categoria}
                   value={filters.categoria}
-                  onChange={(v) => handleFilterChange('categoria', v)}
+                  onChange={function(v) { handleFilterChange('categoria', v); }}
                   placeholder="Todas las categorías"
                 />
                 <FilterDropdown
                   label="Bodega"
                   options={FILTER_OPTIONS.bodega}
                   value={filters.bodega}
-                  onChange={(v) => handleFilterChange('bodega', v)}
+                  onChange={function(v) { handleFilterChange('bodega', v); }}
                   placeholder="Todas las bodegas"
                 />
                 <FilterDropdown
                   label="Estado"
                   options={FILTER_OPTIONS.estado}
                   value={filters.estado}
-                  onChange={(v) => handleFilterChange('estado', v)}
+                  onChange={function(v) { handleFilterChange('estado', v); }}
                   placeholder="Todos los estados"
                 />
               </div>
@@ -482,29 +552,35 @@ const InventarioList = () => {
           )}
         </div>
 
-        {/* Results Count */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* RESULTS COUNT */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="mb-4">
           <p className="text-sm text-slate-500">
-            {filteredProductos.length} producto{filteredProductos.length !== 1 && 's'} encontrado{filteredProductos.length !== 1 && 's'}
+            {pagination?.total || productos.length} producto{(pagination?.total || productos.length) !== 1 ? 's' : ''} encontrado{(pagination?.total || productos.length) !== 1 ? 's' : ''}
           </p>
         </div>
 
-        {/* Table */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* TABLE */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
             <div className="p-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50 animate-pulse">
-                  <div className="w-10 h-10 bg-gray-200 rounded-lg" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-1/3" />
-                    <div className="h-3 bg-gray-100 rounded w-1/4" />
+              {[0, 1, 2, 3, 4].map(function(i) {
+                return (
+                  <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50 animate-pulse">
+                    <div className="w-10 h-10 bg-gray-200 rounded-lg" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-1/3" />
+                      <div className="h-3 bg-gray-100 rounded w-1/4" />
+                    </div>
+                    <div className="h-6 w-16 bg-gray-200 rounded-full" />
                   </div>
-                  <div className="h-6 w-16 bg-gray-200 rounded-full" />
-                </div>
-              ))}
+                );
+              })}
             </div>
-          ) : paginatedProductos.length === 0 ? (
+          ) : productos.length === 0 ? (
             <div className="py-16 text-center">
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Package className="w-8 h-8 text-slate-400" />
@@ -517,7 +593,7 @@ const InventarioList = () => {
                   ? 'Intenta ajustar los filtros de búsqueda'
                   : 'Comienza agregando tu primer producto'}
               </p>
-              {!searchTerm && Object.keys(filters).length === 0 && (
+              {!searchTerm && Object.keys(filters).length === 0 && canCreate && (
                 <Button variant="primary" icon={Plus} onClick={handleCreate}>
                   Nuevo Producto
                 </Button>
@@ -552,69 +628,82 @@ const InventarioList = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedProductos.map((producto) => (
-                    <tr
-                      key={producto.id}
-                      className="border-b border-gray-50 hover:bg-slate-50 transition-colors"
-                    >
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                            <Package className="w-5 h-5 text-slate-500" />
+                  {productos.map(function(producto) {
+                    var bodegaLabel = FILTER_OPTIONS.bodega.find(function(b) { 
+                      return b.value === producto.bodega; 
+                    });
+                    
+                    return (
+                      <tr
+                        key={producto.id}
+                        className="border-b border-gray-50 hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                              <Package className="w-5 h-5 text-slate-500" />
+                            </div>
+                            <div>
+                              <p 
+                                className="text-sm font-medium text-slate-800 hover:text-orange-600 cursor-pointer"
+                                onClick={function() { handleView(producto); }}
+                              >
+                                {producto.nombre}
+                              </p>
+                              <p className="text-xs text-slate-500">{producto.codigo || producto.sku}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p 
-                              className="text-sm font-medium text-slate-800 hover:text-orange-600 cursor-pointer"
-                              onClick={() => handleView(producto)}
-                            >
-                              {producto.nombre}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-slate-600">
+                          {producto.cliente_nombre || producto.clienteNombre || '-'}
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-sm">
+                            <p className="text-slate-800">{producto.ubicacion || '-'}</p>
+                            <p className="text-xs text-slate-500">
+                              {bodegaLabel ? bodegaLabel.label : producto.bodega}
                             </p>
-                            <p className="text-xs text-slate-500">{producto.codigo}</p>
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-sm text-slate-600">
-                        {producto.clienteNombre}
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="text-sm">
-                          <p className="text-slate-800">{producto.ubicacion}</p>
-                          <p className="text-xs text-slate-500">{FILTER_OPTIONS.bodega.find(b => b.value === producto.bodega)?.label}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <StockIndicator actual={producto.stockActual} minimo={producto.stockMinimo} />
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <StatusChip status={producto.estado} />
-                      </td>
-                      <td className="py-4 px-4 text-sm text-slate-800 text-right font-medium">
-                        {formatCurrency(producto.stockActual * producto.costoUnitario)}
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <RowActions
-                          producto={producto}
-                          onView={handleView}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                          onEntrada={handleEntrada}
-                          onSalida={handleSalida}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-4 px-4">
+                          <StockIndicator 
+                            actual={producto.stock_actual || producto.stockActual || 0} 
+                            minimo={producto.stock_minimo || producto.stockMinimo || 0} 
+                          />
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <StatusChip status={producto.estado} />
+                        </td>
+                        <td className="py-4 px-4 text-sm text-slate-800 text-right font-medium">
+                          {formatCurrency((producto.stock_actual || 0) * (producto.costo_unitario || 0))}
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <RowActions
+                            producto={producto}
+                            onView={handleView}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            onEntrada={handleEntrada}
+                            onSalida={handleSalida}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
 
-          {!loading && totalPages > 1 && (
+          {!loading && pagination && pagination.totalPages > 1 && (
             <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={filteredProductos.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              itemsPerPage={pagination.limit}
+              onPageChange={goToPage}
             />
           )}
         </div>
@@ -626,10 +715,13 @@ const InventarioList = () => {
         </footer>
       </main>
 
-      {/* Modals */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* MODALS */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      
       <ProductoForm
         isOpen={formModal.isOpen}
-        onClose={() => setFormModal({ isOpen: false, producto: null })}
+        onClose={function() { setFormModal({ isOpen: false, producto: null }); }}
         onSubmit={handleFormSubmit}
         producto={formModal.producto}
         loading={formLoading}
@@ -637,7 +729,7 @@ const InventarioList = () => {
 
       <MovimientoForm
         isOpen={movimientoModal.isOpen}
-        onClose={() => setMovimientoModal({ isOpen: false, tipo: 'entrada', producto: null })}
+        onClose={function() { setMovimientoModal({ isOpen: false, tipo: 'entrada', producto: null }); }}
         onSubmit={handleMovimientoSubmit}
         tipo={movimientoModal.tipo}
         producto={movimientoModal.producto}
@@ -646,10 +738,10 @@ const InventarioList = () => {
 
       <ConfirmDialog
         isOpen={deleteModal.isOpen}
-        onClose={() => setDeleteModal({ isOpen: false, producto: null })}
+        onClose={function() { setDeleteModal({ isOpen: false, producto: null }); }}
         onConfirm={handleConfirmDelete}
         title="Eliminar Producto"
-        message={`¿Estás seguro de eliminar "${deleteModal.producto?.nombre}"? Esta acción no se puede deshacer.`}
+        message={'¿Estás seguro de eliminar "' + (deleteModal.producto ? deleteModal.producto.nombre : '') + '"? Esta acción no se puede deshacer.'}
         confirmText="Eliminar"
         type="danger"
         loading={formLoading}

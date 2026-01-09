@@ -1,18 +1,31 @@
 /**
- * ISTHO CRM - Dashboard Principal
- * Panel completo con KPIs, gráficos, tabla y alertas
+ * ============================================================================
+ * ISTHO CRM - Dashboard (Fase 5 - Integración Completa)
+ * ============================================================================
+ * Dashboard conectado al backend real mediante hooks.
+ * Muestra KPIs, gráficos, alertas y actividad reciente.
+ * 
+ * CAMBIOS vs versión anterior:
+ * - Eliminados datos MOCK
+ * - Conectado con useDashboard hook
+ * - Conectado con useAuth para info de usuario
+ * - Integrado con sistema de notificaciones
  * 
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Enero 2026
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   Truck, 
   Package, 
   TrendingUp,
+  AlertTriangle,
+  RefreshCw,
+  CheckCircle,
 } from 'lucide-react';
 
 // Layout
@@ -24,9 +37,16 @@ import { KpiCard, DataTable, AlertWidget } from '../../components/common';
 // Charts
 import { BarChart, PieChart } from '../../components/charts';
 
-// ============================================
+// ════════════════════════════════════════════════════════════════════════════
+// HOOKS INTEGRADOS
+// ════════════════════════════════════════════════════════════════════════════
+import { useAuth } from '../../context/AuthContext';
+import useDashboard from '../../hooks/useDashboard';
+import useNotification from '../../hooks/useNotification';
+
+// ════════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN
-// ============================================
+// ════════════════════════════════════════════════════════════════════════════
 
 // KPIs Config
 const KPI_CONFIG = [
@@ -36,6 +56,10 @@ const KPI_CONFIG = [
     icon: Users,
     iconBg: 'bg-blue-100',
     iconColor: 'text-blue-600',
+    kpiKey: 'clientesActivos',
+    changeKey: 'clientesNuevosMes',
+    changePrefix: '+',
+    changeSuffix: ' este mes',
   },
   {
     id: 'despachos',
@@ -43,218 +67,259 @@ const KPI_CONFIG = [
     icon: Truck,
     iconBg: 'bg-emerald-100',
     iconColor: 'text-emerald-600',
+    kpiKey: 'despachosMes',
   },
   {
     id: 'inventario',
-    title: 'Inventario Total',
+    title: 'Productos en Stock',
     icon: Package,
     iconBg: 'bg-violet-100',
     iconColor: 'text-violet-600',
+    kpiKey: 'totalProductos',
   },
   {
     id: 'tasaEntrega',
-    title: 'Tasa de Entrega',
+    title: 'Tasa de Cumplimiento',
     icon: TrendingUp,
     iconBg: 'bg-orange-100',
     iconColor: 'text-orange-600',
+    kpiKey: 'tasaCumplimiento',
+    suffix: '%',
   },
 ];
 
-// Tabla de despachos recientes
+// Columnas de tabla de despachos
 const DESPACHOS_COLUMNS = [
-  { key: 'id', label: 'ID', type: 'id' },
-  { key: 'cliente', label: 'Cliente' },
-  { key: 'destino', label: 'Destino' },
-  { key: 'productos', label: 'Productos', align: 'center' },
+  { key: 'numero_operacion', label: 'ID', type: 'id' },
+  { 
+    key: 'cliente', 
+    label: 'Cliente',
+    render: (value, row) => row.cliente?.razon_social || 'Sin cliente'
+  },
+  { 
+    key: 'tipo', 
+    label: 'Tipo',
+    render: (value) => value === 'ingreso' ? 'Ingreso' : 'Salida'
+  },
   { key: 'estado', label: 'Estado', type: 'status' },
-  { key: 'fecha', label: 'Fecha' },
+  { 
+    key: 'created_at', 
+    label: 'Fecha',
+    render: (value) => new Date(value).toLocaleDateString('es-CO')
+  },
 ];
 
-// ============================================
-// DASHBOARD COMPONENT
-// ============================================
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
 const Dashboard = () => {
   const navigate = useNavigate();
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // HOOKS
+  // ──────────────────────────────────────────────────────────────────────────
+  const { user } = useAuth();
+  const { stockAlert, info } = useNotification();
+  
+  // Hook principal del dashboard con auto-refresh cada 60 segundos
+  const {
+    loading,
+    error,
+    isRefreshing,
+    kpis,
+    alertas,
+    alertasPorTipo,
+    totalAlertas,
+    despachosRecientes,
+    chartData,
+    refresh,
+    lastUpdated,
+  } = useDashboard({ 
+    autoFetch: true,
+    // Si el usuario es cliente, filtrar por su cliente_id
+    clienteId: user?.rol === 'cliente' ? user?.cliente_id : null,
+    refreshInterval: 60000, // Refrescar cada minuto
+  });
 
-  // Estados
-  const [loading, setLoading] = useState(true);
-  const [kpiData, setKpiData] = useState({});
-  const [barChartData, setBarChartData] = useState([]);
-  const [pieChartData, setPieChartData] = useState([]);
-  const [despachosRecientes, setDespachosRecientes] = useState([]);
-  const [alertas, setAlertas] = useState([]);
-
-  // Cargar datos
+  // ──────────────────────────────────────────────────────────────────────────
+  // EFECTOS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  // Mostrar notificación de alertas al cargar (solo una vez)
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      setLoading(true);
+    if (!loading && totalAlertas > 0) {
+      stockAlert(totalAlertas);
+    }
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      try {
-        // Simular delay de API
-        await new Promise((resolve) => setTimeout(resolve, 800));
-
-        // KPIs
-        setKpiData({
-          clientes: { value: '156', change: '+12 este mes', positive: true },
-          despachos: { value: '1,248', change: '+8.2% vs mes anterior', positive: true },
-          inventario: { value: '45,892', change: '94% disponibilidad', positive: true },
-          tasaEntrega: { value: '97.8%', change: '+0.8% mejora', positive: true },
-        });
-
-        // Gráfico de barras - Despachos vs Entregas (últimos 6 meses)
-        setBarChartData([
-          { label: 'Ago', value1: 180, value2: 165 },
-          { label: 'Sep', value1: 210, value2: 195 },
-          { label: 'Oct', value1: 195, value2: 188 },
-          { label: 'Nov', value1: 240, value2: 230 },
-          { label: 'Dic', value1: 285, value2: 275 },
-          { label: 'Ene', value1: 248, value2: 242 },
-        ]);
-
-        // Gráfico circular - Top clientes por volumen
-        setPieChartData([
-          { label: 'Lácteos Betania', value: 4500 },
-          { label: 'Almacenes Éxito', value: 3200 },
-          { label: 'Eternit Colombia', value: 2800 },
-          { label: 'Prodenvases', value: 2100 },
-          { label: 'Otros', value: 1800 },
-        ]);
-
-        // Despachos recientes
-        setDespachosRecientes([
-          { id: 'DSP-001', cliente: 'Lácteos Betania', destino: 'Medellín', productos: 45, estado: 'en_transito', fecha: '2026-01-08' },
-          { id: 'DSP-002', cliente: 'Almacenes Éxito', destino: 'Bogotá', productos: 120, estado: 'completado', fecha: '2026-01-08' },
-          { id: 'DSP-003', cliente: 'Eternit Colombia', destino: 'Cali', productos: 85, estado: 'programado', fecha: '2026-01-09' },
-          { id: 'DSP-004', cliente: 'Prodenvases', destino: 'Barranquilla', productos: 200, estado: 'en_transito', fecha: '2026-01-08' },
-          { id: 'DSP-005', cliente: 'Klar Colombia', destino: 'Cartagena', productos: 65, estado: 'completado', fecha: '2026-01-07' },
-        ]);
-
-        // Alertas
-        setAlertas([
-          {
-            id: 1,
-            type: 'documento',
-            title: 'Certificado ISO por vencer',
-            description: 'El certificado ISO 9001 vence en 15 días',
-            date: 'Vence: 23 Ene 2026',
-          },
-          {
-            id: 2,
-            type: 'inventario',
-            title: 'Stock bajo - Tejas Onduladas',
-            description: 'Solo quedan 450 unidades disponibles',
-            date: 'Actualizado hace 2 horas',
-          },
-          {
-            id: 3,
-            type: 'documento',
-            title: 'Póliza de seguros por renovar',
-            description: 'La póliza de transporte vence en 20 días',
-            date: 'Vence: 28 Ene 2026',
-          },
-          {
-            id: 4,
-            type: 'inventario',
-            title: 'Stock bajo - Envases PET',
-            description: 'Nivel crítico: 1,200 unidades',
-            date: 'Actualizado hace 4 horas',
-          },
-          {
-            id: 5,
-            type: 'vencimiento',
-            title: 'Contrato próximo a vencer',
-            description: 'Contrato con Almacenes Éxito',
-            date: 'Vence: 15 Feb 2026',
-          },
-        ]);
-
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
-
-  // Handlers
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
   const handleDespachoClick = (row) => {
     navigate(`/despachos/${row.id}`);
   };
 
   const handleAlertClick = (alert) => {
-    console.log('Alert clicked:', alert);
     // Navegar según tipo de alerta
-    if (alert.type === 'documento') navigate('/documentos');
-    if (alert.type === 'inventario') navigate('/inventario/alertas');
+    if (alert.tipo === 'stock_bajo' || alert.tipo === 'agotado') {
+      navigate('/inventario/alertas');
+    } else if (alert.tipo === 'vencimiento') {
+      navigate('/inventario/alertas?tipo=vencimiento');
+    }
   };
 
+  const handleRefresh = () => {
+    refresh();
+    info('Actualizando datos...');
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // PREPARAR DATOS PARA GRÁFICOS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  // Datos para gráfico de barras (despachos por estado)
+  const barData = chartData.despachosPorEstado?.map(item => ({
+    label: item.name,
+    value1: item.value,
+  })) || [];
+
+  // Datos para gráfico circular (clientes por estado o ingresos vs salidas)
+  const pieData = chartData.ingresosVsSalidas || [];
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FORMATEAR ALERTAS PARA EL WIDGET
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const formattedAlertas = alertas.slice(0, 5).map(alerta => ({
+    id: alerta.id,
+    type: alerta.tipo === 'stock_bajo' ? 'inventario' : 
+          alerta.tipo === 'agotado' ? 'inventario' : 
+          alerta.tipo === 'vencimiento' ? 'vencimiento' : 'documento',
+    title: alerta.tipo === 'stock_bajo' ? `Stock bajo - ${alerta.nombre}` :
+           alerta.tipo === 'agotado' ? `Agotado - ${alerta.nombre}` :
+           `Por vencer - ${alerta.nombre}`,
+    description: alerta.mensaje || `${alerta.cantidad_actual || 0} unidades disponibles`,
+    date: alerta.fecha_vencimiento ? `Vence: ${new Date(alerta.fecha_vencimiento).toLocaleDateString('es-CO')}` : 'Actualizado recientemente',
+    originalData: alerta,
+  }));
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────────────────
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
-      <FloatingHeader
-        notificationCount={alertas.length}
-        onSearchClick={() => console.log('Search')}
-        onNotificationClick={() => console.log('Notifications')}
-        onReportesClick={() => navigate('/reportes')}
-        onProfileClick={() => navigate('/perfil')}
-      />
+      <FloatingHeader />
 
       {/* Main Content */}
-      <main className="pt-5 px-4 pb-8 max-w-7xl mx-auto">
-        {/* Page Title */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
-          <p className="text-slate-500 mt-1">
-            Bienvenido al panel de control de Istho CRM
-          </p>
+      <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* PAGE HEADER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">
+              Bienvenido, {user?.nombre_completo?.split(' ')[0] || 'Usuario'}
+            </h1>
+            <p className="text-slate-500 mt-1">
+              Panel de control de Istho CRM
+              {lastUpdated && (
+                <span className="text-xs ml-2 text-slate-400">
+                  • Actualizado: {new Date(lastUpdated).toLocaleTimeString('es-CO')}
+                </span>
+              )}
+            </p>
+          </div>
+          
+          {/* Botón de refrescar */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={`
+              flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 
+              rounded-xl hover:bg-gray-50 transition-colors shadow-sm
+              ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}
+            `}
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Actualizar</span>
+          </button>
         </div>
 
-        {/* KPI Cards */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* ERROR STATE */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+            <p className="font-medium">Error al cargar datos</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* KPI CARDS */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {KPI_CONFIG.map((kpi) => {
-            const data = kpiData[kpi.id] || {};
+          {KPI_CONFIG.map((kpiConfig) => {
+            // Obtener valor del KPI
+            let value = kpis[kpiConfig.kpiKey] ?? '-';
+            if (kpiConfig.suffix && value !== '-') {
+              value = `${value}${kpiConfig.suffix}`;
+            }
+            
+            // Obtener cambio si existe
+            let change = null;
+            if (kpiConfig.changeKey && kpis[kpiConfig.changeKey]) {
+              change = `${kpiConfig.changePrefix || ''}${kpis[kpiConfig.changeKey]}${kpiConfig.changeSuffix || ''}`;
+            }
+
             return (
               <KpiCard
-                key={kpi.id}
-                title={kpi.title}
-                value={data.value || '-'}
-                change={data.change}
-                positive={data.positive}
-                icon={kpi.icon}
-                iconBg={kpi.iconBg}
-                iconColor={kpi.iconColor}
+                key={kpiConfig.id}
+                title={kpiConfig.title}
+                value={value}
+                change={change}
+                positive={true}
+                icon={kpiConfig.icon}
+                iconBg={kpiConfig.iconBg}
+                iconColor={kpiConfig.iconColor}
                 loading={loading}
               />
             );
           })}
         </div>
 
-        {/* Charts Row */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* CHARTS ROW */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Bar Chart - Despachos vs Entregas */}
+          {/* Bar Chart - Despachos por Estado */}
           <BarChart
-            title="Despachos vs Entregas"
-            subtitle="Últimos 6 meses"
-            data={barChartData}
+            title="Despachos por Estado"
+            subtitle="Distribución actual"
+            data={barData}
             legend={[
-              { label: 'Despachos', color: '#3b82f6' },
-              { label: 'Entregas', color: '#10b981' },
+              { label: 'Cantidad', color: '#E65100' },
             ]}
             height={300}
+            loading={loading}
           />
 
-          {/* Pie Chart - Top Clientes */}
+          {/* Pie Chart - Ingresos vs Salidas */}
           <PieChart
-            title="Top Clientes por Volumen"
-            subtitle="Distribución de despachos"
-            data={pieChartData}
+            title="Ingresos vs Salidas"
+            subtitle="Operaciones del mes"
+            data={pieData}
             size={180}
+            loading={loading}
           />
         </div>
 
-        {/* Bottom Row - Table & Alerts */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* BOTTOM ROW - TABLE & ALERTS */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Despachos Recientes - 2 columnas */}
           <div className="lg:col-span-2">
@@ -266,7 +331,7 @@ const Dashboard = () => {
                       Despachos Recientes
                     </h3>
                     <p className="text-sm text-slate-500 mt-1">
-                      Últimos movimientos del sistema
+                      Últimas operaciones del sistema
                     </p>
                   </div>
                   <button 
@@ -291,16 +356,57 @@ const Dashboard = () => {
           {/* Alertas Widget - 1 columna */}
           <div className="lg:col-span-1">
             <AlertWidget
-              title="Alertas"
-              alerts={alertas}
+              title="Alertas de Inventario"
+              alerts={formattedAlertas}
               onAlertClick={handleAlertClick}
-              onViewAll={() => navigate('/alertas')}
+              onViewAll={() => navigate('/inventario/alertas')}
               maxItems={4}
+              loading={loading}
+              emptyIcon={CheckCircle}
+              emptyMessage="Sin alertas pendientes"
             />
+
+            {/* Resumen de alertas por tipo */}
+            {!loading && totalAlertas > 0 && (
+              <div className="mt-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <h4 className="text-sm font-medium text-slate-700 mb-3">Resumen de Alertas</h4>
+                <div className="space-y-2">
+                  {alertasPorTipo.stock_bajo?.length > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-amber-600 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Stock Bajo
+                      </span>
+                      <span className="font-medium">{alertasPorTipo.stock_bajo.length}</span>
+                    </div>
+                  )}
+                  {alertasPorTipo.agotado?.length > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-red-600 flex items-center gap-2">
+                        <Package className="w-4 h-4" />
+                        Agotados
+                      </span>
+                      <span className="font-medium">{alertasPorTipo.agotado.length}</span>
+                    </div>
+                  )}
+                  {alertasPorTipo.vencimiento?.length > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-orange-600 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4" />
+                        Por Vencer
+                      </span>
+                      <span className="font-medium">{alertasPorTipo.vencimiento.length}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Footer */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* FOOTER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
           © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
           Centro Logístico Industrial del Norte, Girardota, Antioquia
