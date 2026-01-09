@@ -1,25 +1,24 @@
 /**
  * ============================================================================
- * ISTHO CRM - Servicio de Inventario
+ * ISTHO CRM - Servicio de Inventario (Versión Completa)
  * ============================================================================
  * Gestiona todas las operaciones relacionadas con inventario:
- * - CRUD de registros de inventario
- * - Consultas por cliente
- * - Alertas de stock bajo y vencimiento
- * - Ajustes de cantidades
- * - Estadísticas
+ * - CRUD de productos
+ * - Movimientos (entradas/salidas/ajustes)
+ * - Alertas de stock
+ * - Estadísticas y KPIs
  * 
  * @author Coordinación TI ISTHO
- * @version 1.0.0
+ * @version 2.0.0
  * @date Enero 2026
  */
 
-import apiClient from './client';
+import apiClient from './axios';
 import { INVENTARIO_ENDPOINTS } from './endpoints';
 
-// ============================================================================
+// ════════════════════════════════════════════════════════════════════════════
 // SERVICIO DE INVENTARIO
-// ============================================================================
+// ════════════════════════════════════════════════════════════════════════════
 
 const inventarioService = {
   
@@ -33,20 +32,12 @@ const inventarioService = {
    * @param {Object} params - Parámetros de búsqueda
    * @param {number} [params.page=1] - Número de página
    * @param {number} [params.limit=10] - Registros por página
-   * @param {string} [params.search] - Búsqueda por SKU, producto, código de barras
+   * @param {string} [params.search] - Búsqueda
    * @param {number} [params.cliente_id] - Filtro por cliente
    * @param {string} [params.categoria] - Filtro por categoría
-   * @param {string} [params.zona] - Filtro por zona ('Refrigerado'|'Seco'|'Químico')
-   * @param {string} [params.estado] - Filtro por estado ('disponible'|'reservado'|'dañado'|'cuarentena'|'vencido')
-   * @param {boolean} [params.stock_bajo] - Solo items con stock bajo
-   * @param {boolean} [params.proximo_vencer] - Solo items próximos a vencer
-   * @returns {Promise<Object>} Lista de inventario con paginación
-   * 
-   * @example
-   * const result = await inventarioService.getAll({ 
-   *   cliente_id: 1, 
-   *   stock_bajo: true 
-   * });
+   * @param {string} [params.bodega] - Filtro por bodega/zona
+   * @param {string} [params.estado] - Filtro por estado
+   * @returns {Promise<Object>}
    */
   getAll: async (params = {}) => {
     try {
@@ -55,26 +46,21 @@ const inventarioService = {
     } catch (error) {
       throw {
         success: false,
-        message: error.message || 'Error al obtener inventario',
-        code: error.code || 'GET_INVENTARIO_ERROR',
+        message: error.response?.data?.message || error.message || 'Error al obtener inventario',
+        code: 'GET_INVENTARIO_ERROR',
       };
     }
   },
   
   // ──────────────────────────────────────────────────────────────────────────
-  // OBTENER ITEM POR ID
+  // OBTENER POR ID
   // ──────────────────────────────────────────────────────────────────────────
   
   /**
-   * Obtener un registro de inventario específico
-   * Incluye información del cliente y movimientos recientes
+   * Obtener un producto de inventario por ID
    * 
-   * @param {number|string} id - ID del registro de inventario
-   * @returns {Promise<Object>} Datos del item
-   * 
-   * @example
-   * const item = await inventarioService.getById(1);
-   * // item.data = { id, sku, producto, cantidad, cantidad_disponible, cliente, ... }
+   * @param {number|string} id - ID del producto
+   * @returns {Promise<Object>}
    */
   getById: async (id) => {
     try {
@@ -83,25 +69,22 @@ const inventarioService = {
     } catch (error) {
       throw {
         success: false,
-        message: error.message || 'Error al obtener item de inventario',
-        code: error.code || 'GET_ITEM_ERROR',
+        message: error.response?.data?.message || 'Error al obtener producto',
+        code: 'GET_PRODUCTO_ERROR',
       };
     }
   },
   
   // ──────────────────────────────────────────────────────────────────────────
-  // OBTENER INVENTARIO POR CLIENTE
+  // OBTENER POR CLIENTE
   // ──────────────────────────────────────────────────────────────────────────
   
   /**
-   * Obtener todo el inventario de un cliente específico
+   * Obtener inventario de un cliente específico
    * 
    * @param {number|string} clienteId - ID del cliente
-   * @param {Object} [params] - Parámetros adicionales de filtro
-   * @returns {Promise<Object>} Inventario del cliente
-   * 
-   * @example
-   * const inventario = await inventarioService.getByCliente(1);
+   * @param {Object} [params] - Parámetros adicionales
+   * @returns {Promise<Object>}
    */
   getByCliente: async (clienteId, params = {}) => {
     try {
@@ -113,147 +96,69 @@ const inventarioService = {
     } catch (error) {
       throw {
         success: false,
-        message: error.message || 'Error al obtener inventario del cliente',
-        code: error.code || 'GET_CLIENTE_INVENTARIO_ERROR',
+        message: error.response?.data?.message || 'Error al obtener inventario del cliente',
+        code: 'GET_CLIENTE_INVENTARIO_ERROR',
       };
     }
   },
   
   // ──────────────────────────────────────────────────────────────────────────
-  // CREAR REGISTRO DE INVENTARIO
+  // CREAR PRODUCTO
   // ──────────────────────────────────────────────────────────────────────────
   
   /**
-   * Crear un nuevo registro de inventario
+   * Crear un nuevo producto de inventario
    * 
-   * @param {Object} itemData - Datos del item
-   * @param {number} itemData.cliente_id - ID del cliente (requerido)
-   * @param {string} itemData.sku - Código del producto (requerido)
-   * @param {string} itemData.producto - Nombre del producto (requerido)
-   * @param {number} itemData.cantidad - Stock actual (requerido)
-   * @param {string} [itemData.codigo_barras] - Código de barras EAN/UPC
-   * @param {string} [itemData.descripcion] - Descripción del producto
-   * @param {string} [itemData.categoria] - Categoría
-   * @param {string} [itemData.unidad_medida='UND'] - Unidad de medida
-   * @param {number} [itemData.stock_minimo] - Stock mínimo para alertas
-   * @param {number} [itemData.stock_maximo] - Stock máximo recomendado
-   * @param {string} [itemData.ubicacion] - Ubicación en bodega (ej: A-01-02)
-   * @param {string} [itemData.zona] - Zona ('Refrigerado'|'Seco'|'Químico')
-   * @param {string} [itemData.lote] - Número de lote
-   * @param {string} [itemData.fecha_vencimiento] - Fecha de vencimiento (YYYY-MM-DD)
-   * @param {number} [itemData.costo_unitario] - Costo unitario en COP
-   * @returns {Promise<Object>} Item creado
-   * 
-   * @example
-   * const result = await inventarioService.create({
-   *   cliente_id: 1,
-   *   sku: 'LECHE-001',
-   *   producto: 'Leche Entera 1L',
-   *   cantidad: 500,
-   *   unidad_medida: 'UND',
-   *   stock_minimo: 100,
-   *   zona: 'Refrigerado',
-   *   fecha_vencimiento: '2026-03-15'
-   * });
+   * @param {Object} data - Datos del producto
+   * @returns {Promise<Object>}
    */
-  create: async (itemData) => {
+  create: async (data) => {
     try {
-      const response = await apiClient.post(INVENTARIO_ENDPOINTS.BASE, itemData);
+      const response = await apiClient.post(INVENTARIO_ENDPOINTS.BASE, data);
       return response.data;
     } catch (error) {
       throw {
         success: false,
-        message: error.message || 'Error al crear registro de inventario',
-        errors: error.errors || [],
-        code: error.code || 'CREATE_ITEM_ERROR',
+        message: error.response?.data?.message || 'Error al crear producto',
+        errors: error.response?.data?.errors || [],
+        code: 'CREATE_PRODUCTO_ERROR',
       };
     }
   },
   
   // ──────────────────────────────────────────────────────────────────────────
-  // ACTUALIZAR REGISTRO
+  // ACTUALIZAR PRODUCTO
   // ──────────────────────────────────────────────────────────────────────────
   
   /**
-   * Actualizar un registro de inventario existente
+   * Actualizar un producto existente
    * 
-   * @param {number|string} id - ID del registro
-   * @param {Object} itemData - Datos a actualizar (parcial)
-   * @returns {Promise<Object>} Item actualizado
+   * @param {number|string} id - ID del producto
+   * @param {Object} data - Datos a actualizar
+   * @returns {Promise<Object>}
    */
-  update: async (id, itemData) => {
+  update: async (id, data) => {
     try {
-      const response = await apiClient.put(INVENTARIO_ENDPOINTS.BY_ID(id), itemData);
+      const response = await apiClient.put(INVENTARIO_ENDPOINTS.BY_ID(id), data);
       return response.data;
     } catch (error) {
       throw {
         success: false,
-        message: error.message || 'Error al actualizar inventario',
-        errors: error.errors || [],
-        code: error.code || 'UPDATE_ITEM_ERROR',
+        message: error.response?.data?.message || 'Error al actualizar producto',
+        errors: error.response?.data?.errors || [],
+        code: 'UPDATE_PRODUCTO_ERROR',
       };
     }
   },
   
   // ──────────────────────────────────────────────────────────────────────────
-  // AJUSTAR CANTIDAD
+  // ELIMINAR PRODUCTO
   // ──────────────────────────────────────────────────────────────────────────
   
   /**
-   * Ajustar la cantidad de un item de inventario
-   * Registra el movimiento en el historial
+   * Eliminar un producto de inventario
    * 
-   * @param {number|string} id - ID del registro
-   * @param {Object} ajusteData - Datos del ajuste
-   * @param {number} ajusteData.cantidad - Cantidad a ajustar (positiva o negativa)
-   * @param {string} ajusteData.tipo - Tipo de ajuste ('entrada'|'salida'|'ajuste')
-   * @param {string} [ajusteData.motivo] - Motivo del ajuste
-   * @param {string} [ajusteData.referencia] - Documento de referencia
-   * @returns {Promise<Object>} Item con cantidad actualizada
-   * 
-   * @example
-   * // Entrada de mercancía
-   * await inventarioService.ajustar(1, {
-   *   cantidad: 100,
-   *   tipo: 'entrada',
-   *   motivo: 'Recepción de pedido',
-   *   referencia: 'OC-2026-001'
-   * });
-   * 
-   * // Salida de mercancía
-   * await inventarioService.ajustar(1, {
-   *   cantidad: -50,
-   *   tipo: 'salida',
-   *   motivo: 'Despacho a cliente',
-   *   referencia: 'DSP-2026-001'
-   * });
-   */
-  ajustar: async (id, ajusteData) => {
-    try {
-      const response = await apiClient.post(
-        INVENTARIO_ENDPOINTS.AJUSTAR(id), 
-        ajusteData
-      );
-      return response.data;
-    } catch (error) {
-      throw {
-        success: false,
-        message: error.message || 'Error al ajustar inventario',
-        errors: error.errors || [],
-        code: error.code || 'AJUSTAR_ERROR',
-      };
-    }
-  },
-  
-  // ──────────────────────────────────────────────────────────────────────────
-  // ELIMINAR REGISTRO
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  /**
-   * Eliminar un registro de inventario
-   * Solo si no tiene movimientos asociados
-   * 
-   * @param {number|string} id - ID del registro
+   * @param {number|string} id - ID del producto
    * @returns {Promise<Object>}
    */
   delete: async (id) => {
@@ -263,41 +168,71 @@ const inventarioService = {
     } catch (error) {
       throw {
         success: false,
-        message: error.message || 'Error al eliminar registro',
-        code: error.code || 'DELETE_ITEM_ERROR',
+        message: error.response?.data?.message || 'Error al eliminar producto',
+        code: 'DELETE_PRODUCTO_ERROR',
       };
     }
   },
   
   // ──────────────────────────────────────────────────────────────────────────
-  // ALERTAS
+  // AJUSTAR CANTIDAD (MOVIMIENTOS)
   // ──────────────────────────────────────────────────────────────────────────
   
   /**
-   * Obtener alertas de inventario
-   * Incluye stock bajo, agotado y próximo a vencer
+   * Ajustar cantidad de un producto (entrada, salida, ajuste)
    * 
-   * @param {Object} [params] - Parámetros de filtro
-   * @param {number} [params.cliente_id] - Filtrar por cliente
-   * @param {string} [params.tipo] - Tipo de alerta ('stock_bajo'|'agotado'|'vencimiento')
-   * @returns {Promise<Object>} Lista de alertas
-   * 
-   * @example
-   * const alertas = await inventarioService.getAlertas();
-   * // alertas.data = [
-   * //   { id, tipo: 'stock_bajo', producto, cantidad, stock_minimo, cliente },
-   * //   { id, tipo: 'vencimiento', producto, fecha_vencimiento, dias_restantes },
-   * // ]
+   * @param {number|string} id - ID del producto
+   * @param {Object} data - Datos del ajuste
+   * @param {number} data.cantidad - Cantidad
+   * @param {string} data.tipo - 'entrada' | 'salida' | 'ajuste'
+   * @param {string} [data.motivo] - Motivo del movimiento
+   * @param {string} [data.documento_referencia] - Documento de referencia
+   * @param {string} [data.observaciones] - Observaciones
+   * @returns {Promise<Object>}
    */
-  getAlertas: async (params = {}) => {
+  ajustar: async (id, data) => {
     try {
-      const response = await apiClient.get(INVENTARIO_ENDPOINTS.ALERTAS, { params });
+      const response = await apiClient.post(INVENTARIO_ENDPOINTS.AJUSTAR(id), data);
       return response.data;
     } catch (error) {
       throw {
         success: false,
-        message: error.message || 'Error al obtener alertas',
-        code: error.code || 'GET_ALERTAS_ERROR',
+        message: error.response?.data?.message || 'Error al ajustar inventario',
+        code: 'AJUSTAR_ERROR',
+      };
+    }
+  },
+  
+  /**
+   * Alias de ajustar para compatibilidad
+   */
+  registrarMovimiento: async (id, data) => {
+    return inventarioService.ajustar(id, data);
+  },
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // MOVIMIENTOS (HISTORIAL)
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  /**
+   * Obtener historial de movimientos de un producto
+   * 
+   * @param {number|string} id - ID del producto
+   * @param {Object} [params] - Parámetros (page, limit)
+   * @returns {Promise<Object>}
+   */
+  getMovimientos: async (id, params = {}) => {
+    try {
+      const response = await apiClient.get(
+        INVENTARIO_ENDPOINTS.MOVIMIENTOS(id), 
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.response?.data?.message || 'Error al obtener movimientos',
+        code: 'GET_MOVIMIENTOS_ERROR',
       };
     }
   },
@@ -307,23 +242,10 @@ const inventarioService = {
   // ──────────────────────────────────────────────────────────────────────────
   
   /**
-   * Obtener estadísticas de inventario
+   * Obtener estadísticas/KPIs generales de inventario
    * 
-   * @param {Object} [params] - Parámetros de filtro
-   * @param {number} [params.cliente_id] - Filtrar por cliente
-   * @returns {Promise<Object>} Estadísticas
-   * 
-   * @example
-   * const stats = await inventarioService.getStats();
-   * // stats.data = {
-   * //   total_items: 1250,
-   * //   valor_total: 125000000,
-   * //   items_stock_bajo: 15,
-   * //   items_agotados: 3,
-   * //   items_por_vencer: 8,
-   * //   por_zona: { Refrigerado: 450, Seco: 700, Químico: 100 },
-   * //   por_categoria: { Lácteos: 300, Construcción: 200, ... }
-   * // }
+   * @param {Object} [params] - Parámetros (cliente_id)
+   * @returns {Promise<Object>}
    */
   getStats: async (params = {}) => {
     try {
@@ -332,8 +254,100 @@ const inventarioService = {
     } catch (error) {
       throw {
         success: false,
-        message: error.message || 'Error al obtener estadísticas',
-        code: error.code || 'GET_STATS_ERROR',
+        message: error.response?.data?.message || 'Error al obtener estadísticas',
+        code: 'GET_STATS_ERROR',
+      };
+    }
+  },
+  
+  /**
+   * Obtener estadísticas de movimientos de un producto (para gráficos)
+   * 
+   * @param {number|string} id - ID del producto
+   * @param {Object} [params] - Parámetros (meses)
+   * @returns {Promise<Object>}
+   */
+  getEstadisticasProducto: async (id, params = {}) => {
+    try {
+      const response = await apiClient.get(
+        INVENTARIO_ENDPOINTS.ESTADISTICAS_PRODUCTO(id),
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.response?.data?.message || 'Error al obtener estadísticas del producto',
+        code: 'GET_ESTADISTICAS_PRODUCTO_ERROR',
+      };
+    }
+  },
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // ALERTAS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  /**
+   * Obtener alertas de inventario (stock bajo, agotados, vencimientos)
+   * 
+   * @param {Object} [params] - Parámetros de filtro
+   * @param {number} [params.cliente_id] - Filtrar por cliente
+   * @param {string} [params.tipo] - 'agotado' | 'bajo_stock' | 'vencimiento'
+   * @returns {Promise<Object>}
+   */
+  getAlertas: async (params = {}) => {
+    try {
+      const response = await apiClient.get(INVENTARIO_ENDPOINTS.ALERTAS, { params });
+      return response.data;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.response?.data?.message || 'Error al obtener alertas',
+        code: 'GET_ALERTAS_ERROR',
+      };
+    }
+  },
+  
+  /**
+   * Marcar una alerta como atendida
+   * 
+   * @param {string} alertaId - ID de la alerta (formato: "tipo-productoId")
+   * @param {Object} [data] - Datos adicionales (observaciones)
+   * @returns {Promise<Object>}
+   */
+  atenderAlerta: async (alertaId, data = {}) => {
+    try {
+      const response = await apiClient.put(
+        INVENTARIO_ENDPOINTS.ATENDER_ALERTA(alertaId),
+        data
+      );
+      return response.data;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.response?.data?.message || 'Error al atender alerta',
+        code: 'ATENDER_ALERTA_ERROR',
+      };
+    }
+  },
+  
+  /**
+   * Descartar una alerta
+   * 
+   * @param {string} alertaId - ID de la alerta
+   * @returns {Promise<Object>}
+   */
+  descartarAlerta: async (alertaId) => {
+    try {
+      const response = await apiClient.delete(
+        INVENTARIO_ENDPOINTS.DESCARTAR_ALERTA(alertaId)
+      );
+      return response.data;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.response?.data?.message || 'Error al descartar alerta',
+        code: 'DESCARTAR_ALERTA_ERROR',
       };
     }
   },
@@ -344,12 +358,11 @@ const inventarioService = {
   
   /**
    * Buscar productos por término
-   * Busca en SKU, producto, código de barras
    * 
    * @param {string} term - Término de búsqueda
    * @param {number} [clienteId] - Filtrar por cliente
    * @param {number} [limit=10] - Límite de resultados
-   * @returns {Promise<Object>} Resultados de búsqueda
+   * @returns {Promise<Object>}
    */
   search: async (term, clienteId = null, limit = 10) => {
     const params = { search: term, limit };
@@ -358,66 +371,101 @@ const inventarioService = {
   },
   
   /**
-   * Obtener items con stock bajo
+   * Obtener productos con stock bajo
    * 
    * @param {number} [clienteId] - Filtrar por cliente
-   * @returns {Promise<Object>} Items con stock bajo
+   * @returns {Promise<Object>}
    */
   getStockBajo: async (clienteId = null) => {
-    const params = { stock_bajo: true };
+    const params = { stock_bajo: 'true' };
     if (clienteId) params.cliente_id = clienteId;
     return inventarioService.getAll(params);
   },
   
   /**
-   * Obtener items próximos a vencer
+   * Obtener productos próximos a vencer
    * 
    * @param {number} [dias=30] - Días hasta vencimiento
    * @param {number} [clienteId] - Filtrar por cliente
-   * @returns {Promise<Object>} Items próximos a vencer
+   * @returns {Promise<Object>}
    */
   getProximosVencer: async (dias = 30, clienteId = null) => {
-    const params = { proximo_vencer: true, dias_vencimiento: dias };
+    const params = { por_vencer: 'true', dias_vencimiento: dias };
     if (clienteId) params.cliente_id = clienteId;
     return inventarioService.getAll(params);
   },
   
   /**
-   * Obtener categorías únicas
+   * Obtener categorías disponibles
    * 
-   * @returns {Promise<string[]>} Lista de categorías
+   * @returns {Array<{value: string, label: string}>}
    */
-  getCategorias: async () => {
-    try {
-      // Esto podría ser un endpoint dedicado, por ahora extraemos de stats
-      const stats = await inventarioService.getStats();
-      return Object.keys(stats.data?.por_categoria || {});
-    } catch {
-      return [];
-    }
+  getCategorias: () => {
+    return [
+      { value: 'lacteos', label: 'Lácteos' },
+      { value: 'bebidas', label: 'Bebidas' },
+      { value: 'construccion', label: 'Construcción' },
+      { value: 'envases', label: 'Envases' },
+      { value: 'quimicos', label: 'Químicos' },
+      { value: 'alimentos', label: 'Alimentos' },
+      { value: 'farmaceutico', label: 'Farmacéutico' },
+      { value: 'textil', label: 'Textil' },
+      { value: 'tecnologia', label: 'Tecnología' },
+    ];
   },
   
   /**
-   * Obtener zonas únicas
+   * Obtener zonas/bodegas disponibles
    * 
-   * @returns {string[]} Lista de zonas predefinidas
+   * @returns {Array<{value: string, label: string}>}
    */
   getZonas: () => {
-    return ['Refrigerado', 'Seco', 'Químico', 'Peligroso', 'General'];
+    return [
+      { value: 'BOD-01', label: 'Área 01 - Refrigerados' },
+      { value: 'BOD-02', label: 'Área 02 - Secos' },
+      { value: 'BOD-03', label: 'Área 03 - Químicos' },
+      { value: 'BOD-04', label: 'Área 04 - Construcción' },
+    ];
   },
   
   /**
-   * Obtener unidades de medida
+   * Obtener unidades de medida disponibles
    * 
-   * @returns {string[]} Lista de unidades
+   * @returns {Array<{value: string, label: string}>}
    */
   getUnidadesMedida: () => {
-    return ['UND', 'KG', 'LT', 'CAJ', 'PAQ', 'BTO', 'GAL', 'M3'];
+    return [
+      { value: 'UND', label: 'Unidades' },
+      { value: 'KG', label: 'Kilogramos' },
+      { value: 'LT', label: 'Litros' },
+      { value: 'CAJ', label: 'Cajas' },
+      { value: 'PAQ', label: 'Paquetes' },
+      { value: 'BTO', label: 'Bultos' },
+      { value: 'GAL', label: 'Galones' },
+      { value: 'M3', label: 'Metros cúbicos' },
+    ];
+  },
+  
+  /**
+   * Obtener estados disponibles
+   * 
+   * @returns {Array<{value: string, label: string}>}
+   */
+  getEstados: () => {
+    return [
+      { value: 'disponible', label: 'Disponible' },
+      { value: 'bajo_stock', label: 'Bajo Stock' },
+      { value: 'agotado', label: 'Agotado' },
+      { value: 'reservado', label: 'Reservado' },
+      { value: 'cuarentena', label: 'Cuarentena' },
+      { value: 'dañado', label: 'Dañado' },
+      { value: 'vencido', label: 'Vencido' },
+    ];
   },
 };
 
-// ============================================================================
+// ════════════════════════════════════════════════════════════════════════════
 // EXPORT
-// ============================================================================
+// ════════════════════════════════════════════════════════════════════════════
 
 export default inventarioService;

@@ -640,13 +640,13 @@ const PerfilUsuario = () => {
                           <div>
                             <p className="text-slate-500">Fecha de Ingreso</p>
                             <p className="font-medium text-slate-800">
-                              {user.fecha_ingreso || user.created_at 
-                                ? new Date(user.fecha_ingreso || user.created_at).toLocaleDateString('es-CO')
+                              {user.created_at 
+                                ? new Date(user.created_at).toLocaleDateString('es-CO')
                                 : '-'
                               }
                             </p>
                             <p className="text-xs text-emerald-600">
-                              Antigüedad: {calcularAntiguedad(user.fecha_ingreso || user.created_at)}
+                              Antigüedad: {calcularAntiguedad(user.created_at)}
                             </p>
                           </div>
                         </div>

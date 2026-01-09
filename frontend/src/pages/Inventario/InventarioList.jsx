@@ -1,22 +1,20 @@
 /**
  * ============================================================================
- * ISTHO CRM - InventarioList (Fase 5 - Integración Completa)
+ * ISTHO CRM - InventarioList (Versión Corregida)
  * ============================================================================
  * Listado de productos conectado al backend real.
  * 
- * CAMBIOS vs versión anterior:
- * - Eliminado MOCK_PRODUCTOS
- * - Conectado con useInventario hook
- * - CRUD real de productos
- * - Movimientos (entrada/salida) conectados a API
- * - Control de permisos con ProtectedAction
+ * CORRECCIONES:
+ * - Usa nombres correctos del hook useInventario
+ * - snake_case para campos del backend
+ * - Integración completa con API
  * 
  * @author Coordinación TI ISTHO
  * @version 2.0.0
  * @date Enero 2026
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -53,17 +51,15 @@ import {
 import ProductoForm from './components/ProductoForm';
 import MovimientoForm from './components/MovimientoForm';
 
-// ════════════════════════════════════════════════════════════════════════════
-// HOOKS INTEGRADOS
-// ════════════════════════════════════════════════════════════════════════════
+// Hooks
 import useInventario from '../../hooks/useInventario';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
-import { ProtectedAction } from '../../components/auth/PrivateRoute';
 
 // ════════════════════════════════════════════════════════════════════════════
 // OPCIONES DE FILTROS
 // ════════════════════════════════════════════════════════════════════════════
+
 const FILTER_OPTIONS = {
   categoria: [
     { value: 'lacteos', label: 'Lácteos' },
@@ -96,11 +92,14 @@ const FILTER_OPTIONS = {
  */
 const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, canEdit, canDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Usar snake_case para campos del backend
+  const stockActual = producto.stock_actual || producto.cantidad || 0;
 
   return (
     <div className="relative">
       <button
-        onClick={function() { setIsOpen(!isOpen); }}
+        onClick={() => setIsOpen(!isOpen)}
         className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
       >
         <MoreVertical className="w-4 h-4" />
@@ -108,10 +107,10 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-10" onClick={function() { setIsOpen(false); }} />
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20">
             <button
-              onClick={function() { onView(producto); setIsOpen(false); }}
+              onClick={() => { onView(producto); setIsOpen(false); }}
               className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
               <Eye className="w-4 h-4" />
@@ -119,7 +118,7 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
             </button>
             {canEdit && (
               <button
-                onClick={function() { onEdit(producto); setIsOpen(false); }}
+                onClick={() => { onEdit(producto); setIsOpen(false); }}
                 className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
                 <Pencil className="w-4 h-4" />
@@ -130,16 +129,18 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
               <>
                 <div className="border-t border-gray-100 my-1" />
                 <button
-                  onClick={function() { onEntrada(producto); setIsOpen(false); }}
+                  onClick={() => { onEntrada(producto); setIsOpen(false); }}
                   className="flex items-center gap-2 w-full px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50"
                 >
                   <PackagePlus className="w-4 h-4" />
                   Registrar Entrada
                 </button>
                 <button
-                  onClick={function() { onSalida(producto); setIsOpen(false); }}
-                  className={'flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-blue-50 ' + (producto.stock_actual === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600')}
-                  disabled={producto.stock_actual === 0}
+                  onClick={() => { onSalida(producto); setIsOpen(false); }}
+                  className={`flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-blue-50 ${
+                    stockActual === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600'
+                  }`}
+                  disabled={stockActual === 0}
                 >
                   <PackageMinus className="w-4 h-4" />
                   Registrar Salida
@@ -150,7 +151,7 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
               <>
                 <div className="border-t border-gray-100 my-1" />
                 <button
-                  onClick={function() { onDelete(producto); setIsOpen(false); }}
+                  onClick={() => { onDelete(producto); setIsOpen(false); }}
                   className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -182,8 +183,8 @@ const StockIndicator = ({ actual, minimo }) => {
     <div className="flex items-center gap-2">
       <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
         <div 
-          className={'h-full transition-all duration-300 ' + colorClass}
-          style={{ width: Math.min(porcentaje, 100) + '%' }}
+          className={`h-full transition-all duration-300 ${colorClass}`}
+          style={{ width: `${Math.min(porcentaje, 100)}%` }}
         />
       </div>
       <span className="text-sm font-medium text-slate-700">
@@ -193,37 +194,56 @@ const StockIndicator = ({ actual, minimo }) => {
   );
 };
 
+/**
+ * Helper para verificar permisos
+ */
+const checkPermission = (userRole, action) => {
+  const permissions = {
+    admin: ['ver', 'crear', 'editar', 'eliminar', 'exportar', 'importar'],
+    supervisor: ['ver', 'crear', 'editar', 'exportar'],
+    operador: ['ver', 'crear', 'editar'],
+    cliente: ['ver'],
+  };
+  return permissions[userRole]?.includes(action) || false;
+};
+
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
+
 const InventarioList = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, hasPermission } = useAuth();
-  const { success, apiError, saved, deleted, stockAlert } = useNotification();
+  const { user } = useAuth();
+  const { success, error: notifyError, saved, deleted, stockAlert } = useNotification();
 
   // ──────────────────────────────────────────────────────────────────────────
-  // HOOK DE INVENTARIO
+  // HOOK DE INVENTARIO (nombres correctos)
   // ──────────────────────────────────────────────────────────────────────────
   const {
+    // Lista
     productos,
+    pagination,
     loading,
     error,
-    pagination,
+    // KPIs
     kpis,
+    // Estado
     isRefreshing,
     // Acciones
     refresh,
-    search,
+    search: hookSearch,
     applyFilters,
     goToPage,
     createProducto,
     updateProducto,
     deleteProducto,
     registrarMovimiento,
+    // Stats
+    fetchStats,
   } = useInventario({ 
     autoFetch: true,
-    // Si es cliente, filtrar por su cliente_id
+    autoFetchStats: true,
     initialFilters: user?.rol === 'cliente' ? { cliente_id: user.cliente_id } : {},
   });
 
@@ -240,17 +260,17 @@ const InventarioList = () => {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, producto: null });
   const [formLoading, setFormLoading] = useState(false);
 
-  // Permisos
-  const canCreate = hasPermission('inventario', 'crear');
-  const canEdit = hasPermission('inventario', 'editar');
-  const canDelete = hasPermission('inventario', 'eliminar');
-  const canExport = hasPermission('inventario', 'exportar');
-  const canImport = hasPermission('inventario', 'importar');
+  // Permisos usando helper local
+  const canCreate = checkPermission(user?.rol, 'crear');
+  const canEdit = checkPermission(user?.rol, 'editar');
+  const canDelete = checkPermission(user?.rol, 'eliminar');
+  const canExport = checkPermission(user?.rol, 'exportar');
+  const canImport = checkPermission(user?.rol, 'importar');
 
   // ──────────────────────────────────────────────────────────────────────────
   // APLICAR FILTRO DE URL
   // ──────────────────────────────────────────────────────────────────────────
-  useEffect(function() {
+  useEffect(() => {
     const filterParam = searchParams.get('filter');
     if (filterParam === 'alertas') {
       setFilters({ estado: 'bajo_stock' });
@@ -264,7 +284,7 @@ const InventarioList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // NOTIFICAR ALERTAS AL CARGAR
   // ──────────────────────────────────────────────────────────────────────────
-  useEffect(function() {
+  useEffect(() => {
     if (kpis && (kpis.bajoStock + kpis.agotados) > 0 && !loading) {
       stockAlert(kpis.bajoStock + kpis.agotados);
     }
@@ -274,13 +294,13 @@ const InventarioList = () => {
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
   
-  const handleSearch = function(value) {
+  const handleSearch = (value) => {
     setSearchTerm(value);
-    search(value);
+    hookSearch(value);
   };
 
-  const handleFilterChange = function(key, value) {
-    var newFilters = Object.assign({}, filters);
+  const handleFilterChange = (key, value) => {
+    const newFilters = { ...filters };
     if (value) {
       newFilters[key] = value;
     } else {
@@ -290,38 +310,38 @@ const InventarioList = () => {
     applyFilters(newFilters);
   };
 
-  const handleClearFilters = function() {
+  const handleClearFilters = () => {
     setFilters({});
     setSearchTerm('');
     applyFilters({});
-    search('');
+    hookSearch('');
   };
 
-  const handleCreate = function() {
+  const handleCreate = () => {
     setFormModal({ isOpen: true, producto: null });
   };
 
-  const handleEdit = function(producto) {
-    setFormModal({ isOpen: true, producto: producto });
+  const handleEdit = (producto) => {
+    setFormModal({ isOpen: true, producto });
   };
 
-  const handleView = function(producto) {
-    navigate('/inventario/productos/' + producto.id);
+  const handleView = (producto) => {
+    navigate(`/inventario/productos/${producto.id}`);
   };
 
-  const handleDelete = function(producto) {
-    setDeleteModal({ isOpen: true, producto: producto });
+  const handleDelete = (producto) => {
+    setDeleteModal({ isOpen: true, producto });
   };
 
-  const handleEntrada = function(producto) {
-    setMovimientoModal({ isOpen: true, tipo: 'entrada', producto: producto });
+  const handleEntrada = (producto) => {
+    setMovimientoModal({ isOpen: true, tipo: 'entrada', producto });
   };
 
-  const handleSalida = function(producto) {
-    setMovimientoModal({ isOpen: true, tipo: 'salida', producto: producto });
+  const handleSalida = (producto) => {
+    setMovimientoModal({ isOpen: true, tipo: 'salida', producto });
   };
 
-  const handleFormSubmit = async function(data) {
+  const handleFormSubmit = async (data) => {
     setFormLoading(true);
     try {
       if (formModal.producto) {
@@ -333,39 +353,39 @@ const InventarioList = () => {
       }
       setFormModal({ isOpen: false, producto: null });
     } catch (err) {
-      apiError(err);
+      notifyError(err.message || 'Error al guardar producto');
     } finally {
       setFormLoading(false);
     }
   };
 
-  const handleMovimientoSubmit = async function(data) {
+  const handleMovimientoSubmit = async (data) => {
     setFormLoading(true);
     try {
       await registrarMovimiento(movimientoModal.producto.id, {
         tipo: movimientoModal.tipo,
         cantidad: data.cantidad,
         motivo: data.motivo,
-        documento_referencia: data.documento_referencia,
+        documento_referencia: data.documento_referencia || data.documento,
         observaciones: data.observaciones,
       });
-      success('Movimiento de ' + movimientoModal.tipo + ' registrado correctamente');
+      success(`Movimiento de ${movimientoModal.tipo} registrado correctamente`);
       setMovimientoModal({ isOpen: false, tipo: 'entrada', producto: null });
     } catch (err) {
-      apiError(err);
+      notifyError(err.message || 'Error al registrar movimiento');
     } finally {
       setFormLoading(false);
     }
   };
 
-  const handleConfirmDelete = async function() {
+  const handleConfirmDelete = async () => {
     setFormLoading(true);
     try {
       await deleteProducto(deleteModal.producto.id);
       deleted('Producto');
       setDeleteModal({ isOpen: false, producto: null });
     } catch (err) {
-      apiError(err);
+      notifyError(err.message || 'Error al eliminar producto');
     } finally {
       setFormLoading(false);
     }
@@ -375,7 +395,7 @@ const InventarioList = () => {
   // FORMATTERS
   // ──────────────────────────────────────────────────────────────────────────
   
-  const formatCurrency = function(value) {
+  const formatCurrency = (value) => {
     if (!value) return '$0';
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -385,16 +405,16 @@ const InventarioList = () => {
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // KPIs LOCALES (fallback si API no provee)
+  // KPIs PARA DISPLAY
   // ──────────────────────────────────────────────────────────────────────────
   
   const displayKpis = kpis || {
     total: productos.length,
-    disponibles: productos.filter(function(p) { return p.estado === 'disponible'; }).length,
-    bajoStock: productos.filter(function(p) { return p.estado === 'bajo_stock'; }).length,
-    agotados: productos.filter(function(p) { return p.estado === 'agotado'; }).length,
-    valorTotal: productos.reduce(function(sum, p) { 
-      return sum + ((p.stock_actual || 0) * (p.costo_unitario || 0)); 
+    disponibles: productos.filter(p => p.estado === 'disponible').length,
+    bajoStock: productos.filter(p => p.estado === 'bajo_stock' || p.stock_bajo).length,
+    agotados: productos.filter(p => p.cantidad === 0 || p.estado === 'agotado').length,
+    valorTotal: productos.reduce((sum, p) => {
+      return sum + ((p.stock_actual || p.cantidad || 0) * (p.costo_unitario || 0));
     }, 0),
   };
 
@@ -427,23 +447,23 @@ const InventarioList = () => {
               title="Actualizar datos"
             />
             
-            <ProtectedAction module="inventario" action="exportar">
+            {canExport && (
               <Button variant="outline" icon={Download} size="md">
                 Exportar
               </Button>
-            </ProtectedAction>
+            )}
             
-            <ProtectedAction module="inventario" action="importar">
+            {canImport && (
               <Button variant="outline" icon={Upload} size="md">
                 Importar
               </Button>
-            </ProtectedAction>
+            )}
             
-            <ProtectedAction module="inventario" action="crear">
+            {canCreate && (
               <Button variant="primary" icon={Plus} onClick={handleCreate}>
                 Nuevo Producto
               </Button>
-            </ProtectedAction>
+            )}
           </div>
         </div>
 
@@ -461,7 +481,7 @@ const InventarioList = () => {
           <KpiCard
             title="Disponibles"
             value={displayKpis.disponibles}
-            change={displayKpis.total > 0 ? Math.round((displayKpis.disponibles / displayKpis.total) * 100) + '% del total' : '0%'}
+            change={displayKpis.total > 0 ? `${Math.round((displayKpis.disponibles / displayKpis.total) * 100)}% del total` : '0%'}
             positive={true}
             icon={Warehouse}
             iconBg="bg-emerald-100"
@@ -470,12 +490,12 @@ const InventarioList = () => {
           <KpiCard
             title="Stock Bajo / Agotado"
             value={displayKpis.bajoStock + displayKpis.agotados}
-            change={displayKpis.agotados > 0 ? displayKpis.agotados + ' agotados' : 'Sin agotados'}
+            change={displayKpis.agotados > 0 ? `${displayKpis.agotados} agotados` : 'Sin agotados'}
             positive={displayKpis.agotados === 0}
             icon={AlertTriangle}
             iconBg="bg-amber-100"
             iconColor="text-amber-600"
-            onClick={function() { handleFilterChange('estado', 'bajo_stock'); }}
+            onClick={() => handleFilterChange('estado', 'bajo_stock')}
             className="cursor-pointer hover:shadow-md transition-shadow"
           />
           <KpiCard
@@ -497,14 +517,14 @@ const InventarioList = () => {
                 placeholder="Buscar por nombre, SKU o cliente..."
                 value={searchTerm}
                 onChange={handleSearch}
-                onClear={function() { handleSearch(''); }}
+                onClear={() => handleSearch('')}
               />
             </div>
 
             <Button
               variant={showFilters ? 'secondary' : 'outline'}
               icon={Filter}
-              onClick={function() { setShowFilters(!showFilters); }}
+              onClick={() => setShowFilters(!showFilters)}
             >
               Filtros
               {Object.keys(filters).length > 0 && (
@@ -522,21 +542,21 @@ const InventarioList = () => {
                   label="Categoría"
                   options={FILTER_OPTIONS.categoria}
                   value={filters.categoria}
-                  onChange={function(v) { handleFilterChange('categoria', v); }}
+                  onChange={(v) => handleFilterChange('categoria', v)}
                   placeholder="Todas las categorías"
                 />
                 <FilterDropdown
                   label="Bodega"
                   options={FILTER_OPTIONS.bodega}
                   value={filters.bodega}
-                  onChange={function(v) { handleFilterChange('bodega', v); }}
+                  onChange={(v) => handleFilterChange('bodega', v)}
                   placeholder="Todas las bodegas"
                 />
                 <FilterDropdown
                   label="Estado"
                   options={FILTER_OPTIONS.estado}
                   value={filters.estado}
-                  onChange={function(v) { handleFilterChange('estado', v); }}
+                  onChange={(v) => handleFilterChange('estado', v)}
                   placeholder="Todos los estados"
                 />
               </div>
@@ -567,18 +587,16 @@ const InventarioList = () => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
             <div className="p-4">
-              {[0, 1, 2, 3, 4].map(function(i) {
-                return (
-                  <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50 animate-pulse">
-                    <div className="w-10 h-10 bg-gray-200 rounded-lg" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-1/3" />
-                      <div className="h-3 bg-gray-100 rounded w-1/4" />
-                    </div>
-                    <div className="h-6 w-16 bg-gray-200 rounded-full" />
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50 animate-pulse">
+                  <div className="w-10 h-10 bg-gray-200 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-1/3" />
+                    <div className="h-3 bg-gray-100 rounded w-1/4" />
                   </div>
-                );
-              })}
+                  <div className="h-6 w-16 bg-gray-200 rounded-full" />
+                </div>
+              ))}
             </div>
           ) : productos.length === 0 ? (
             <div className="py-16 text-center">
@@ -628,10 +646,12 @@ const InventarioList = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {productos.map(function(producto) {
-                    var bodegaLabel = FILTER_OPTIONS.bodega.find(function(b) { 
-                      return b.value === producto.bodega; 
-                    });
+                  {productos.map((producto) => {
+                    // Usar snake_case para campos del backend
+                    const stockActual = producto.stock_actual || producto.cantidad || 0;
+                    const stockMinimo = producto.stock_minimo || 0;
+                    const costoUnitario = producto.costo_unitario || 0;
+                    const bodegaLabel = FILTER_OPTIONS.bodega.find(b => b.value === producto.bodega || b.value === producto.zona);
                     
                     return (
                       <tr
@@ -646,36 +666,36 @@ const InventarioList = () => {
                             <div>
                               <p 
                                 className="text-sm font-medium text-slate-800 hover:text-orange-600 cursor-pointer"
-                                onClick={function() { handleView(producto); }}
+                                onClick={() => handleView(producto)}
                               >
-                                {producto.nombre}
+                                {producto.nombre || producto.producto}
                               </p>
                               <p className="text-xs text-slate-500">{producto.codigo || producto.sku}</p>
                             </div>
                           </div>
                         </td>
                         <td className="py-4 px-4 text-sm text-slate-600">
-                          {producto.cliente_nombre || producto.clienteNombre || '-'}
+                          {producto.cliente_nombre || '-'}
                         </td>
                         <td className="py-4 px-4">
                           <div className="text-sm">
                             <p className="text-slate-800">{producto.ubicacion || '-'}</p>
                             <p className="text-xs text-slate-500">
-                              {bodegaLabel ? bodegaLabel.label : producto.bodega}
+                              {bodegaLabel?.label || producto.bodega || producto.zona}
                             </p>
                           </div>
                         </td>
                         <td className="py-4 px-4">
                           <StockIndicator 
-                            actual={producto.stock_actual || producto.stockActual || 0} 
-                            minimo={producto.stock_minimo || producto.stockMinimo || 0} 
+                            actual={stockActual} 
+                            minimo={stockMinimo} 
                           />
                         </td>
                         <td className="py-4 px-4 text-center">
                           <StatusChip status={producto.estado} />
                         </td>
                         <td className="py-4 px-4 text-sm text-slate-800 text-right font-medium">
-                          {formatCurrency((producto.stock_actual || 0) * (producto.costo_unitario || 0))}
+                          {formatCurrency(stockActual * costoUnitario)}
                         </td>
                         <td className="py-4 px-4 text-center">
                           <RowActions
@@ -721,7 +741,7 @@ const InventarioList = () => {
       
       <ProductoForm
         isOpen={formModal.isOpen}
-        onClose={function() { setFormModal({ isOpen: false, producto: null }); }}
+        onClose={() => setFormModal({ isOpen: false, producto: null })}
         onSubmit={handleFormSubmit}
         producto={formModal.producto}
         loading={formLoading}
@@ -729,7 +749,7 @@ const InventarioList = () => {
 
       <MovimientoForm
         isOpen={movimientoModal.isOpen}
-        onClose={function() { setMovimientoModal({ isOpen: false, tipo: 'entrada', producto: null }); }}
+        onClose={() => setMovimientoModal({ isOpen: false, tipo: 'entrada', producto: null })}
         onSubmit={handleMovimientoSubmit}
         tipo={movimientoModal.tipo}
         producto={movimientoModal.producto}
@@ -738,10 +758,10 @@ const InventarioList = () => {
 
       <ConfirmDialog
         isOpen={deleteModal.isOpen}
-        onClose={function() { setDeleteModal({ isOpen: false, producto: null }); }}
+        onClose={() => setDeleteModal({ isOpen: false, producto: null })}
         onConfirm={handleConfirmDelete}
         title="Eliminar Producto"
-        message={'¿Estás seguro de eliminar "' + (deleteModal.producto ? deleteModal.producto.nombre : '') + '"? Esta acción no se puede deshacer.'}
+        message={`¿Estás seguro de eliminar "${deleteModal.producto?.nombre || deleteModal.producto?.producto || ''}"? Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         type="danger"
         loading={formLoading}

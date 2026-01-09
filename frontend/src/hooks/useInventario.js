@@ -1,21 +1,27 @@
 /**
  * ============================================================================
- * ISTHO CRM - Hook useInventario
+ * ISTHO CRM - Hook useInventario (Versión Completa)
  * ============================================================================
- * Hook personalizado para gestión de inventario.
- * Provee estado, funciones CRUD, alertas y utilidades para el módulo.
+ * Hook personalizado para gestión completa de inventario.
+ * 
+ * Incluye:
+ * - CRUD de productos
+ * - Movimientos (entradas/salidas/ajustes)
+ * - Historial de movimientos
+ * - Alertas
+ * - Estadísticas y KPIs
  * 
  * @author Coordinación TI ISTHO
- * @version 1.0.0
+ * @version 2.0.0
  * @date Enero 2026
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import inventarioService from '../api/inventario.service';
 
-// ============================================================================
+// ════════════════════════════════════════════════════════════════════════════
 // ESTADOS INICIALES
-// ============================================================================
+// ════════════════════════════════════════════════════════════════════════════
 
 const INITIAL_LIST_STATE = {
   data: [],
@@ -35,6 +41,13 @@ const INITIAL_DETAIL_STATE = {
   error: null,
 };
 
+const INITIAL_MOVIMIENTOS_STATE = {
+  data: [],
+  pagination: null,
+  loading: false,
+  error: null,
+};
+
 const INITIAL_ALERTAS_STATE = {
   data: [],
   loading: false,
@@ -47,9 +60,15 @@ const INITIAL_STATS_STATE = {
   error: null,
 };
 
-// ============================================================================
+const INITIAL_ESTADISTICAS_STATE = {
+  data: [],
+  loading: false,
+  error: null,
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // HOOK PRINCIPAL
-// ============================================================================
+// ════════════════════════════════════════════════════════════════════════════
 
 /**
  * Hook para gestión completa de inventario
@@ -57,24 +76,15 @@ const INITIAL_STATS_STATE = {
  * @param {Object} options - Opciones de configuración
  * @param {boolean} [options.autoFetch=false] - Cargar lista automáticamente
  * @param {boolean} [options.autoFetchAlertas=false] - Cargar alertas automáticamente
- * @param {number} [options.clienteId] - Filtrar por cliente específico
+ * @param {boolean} [options.autoFetchStats=false] - Cargar stats automáticamente
  * @param {Object} [options.initialFilters={}] - Filtros iniciales
  * @returns {Object} Estado y funciones de inventario
- * 
- * @example
- * const { 
- *   inventario, 
- *   alertas,
- *   loading, 
- *   fetchInventario,
- *   ajustarCantidad 
- * } = useInventario({ autoFetch: true, autoFetchAlertas: true });
  */
 const useInventario = (options = {}) => {
   const { 
     autoFetch = false, 
     autoFetchAlertas = false,
-    clienteId = null,
+    autoFetchStats = false,
     initialFilters = {} 
   } = options;
   
@@ -84,21 +94,17 @@ const useInventario = (options = {}) => {
   
   const [listState, setListState] = useState(INITIAL_LIST_STATE);
   const [detailState, setDetailState] = useState(INITIAL_DETAIL_STATE);
+  const [movimientosState, setMovimientosState] = useState(INITIAL_MOVIMIENTOS_STATE);
   const [alertasState, setAlertasState] = useState(INITIAL_ALERTAS_STATE);
   const [statsState, setStatsState] = useState(INITIAL_STATS_STATE);
-  const [filters, setFilters] = useState({
-    ...initialFilters,
-    ...(clienteId ? { cliente_id: clienteId } : {}),
-  });
+  const [estadisticasState, setEstadisticasState] = useState(INITIAL_ESTADISTICAS_STATE);
+  const [filters, setFilters] = useState(initialFilters);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // ──────────────────────────────────────────────────────────────────────────
-  // FETCH LISTA DE INVENTARIO
+  // FETCH LISTA DE PRODUCTOS
   // ──────────────────────────────────────────────────────────────────────────
   
-  /**
-   * Obtener lista de inventario con filtros y paginación
-   * @param {Object} params - Parámetros de búsqueda
-   */
   const fetchInventario = useCallback(async (params = {}) => {
     setListState(prev => ({ ...prev, loading: true, error: null }));
     
@@ -130,52 +136,10 @@ const useInventario = (options = {}) => {
   }, [filters]);
   
   // ──────────────────────────────────────────────────────────────────────────
-  // FETCH INVENTARIO POR CLIENTE
+  // FETCH PRODUCTO POR ID
   // ──────────────────────────────────────────────────────────────────────────
   
-  /**
-   * Obtener inventario de un cliente específico
-   * @param {number|string} idCliente - ID del cliente
-   * @param {Object} params - Parámetros adicionales
-   */
-  const fetchByCliente = useCallback(async (idCliente, params = {}) => {
-    setListState(prev => ({ ...prev, loading: true, error: null }));
-    
-    try {
-      const response = await inventarioService.getByCliente(idCliente, params);
-      
-      if (response.success) {
-        setListState({
-          data: response.data || [],
-          pagination: response.pagination || INITIAL_LIST_STATE.pagination,
-          loading: false,
-          error: null,
-        });
-      } else {
-        throw new Error(response.message);
-      }
-      
-      return response;
-    } catch (error) {
-      const errorMessage = error.message || 'Error al cargar inventario del cliente';
-      setListState(prev => ({
-        ...prev,
-        loading: false,
-        error: errorMessage,
-      }));
-      throw error;
-    }
-  }, []);
-  
-  // ──────────────────────────────────────────────────────────────────────────
-  // FETCH ITEM POR ID
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  /**
-   * Obtener un item de inventario específico
-   * @param {number|string} id - ID del registro
-   */
-  const fetchItem = useCallback(async (id) => {
+  const fetchById = useCallback(async (id) => {
     setDetailState({ data: null, loading: true, error: null });
     
     try {
@@ -193,7 +157,7 @@ const useInventario = (options = {}) => {
       
       return response;
     } catch (error) {
-      const errorMessage = error.message || 'Error al cargar item';
+      const errorMessage = error.message || 'Error al cargar producto';
       setDetailState({
         data: null,
         loading: false,
@@ -204,18 +168,141 @@ const useInventario = (options = {}) => {
   }, []);
   
   // ──────────────────────────────────────────────────────────────────────────
-  // CREAR ITEM
+  // FETCH MOVIMIENTOS DE UN PRODUCTO
   // ──────────────────────────────────────────────────────────────────────────
   
-  /**
-   * Crear un nuevo registro de inventario
-   * @param {Object} itemData - Datos del item
-   */
-  const createItem = useCallback(async (itemData) => {
-    setListState(prev => ({ ...prev, loading: true, error: null }));
+  const fetchMovimientos = useCallback(async (productoId, params = {}) => {
+    setMovimientosState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      const response = await inventarioService.create(itemData);
+      const response = await inventarioService.getMovimientos(productoId, params);
+      
+      if (response.success) {
+        setMovimientosState({
+          data: response.data || [],
+          pagination: response.pagination || null,
+          loading: false,
+          error: null,
+        });
+      } else {
+        throw new Error(response.message);
+      }
+      
+      return response;
+    } catch (error) {
+      const errorMessage = error.message || 'Error al cargar movimientos';
+      setMovimientosState(prev => ({
+        ...prev,
+        loading: false,
+        error: errorMessage,
+      }));
+      throw error;
+    }
+  }, []);
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // FETCH ESTADÍSTICAS DE UN PRODUCTO (PARA GRÁFICOS)
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const fetchEstadisticas = useCallback(async (productoId, meses = 6) => {
+    setEstadisticasState(prev => ({ ...prev, loading: true, error: null }));
+    
+    try {
+      const response = await inventarioService.getEstadisticasProducto(productoId, { meses });
+      
+      if (response.success) {
+        setEstadisticasState({
+          data: response.data || [],
+          loading: false,
+          error: null,
+        });
+      } else {
+        throw new Error(response.message);
+      }
+      
+      return response;
+    } catch (error) {
+      const errorMessage = error.message || 'Error al cargar estadísticas';
+      setEstadisticasState(prev => ({
+        ...prev,
+        loading: false,
+        error: errorMessage,
+      }));
+      throw error;
+    }
+  }, []);
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // FETCH STATS/KPIS GENERALES
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const fetchStats = useCallback(async (params = {}) => {
+    setStatsState(prev => ({ ...prev, loading: true, error: null }));
+    
+    try {
+      const response = await inventarioService.getStats(params);
+      
+      if (response.success) {
+        setStatsState({
+          data: response.data,
+          loading: false,
+          error: null,
+        });
+      } else {
+        throw new Error(response.message);
+      }
+      
+      return response;
+    } catch (error) {
+      const errorMessage = error.message || 'Error al cargar estadísticas';
+      setStatsState(prev => ({
+        ...prev,
+        loading: false,
+        error: errorMessage,
+      }));
+      throw error;
+    }
+  }, []);
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // FETCH ALERTAS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const fetchAlertas = useCallback(async (params = {}) => {
+    setAlertasState(prev => ({ ...prev, loading: true, error: null }));
+    
+    try {
+      const response = await inventarioService.getAlertas(params);
+      
+      if (response.success) {
+        setAlertasState({
+          data: response.data || [],
+          loading: false,
+          error: null,
+        });
+      } else {
+        throw new Error(response.message);
+      }
+      
+      return response;
+    } catch (error) {
+      const errorMessage = error.message || 'Error al cargar alertas';
+      setAlertasState(prev => ({
+        ...prev,
+        loading: false,
+        error: errorMessage,
+      }));
+      throw error;
+    }
+  }, []);
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // CREAR PRODUCTO
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const createProducto = useCallback(async (data) => {
+    try {
+      const response = await inventarioService.create(data);
       
       if (response.success) {
         // Agregar a la lista
@@ -226,31 +313,27 @@ const useInventario = (options = {}) => {
             ...prev.pagination,
             total: prev.pagination.total + 1,
           },
-          loading: false,
         }));
+        
+        // Refrescar stats
+        fetchStats();
       } else {
         throw new Error(response.message);
       }
       
       return response;
     } catch (error) {
-      setListState(prev => ({ ...prev, loading: false }));
       throw error;
     }
-  }, []);
+  }, [fetchStats]);
   
   // ──────────────────────────────────────────────────────────────────────────
-  // ACTUALIZAR ITEM
+  // ACTUALIZAR PRODUCTO
   // ──────────────────────────────────────────────────────────────────────────
   
-  /**
-   * Actualizar un item existente
-   * @param {number|string} id - ID del registro
-   * @param {Object} itemData - Datos a actualizar
-   */
-  const updateItem = useCallback(async (id, itemData) => {
+  const updateProducto = useCallback(async (id, data) => {
     try {
-      const response = await inventarioService.update(id, itemData);
+      const response = await inventarioService.update(id, data);
       
       if (response.success) {
         // Actualizar en la lista
@@ -261,7 +344,7 @@ const useInventario = (options = {}) => {
           ),
         }));
         
-        // Actualizar en detalle si es el mismo
+        // Actualizar detalle si es el mismo
         setDetailState(prev => {
           if (prev.data?.id === id) {
             return { ...prev, data: { ...prev.data, ...response.data } };
@@ -279,57 +362,10 @@ const useInventario = (options = {}) => {
   }, []);
   
   // ──────────────────────────────────────────────────────────────────────────
-  // AJUSTAR CANTIDAD
+  // ELIMINAR PRODUCTO
   // ──────────────────────────────────────────────────────────────────────────
   
-  /**
-   * Ajustar cantidad de un item
-   * @param {number|string} id - ID del registro
-   * @param {Object} ajusteData - Datos del ajuste
-   * @param {number} ajusteData.cantidad - Cantidad (+ o -)
-   * @param {string} ajusteData.tipo - Tipo de ajuste
-   * @param {string} [ajusteData.motivo] - Motivo
-   * @param {string} [ajusteData.referencia] - Documento referencia
-   */
-  const ajustarCantidad = useCallback(async (id, ajusteData) => {
-    try {
-      const response = await inventarioService.ajustar(id, ajusteData);
-      
-      if (response.success) {
-        // Actualizar en la lista
-        setListState(prev => ({
-          ...prev,
-          data: prev.data.map(item => 
-            item.id === id ? { ...item, ...response.data } : item
-          ),
-        }));
-        
-        // Actualizar detalle
-        setDetailState(prev => {
-          if (prev.data?.id === id) {
-            return { ...prev, data: { ...prev.data, ...response.data } };
-          }
-          return prev;
-        });
-      } else {
-        throw new Error(response.message);
-      }
-      
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  }, []);
-  
-  // ──────────────────────────────────────────────────────────────────────────
-  // ELIMINAR ITEM
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  /**
-   * Eliminar un registro de inventario
-   * @param {number|string} id - ID del registro
-   */
-  const deleteItem = useCallback(async (id) => {
+  const deleteProducto = useCallback(async (id) => {
     try {
       const response = await inventarioService.delete(id);
       
@@ -351,6 +387,94 @@ const useInventario = (options = {}) => {
           }
           return prev;
         });
+        
+        // Refrescar stats
+        fetchStats();
+      } else {
+        throw new Error(response.message);
+      }
+      
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }, [fetchStats]);
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // REGISTRAR MOVIMIENTO (ENTRADA/SALIDA/AJUSTE)
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const registrarMovimiento = useCallback(async (productoId, data) => {
+    try {
+      const response = await inventarioService.ajustar(productoId, data);
+      
+      if (response.success) {
+        // Actualizar cantidad en la lista
+        setListState(prev => ({
+          ...prev,
+          data: prev.data.map(item => {
+            if (item.id === productoId) {
+              return {
+                ...item,
+                cantidad: response.data.cantidad_nueva,
+                stock_actual: response.data.cantidad_nueva,
+              };
+            }
+            return item;
+          }),
+        }));
+        
+        // Actualizar detalle si es el mismo
+        setDetailState(prev => {
+          if (prev.data?.id === productoId) {
+            return {
+              ...prev,
+              data: {
+                ...prev.data,
+                cantidad: response.data.cantidad_nueva,
+                stock_actual: response.data.cantidad_nueva,
+              },
+            };
+          }
+          return prev;
+        });
+        
+        // Refrescar movimientos si están cargados
+        if (movimientosState.data.length > 0) {
+          fetchMovimientos(productoId);
+        }
+        
+        // Refrescar stats y alertas
+        fetchStats();
+        fetchAlertas();
+      } else {
+        throw new Error(response.message);
+      }
+      
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }, [fetchStats, fetchAlertas, fetchMovimientos, movimientosState.data.length]);
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // GESTIÓN DE ALERTAS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const atenderAlerta = useCallback(async (alertaId, observaciones = '') => {
+    try {
+      const response = await inventarioService.atenderAlerta(alertaId, { observaciones });
+      
+      if (response.success) {
+        // Actualizar estado de la alerta en el listado
+        setAlertasState(prev => ({
+          ...prev,
+          data: prev.data.map(alerta => 
+            alerta.id === alertaId 
+              ? { ...alerta, estado: 'atendida' }
+              : alerta
+          ),
+        }));
       } else {
         throw new Error(response.message);
       }
@@ -361,79 +485,25 @@ const useInventario = (options = {}) => {
     }
   }, []);
   
-  // ──────────────────────────────────────────────────────────────────────────
-  // ALERTAS
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  /**
-   * Obtener alertas de inventario
-   * @param {Object} params - Parámetros de filtro
-   */
-  const fetchAlertas = useCallback(async (params = {}) => {
-    setAlertasState({ data: [], loading: true, error: null });
-    
+  const descartarAlerta = useCallback(async (alertaId) => {
     try {
-      const mergedParams = clienteId ? { ...params, cliente_id: clienteId } : params;
-      const response = await inventarioService.getAlertas(mergedParams);
+      const response = await inventarioService.descartarAlerta(alertaId);
       
       if (response.success) {
-        setAlertasState({
-          data: response.data || [],
-          loading: false,
-          error: null,
-        });
+        // Remover alerta del listado
+        setAlertasState(prev => ({
+          ...prev,
+          data: prev.data.filter(alerta => alerta.id !== alertaId),
+        }));
       } else {
         throw new Error(response.message);
       }
       
       return response;
     } catch (error) {
-      const errorMessage = error.message || 'Error al cargar alertas';
-      setAlertasState({
-        data: [],
-        loading: false,
-        error: errorMessage,
-      });
       throw error;
     }
-  }, [clienteId]);
-  
-  // ──────────────────────────────────────────────────────────────────────────
-  // ESTADÍSTICAS
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  /**
-   * Obtener estadísticas de inventario
-   * @param {Object} params - Parámetros de filtro
-   */
-  const fetchStats = useCallback(async (params = {}) => {
-    setStatsState({ data: null, loading: true, error: null });
-    
-    try {
-      const mergedParams = clienteId ? { ...params, cliente_id: clienteId } : params;
-      const response = await inventarioService.getStats(mergedParams);
-      
-      if (response.success) {
-        setStatsState({
-          data: response.data,
-          loading: false,
-          error: null,
-        });
-      } else {
-        throw new Error(response.message);
-      }
-      
-      return response;
-    } catch (error) {
-      const errorMessage = error.message || 'Error al cargar estadísticas';
-      setStatsState({
-        data: null,
-        loading: false,
-        error: errorMessage,
-      });
-      throw error;
-    }
-  }, [clienteId]);
+  }, []);
   
   // ──────────────────────────────────────────────────────────────────────────
   // PAGINACIÓN
@@ -457,57 +527,27 @@ const useInventario = (options = {}) => {
   }, [fetchInventario]);
   
   const clearFilters = useCallback(() => {
-    const baseFilters = clienteId ? { cliente_id: clienteId } : {};
-    setFilters(baseFilters);
-    fetchInventario({ page: 1, ...baseFilters });
-  }, [fetchInventario, clienteId]);
+    setFilters({});
+    fetchInventario({ page: 1 });
+  }, [fetchInventario]);
   
   const search = useCallback((term) => {
     applyFilters({ search: term });
   }, [applyFilters]);
   
   // ──────────────────────────────────────────────────────────────────────────
-  // FILTROS ESPECIALIZADOS
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  /**
-   * Filtrar por stock bajo
-   */
-  const filterStockBajo = useCallback(() => {
-    applyFilters({ stock_bajo: true });
-  }, [applyFilters]);
-  
-  /**
-   * Filtrar por próximos a vencer
-   * @param {number} dias - Días para vencimiento
-   */
-  const filterProximosVencer = useCallback((dias = 30) => {
-    applyFilters({ proximo_vencer: true, dias_vencimiento: dias });
-  }, [applyFilters]);
-  
-  /**
-   * Filtrar por zona
-   * @param {string} zona - Zona de almacenamiento
-   */
-  const filterByZona = useCallback((zona) => {
-    applyFilters({ zona });
-  }, [applyFilters]);
-  
-  /**
-   * Filtrar por categoría
-   * @param {string} categoria - Categoría
-   */
-  const filterByCategoria = useCallback((categoria) => {
-    applyFilters({ categoria });
-  }, [applyFilters]);
-  
-  // ──────────────────────────────────────────────────────────────────────────
   // UTILIDADES
   // ──────────────────────────────────────────────────────────────────────────
   
-  const refresh = useCallback(() => {
-    fetchInventario({ page: listState.pagination.page });
-  }, [fetchInventario, listState.pagination.page]);
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchInventario({ page: listState.pagination.page });
+      await fetchStats();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchInventario, fetchStats, listState.pagination.page]);
   
   const refreshAlertas = useCallback(() => {
     fetchAlertas();
@@ -515,48 +555,47 @@ const useInventario = (options = {}) => {
   
   const clearDetail = useCallback(() => {
     setDetailState(INITIAL_DETAIL_STATE);
+    setMovimientosState(INITIAL_MOVIMIENTOS_STATE);
+    setEstadisticasState(INITIAL_ESTADISTICAS_STATE);
   }, []);
   
   const clearErrors = useCallback(() => {
     setListState(prev => ({ ...prev, error: null }));
     setDetailState(prev => ({ ...prev, error: null }));
+    setMovimientosState(prev => ({ ...prev, error: null }));
     setAlertasState(prev => ({ ...prev, error: null }));
     setStatsState(prev => ({ ...prev, error: null }));
+    setEstadisticasState(prev => ({ ...prev, error: null }));
   }, []);
   
   // ──────────────────────────────────────────────────────────────────────────
   // DATOS CALCULADOS
   // ──────────────────────────────────────────────────────────────────────────
   
-  /**
-   * Alertas agrupadas por tipo
-   */
-  const alertasPorTipo = useMemo(() => {
-    const grouped = {
-      stock_bajo: [],
-      agotado: [],
-      vencimiento: [],
+  // KPIs para compatibilidad con componentes
+  const kpis = useMemo(() => {
+    if (statsState.data) {
+      return statsState.data;
+    }
+    
+    // Calcular desde la lista si no hay stats
+    const productos = listState.data;
+    return {
+      total: productos.length,
+      disponibles: productos.filter(p => p.estado === 'disponible').length,
+      bajoStock: productos.filter(p => p.stock_bajo || p.estado === 'bajo_stock').length,
+      agotados: productos.filter(p => p.cantidad === 0 || p.estado === 'agotado').length,
+      valorTotal: productos.reduce((sum, p) => {
+        return sum + ((p.stock_actual || p.cantidad || 0) * (p.costo_unitario || 0));
+      }, 0),
     };
-    
-    alertasState.data.forEach(alerta => {
-      if (grouped[alerta.tipo]) {
-        grouped[alerta.tipo].push(alerta);
-      }
-    });
-    
-    return grouped;
-  }, [alertasState.data]);
+  }, [statsState.data, listState.data]);
   
-  /**
-   * Total de alertas
-   */
-  const totalAlertas = useMemo(() => alertasState.data.length, [alertasState.data]);
-  
-  /**
-   * Constantes útiles
-   */
+  // Constantes útiles
+  const categorias = useMemo(() => inventarioService.getCategorias(), []);
   const zonas = useMemo(() => inventarioService.getZonas(), []);
   const unidadesMedida = useMemo(() => inventarioService.getUnidadesMedida(), []);
+  const estados = useMemo(() => inventarioService.getEstados(), []);
   
   // ──────────────────────────────────────────────────────────────────────────
   // AUTO FETCH
@@ -574,128 +613,135 @@ const useInventario = (options = {}) => {
     }
   }, [autoFetchAlertas]); // eslint-disable-line react-hooks/exhaustive-deps
   
+  useEffect(() => {
+    if (autoFetchStats) {
+      fetchStats();
+    }
+  }, [autoFetchStats]); // eslint-disable-line react-hooks/exhaustive-deps
+  
   // ──────────────────────────────────────────────────────────────────────────
   // RETURN
   // ──────────────────────────────────────────────────────────────────────────
   
   return {
-    // Estado de lista
-    inventario: listState.data,
+    // ═══════════════════════════════════════════════════════════════════════
+    // ESTADO DE LISTA (nombres compatibles con componentes)
+    // ═══════════════════════════════════════════════════════════════════════
+    productos: listState.data,          // Alias para InventarioList
+    inventario: listState.data,         // Nombre original
     pagination: listState.pagination,
     loading: listState.loading,
     error: listState.error,
     
-    // Estado de detalle
-    item: detailState.data,
+    // ═══════════════════════════════════════════════════════════════════════
+    // ESTADO DE DETALLE
+    // ═══════════════════════════════════════════════════════════════════════
+    currentProducto: detailState.data,  // Alias para ProductoDetail
+    item: detailState.data,             // Nombre original
     loadingDetail: detailState.loading,
     errorDetail: detailState.error,
     
-    // Estado de alertas
+    // ═══════════════════════════════════════════════════════════════════════
+    // ESTADO DE MOVIMIENTOS
+    // ═══════════════════════════════════════════════════════════════════════
+    movimientos: movimientosState.data,
+    loadingMovimientos: movimientosState.loading,
+    errorMovimientos: movimientosState.error,
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // ESTADO DE ALERTAS
+    // ═══════════════════════════════════════════════════════════════════════
     alertas: alertasState.data,
-    alertasPorTipo,
-    totalAlertas,
     loadingAlertas: alertasState.loading,
     errorAlertas: alertasState.error,
     
-    // Estado de estadísticas
+    // ═══════════════════════════════════════════════════════════════════════
+    // ESTADO DE STATS/KPIS
+    // ═══════════════════════════════════════════════════════════════════════
     stats: statsState.data,
+    kpis: kpis,                         // Alias para InventarioList
     loadingStats: statsState.loading,
     errorStats: statsState.error,
     
-    // Filtros
+    // ═══════════════════════════════════════════════════════════════════════
+    // ESTADO DE ESTADÍSTICAS (GRÁFICOS)
+    // ═══════════════════════════════════════════════════════════════════════
+    estadisticas: estadisticasState.data,
+    loadingEstadisticas: estadisticasState.loading,
+    errorEstadisticas: estadisticasState.error,
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // UTILIDADES DE ESTADO
+    // ═══════════════════════════════════════════════════════════════════════
+    isRefreshing,
     filters,
     
-    // Acciones principales
+    // ═══════════════════════════════════════════════════════════════════════
+    // ACCIONES CRUD (nombres compatibles con componentes)
+    // ═══════════════════════════════════════════════════════════════════════
     fetchInventario,
-    fetchByCliente,
-    fetchItem,
-    createItem,
-    updateItem,
-    ajustarCantidad,
-    deleteItem,
+    fetchById,                          // Alias para ProductoDetail
+    fetchItem: fetchById,               // Nombre alternativo
+    createProducto,                     // Alias para InventarioList
+    createItem: createProducto,         // Nombre alternativo
+    updateProducto,                     // Alias para InventarioList
+    updateItem: updateProducto,         // Nombre alternativo
+    deleteProducto,                     // Alias para InventarioList
+    deleteItem: deleteProducto,         // Nombre alternativo
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // ACCIONES DE MOVIMIENTOS
+    // ═══════════════════════════════════════════════════════════════════════
+    registrarMovimiento,                // Alias para componentes
+    ajustarCantidad: registrarMovimiento, // Nombre alternativo
+    fetchMovimientos,
+    fetchEstadisticas,
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // ACCIONES DE ALERTAS
+    // ═══════════════════════════════════════════════════════════════════════
     fetchAlertas,
+    atenderAlerta,
+    descartarAlerta,
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // ACCIONES DE STATS
+    // ═══════════════════════════════════════════════════════════════════════
     fetchStats,
     
-    // Paginación
+    // ═══════════════════════════════════════════════════════════════════════
+    // PAGINACIÓN
+    // ═══════════════════════════════════════════════════════════════════════
     goToPage,
     setPageSize,
     
-    // Filtros
+    // ═══════════════════════════════════════════════════════════════════════
+    // FILTROS
+    // ═══════════════════════════════════════════════════════════════════════
     applyFilters,
     clearFilters,
     search,
-    filterStockBajo,
-    filterProximosVencer,
-    filterByZona,
-    filterByCategoria,
     
-    // Utilidades
+    // ═══════════════════════════════════════════════════════════════════════
+    // UTILIDADES
+    // ═══════════════════════════════════════════════════════════════════════
     refresh,
     refreshAlertas,
     clearDetail,
     clearErrors,
     
-    // Constantes
+    // ═══════════════════════════════════════════════════════════════════════
+    // CONSTANTES
+    // ═══════════════════════════════════════════════════════════════════════
+    categorias,
     zonas,
     unidadesMedida,
+    estados,
   };
 };
 
-// ============================================================================
-// HOOK PARA ALERTAS SOLAMENTE
-// ============================================================================
-
-/**
- * Hook simplificado solo para alertas de inventario
- * Ideal para widgets y notificaciones
- * 
- * @example
- * const { alertas, totalAlertas, refresh } = useInventarioAlertas();
- */
-export const useInventarioAlertas = (clienteId = null) => {
-  const [alertas, setAlertas] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  
-  const fetchAlertas = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const params = clienteId ? { cliente_id: clienteId } : {};
-      const response = await inventarioService.getAlertas(params);
-      if (response.success) {
-        setAlertas(response.data || []);
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [clienteId]);
-  
-  useEffect(() => {
-    fetchAlertas();
-  }, [fetchAlertas]);
-  
-  const alertasPorTipo = useMemo(() => {
-    const grouped = { stock_bajo: [], agotado: [], vencimiento: [] };
-    alertas.forEach(a => grouped[a.tipo]?.push(a));
-    return grouped;
-  }, [alertas]);
-  
-  return { 
-    alertas, 
-    alertasPorTipo,
-    totalAlertas: alertas.length,
-    loading, 
-    error, 
-    refresh: fetchAlertas 
-  };
-};
-
-// ============================================================================
+// ════════════════════════════════════════════════════════════════════════════
 // EXPORT
-// ============================================================================
+// ════════════════════════════════════════════════════════════════════════════
 
 export default useInventario;

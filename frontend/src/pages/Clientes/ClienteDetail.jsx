@@ -1,21 +1,19 @@
 /**
  * ============================================================================
- * ISTHO CRM - ClienteDetail (Fase 5 - Integración Completa)
+ * ISTHO CRM - ClienteDetail
  * ============================================================================
  * Vista de detalle del cliente conectada al backend real.
  * 
- * CAMBIOS vs versión anterior:
- * - Eliminados MOCK_CLIENTE, MOCK_CONTACTOS, MOCK_HISTORIAL
- * - Conectado con useClientes hook (fetchById, contactos, historial)
- * - CRUD real de contactos
- * - Integrado con sistema de notificaciones
+ * CORREGIDO: 
+ * - Usa nombres correctos del hook useClientes
+ * - Verificación de permisos basada en rol del usuario
  * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.4.0
  * @date Enero 2026
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -35,7 +33,7 @@ import {
   MessageSquare,
   FileCheck,
   DollarSign,
-  RefreshCw,
+  Database,
 } from 'lucide-react';
 
 // Layout
@@ -47,13 +45,66 @@ import { Button, StatusChip, KpiCard, ConfirmDialog, Modal } from '../../compone
 // Local Components
 import ClienteForm from './components/ClienteForm';
 
-// ════════════════════════════════════════════════════════════════════════════
-// HOOKS INTEGRADOS
-// ════════════════════════════════════════════════════════════════════════════
+// Hooks
 import useClientes from '../../hooks/useClientes';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
-import { ProtectedAction } from '../../components/auth/PrivateRoute';
+
+// ════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════════════
+
+const formatTipoCliente = (tipo) => {
+  const tipos = {
+    corporativo: 'Corporativo',
+    pyme: 'PyME',
+    persona_natural: 'Persona Natural',
+  };
+  return tipos[tipo] || tipo || '-';
+};
+
+const formatSector = (sector) => {
+  const sectores = {
+    alimentos: 'Alimentos y Bebidas',
+    construccion: 'Construcción',
+    manufactura: 'Manufactura',
+    retail: 'Retail',
+    farmaceutico: 'Farmacéutico',
+    quimico: 'Químico',
+    textil: 'Textil',
+    tecnologia: 'Tecnología',
+    servicios: 'Servicios',
+    otro: 'Otro',
+  };
+  return sectores[sector] || sector || '-';
+};
+
+const formatCurrency = (value) => {
+  if (!value) return '$0';
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+  }).format(value);
+};
+
+/**
+ * Verificar permisos basado en rol
+ * @param {string} userRole - Rol del usuario
+ * @param {string} action - Acción a verificar
+ * @returns {boolean}
+ */
+const checkPermission = (userRole, action) => {
+  const permissions = {
+    admin: ['ver', 'crear', 'editar', 'eliminar', 'exportar', 'importar'],
+    supervisor: ['ver', 'crear', 'editar', 'exportar'],
+    operador: ['ver'],
+    cliente: ['ver'],
+  };
+  
+  const rolePermissions = permissions[userRole] || permissions.operador;
+  return rolePermissions.includes(action);
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTES INTERNOS
@@ -63,17 +114,20 @@ import { ProtectedAction } from '../../components/auth/PrivateRoute';
  * Tarjeta de contacto
  */
 const ContactCard = ({ contacto, onEdit, onDelete, canEdit }) => (
-  <div className={
-    'p-4 rounded-xl border transition-colors ' +
-    (contacto.es_principal ? 'border-orange-200 bg-orange-50' : 'border-gray-100 bg-white hover:bg-slate-50')
-  }>
+  <div className={`
+    p-4 rounded-xl border transition-colors
+    ${contacto.es_principal 
+      ? 'border-orange-200 bg-orange-50' 
+      : 'border-gray-100 bg-white hover:bg-slate-50'
+    }
+  `}>
     <div className="flex items-start justify-between">
       <div className="flex items-center gap-3">
-        <div className={
-          'w-10 h-10 rounded-full flex items-center justify-center ' +
-          (contacto.es_principal ? 'bg-orange-200' : 'bg-slate-200')
-        }>
-          <User className={'w-5 h-5 ' + (contacto.es_principal ? 'text-orange-700' : 'text-slate-600')} />
+        <div className={`
+          w-10 h-10 rounded-full flex items-center justify-center
+          ${contacto.es_principal ? 'bg-orange-200' : 'bg-slate-200'}
+        `}>
+          <User className={`w-5 h-5 ${contacto.es_principal ? 'text-orange-700' : 'text-slate-600'}`} />
         </div>
         <div>
           <div className="flex items-center gap-2">
@@ -84,19 +138,19 @@ const ContactCard = ({ contacto, onEdit, onDelete, canEdit }) => (
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500">{contacto.cargo}</p>
+          <p className="text-sm text-slate-500">{contacto.cargo || 'Sin cargo'}</p>
         </div>
       </div>
       {canEdit && (
         <div className="flex gap-1">
           <button
-            onClick={() => onEdit && onEdit(contacto)}
+            onClick={() => onEdit?.(contacto)}
             className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg"
           >
             <Pencil className="w-4 h-4" />
           </button>
           <button
-            onClick={() => onDelete && onDelete(contacto)}
+            onClick={() => onDelete?.(contacto)}
             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg"
           >
             <Trash2 className="w-4 h-4" />
@@ -105,14 +159,18 @@ const ContactCard = ({ contacto, onEdit, onDelete, canEdit }) => (
       )}
     </div>
     <div className="mt-3 space-y-1.5 text-sm">
-      <div className="flex items-center gap-2 text-slate-600">
-        <Phone className="w-4 h-4 text-slate-400" />
-        {contacto.telefono}
-      </div>
-      <div className="flex items-center gap-2 text-slate-600">
-        <Mail className="w-4 h-4 text-slate-400" />
-        {contacto.email}
-      </div>
+      {contacto.telefono && (
+        <div className="flex items-center gap-2 text-slate-600">
+          <Phone className="w-4 h-4 text-slate-400" />
+          {contacto.telefono}
+        </div>
+      )}
+      {contacto.email && (
+        <div className="flex items-center gap-2 text-slate-600">
+          <Mail className="w-4 h-4 text-slate-400" />
+          {contacto.email}
+        </div>
+      )}
     </div>
   </div>
 );
@@ -128,22 +186,27 @@ const ActivityItem = ({ actividad }) => {
     documento: { icon: FileCheck, bg: 'bg-violet-100', color: 'text-violet-600' },
     nota: { icon: MessageSquare, bg: 'bg-amber-100', color: 'text-amber-600' },
     creacion: { icon: Building2, bg: 'bg-slate-100', color: 'text-slate-600' },
-    actualizacion: { icon: Pencil, bg: 'bg-orange-100', color: 'text-orange-600' },
+    actualizar: { icon: Pencil, bg: 'bg-orange-100', color: 'text-orange-600' },
+    login: { icon: User, bg: 'bg-green-100', color: 'text-green-600' },
   };
 
-  const config = iconConfig[actividad.tipo] || iconConfig.nota;
+  const config = iconConfig[actividad.tipo] || iconConfig[actividad.accion] || iconConfig.nota;
   const Icon = config.icon;
 
   return (
     <div className="flex gap-4">
-      <div className={'w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ' + config.bg}>
-        <Icon className={'w-5 h-5 ' + config.color} />
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+        <Icon className={`w-5 h-5 ${config.color}`} />
       </div>
       <div className="flex-1 pb-6 border-b border-gray-100 last:border-0">
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-medium text-slate-800">{actividad.titulo || actividad.accion}</p>
-            <p className="text-sm text-slate-500 mt-0.5">{actividad.descripcion || actividad.detalle}</p>
+            <p className="font-medium text-slate-800">
+              {actividad.titulo || actividad.accion || 'Actividad'}
+            </p>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {actividad.descripcion || actividad.detalle || '-'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
@@ -166,17 +229,37 @@ const ActivityItem = ({ actividad }) => {
  */
 const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => {
   const [formData, setFormData] = useState({});
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    setFormData(contacto || { es_principal: false });
+    if (isOpen) {
+      setFormData(contacto || { es_principal: false, recibe_notificaciones: true });
+      setErrors({});
+    }
   }, [contacto, isOpen]);
 
   const handleChange = (field, value) => {
-    setFormData(function(prev) { return Object.assign({}, prev, { [field]: value }); });
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: null }));
+    }
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.nombre?.trim()) newErrors.nombre = 'El nombre es requerido';
+    if (!formData.telefono?.trim()) newErrors.telefono = 'El teléfono es requerido';
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Email inválido';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
-    onSubmit(formData);
+    if (validate()) {
+      onSubmit(formData);
+    }
   };
 
   return (
@@ -187,7 +270,9 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
       size="md"
       footer={
         <>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Cancelar
+          </Button>
           <Button variant="primary" onClick={handleSubmit} loading={loading}>
             {contacto ? 'Guardar' : 'Agregar'}
           </Button>
@@ -202,23 +287,28 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
           <input
             type="text"
             value={formData.nombre || ''}
-            onChange={function(e) { handleChange('nombre', e.target.value); }}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+            onChange={(e) => handleChange('nombre', e.target.value)}
+            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
+              errors.nombre ? 'border-red-300' : 'border-slate-200'
+            }`}
             placeholder="Nombre del contacto"
           />
+          {errors.nombre && <p className="text-xs text-red-500 mt-1">{errors.nombre}</p>}
         </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            Cargo <span className="text-red-500">*</span>
+            Cargo
           </label>
           <input
             type="text"
             value={formData.cargo || ''}
-            onChange={function(e) { handleChange('cargo', e.target.value); }}
+            onChange={(e) => handleChange('cargo', e.target.value)}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
             placeholder="Cargo en la empresa"
           />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
             Teléfono <span className="text-red-500">*</span>
@@ -226,32 +316,52 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
           <input
             type="tel"
             value={formData.telefono || ''}
-            onChange={function(e) { handleChange('telefono', e.target.value); }}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+            onChange={(e) => handleChange('telefono', e.target.value)}
+            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
+              errors.telefono ? 'border-red-300' : 'border-slate-200'
+            }`}
             placeholder="+57 300 123 4567"
           />
+          {errors.telefono && <p className="text-xs text-red-500 mt-1">{errors.telefono}</p>}
         </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            Email <span className="text-red-500">*</span>
+            Email
           </label>
           <input
             type="email"
             value={formData.email || ''}
-            onChange={function(e) { handleChange('email', e.target.value); }}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+            onChange={(e) => handleChange('email', e.target.value)}
+            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
+              errors.email ? 'border-red-300' : 'border-slate-200'
+            }`}
             placeholder="email@empresa.com"
           />
+          {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
         </div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={formData.es_principal || false}
-            onChange={function(e) { handleChange('es_principal', e.target.checked); }}
-            className="w-4 h-4 text-orange-500 rounded focus:ring-orange-500"
-          />
-          <span className="text-sm text-slate-700">Contacto principal</span>
-        </label>
+
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.es_principal || false}
+              onChange={(e) => handleChange('es_principal', e.target.checked)}
+              className="w-4 h-4 text-orange-500 rounded focus:ring-orange-500"
+            />
+            <span className="text-sm text-slate-700">Contacto principal</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.recibe_notificaciones ?? true}
+              onChange={(e) => handleChange('recibe_notificaciones', e.target.checked)}
+              className="w-4 h-4 text-orange-500 rounded focus:ring-orange-500"
+            />
+            <span className="text-sm text-slate-700">Recibe notificaciones</span>
+          </label>
+        </div>
       </div>
     </Modal>
   );
@@ -260,33 +370,27 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
+
 const ClienteDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, hasPermission } = useAuth();
-  const { success, apiError, contactoAgregado, deleted } = useNotification();
+  const { user } = useAuth();
+  const { success, apiError, deleted } = useNotification();
+
+  // Obtener rol del usuario
+  const userRole = user?.rol || user?.role || 'operador';
 
   // ──────────────────────────────────────────────────────────────────────────
   // HOOK DE CLIENTES
   // ──────────────────────────────────────────────────────────────────────────
   const {
-    // Cliente actual
-    currentCliente: cliente,
-    loading,
-    error,
-    // Contactos
-    contactos,
-    loadingContactos,
-    // Historial
-    historial,
-    loadingHistorial,
-    // Acciones
-    fetchById,
-    fetchContactos,
-    fetchHistorial,
+    cliente,
+    loadingDetail: loading,
+    errorDetail: error,
+    fetchCliente,
     updateCliente,
     deleteCliente,
-    // Contactos CRUD
+    fetchContactos,
     createContacto,
     updateContacto,
     deleteContacto,
@@ -296,6 +400,10 @@ const ClienteDetail = () => {
   // ESTADOS LOCALES
   // ──────────────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('info');
+  const [contactos, setContactos] = useState([]);
+  const [loadingContactos, setLoadingContactos] = useState(false);
+  const [historial, setHistorial] = useState([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
   
   // Modals
   const [editModal, setEditModal] = useState(false);
@@ -305,15 +413,37 @@ const ClienteDetail = () => {
   const [formLoading, setFormLoading] = useState(false);
 
   // ──────────────────────────────────────────────────────────────────────────
+  // PERMISOS
+  // ──────────────────────────────────────────────────────────────────────────
+  const canEdit = checkPermission(userRole, 'editar');
+  const canDelete = checkPermission(userRole, 'eliminar');
+
+  // ──────────────────────────────────────────────────────────────────────────
   // CARGAR DATOS
   // ──────────────────────────────────────────────────────────────────────────
+  
+  const loadContactos = useCallback(async (clienteId) => {
+    setLoadingContactos(true);
+    try {
+      const response = await fetchContactos(clienteId);
+      if (response?.success) {
+        setContactos(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error cargando contactos:', err);
+      setContactos([]);
+    } finally {
+      setLoadingContactos(false);
+    }
+  }, [fetchContactos]);
+
   useEffect(() => {
     if (id) {
-      fetchById(id);
-      fetchContactos(id);
-      fetchHistorial(id);
+      fetchCliente(id);
+      loadContactos(id);
+      setHistorial([]);
     }
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, fetchCliente, loadContactos]);
 
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
@@ -325,6 +455,7 @@ const ClienteDetail = () => {
       await updateCliente(id, data);
       success('Cliente actualizado correctamente');
       setEditModal(false);
+      fetchCliente(id);
     } catch (err) {
       apiError(err);
     } finally {
@@ -353,11 +484,10 @@ const ClienteDetail = () => {
         success('Contacto actualizado');
       } else {
         await createContacto(id, data);
-        contactoAgregado();
+        success('Contacto agregado');
       }
       setContactoModal({ isOpen: false, contacto: null });
-      // Refrescar contactos
-      fetchContactos(id);
+      loadContactos(id);
     } catch (err) {
       apiError(err);
     } finally {
@@ -371,25 +501,12 @@ const ClienteDetail = () => {
       await deleteContacto(id, deleteContactoModal.contacto.id);
       deleted('Contacto');
       setDeleteContactoModal({ isOpen: false, contacto: null });
-      fetchContactos(id);
+      loadContactos(id);
     } catch (err) {
       apiError(err);
     } finally {
       setFormLoading(false);
     }
-  };
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // FORMATTERS
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  const formatCurrency = (value) => {
-    if (!value) return '$0';
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(value);
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -404,9 +521,9 @@ const ClienteDetail = () => {
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-48" />
             <div className="grid grid-cols-4 gap-4">
-              {[0, 1, 2, 3].map(function(i) {
-                return <div key={i} className="h-32 bg-gray-200 rounded-2xl" />;
-              })}
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-32 bg-gray-200 rounded-2xl" />
+              ))}
             </div>
             <div className="h-96 bg-gray-200 rounded-2xl" />
           </div>
@@ -430,7 +547,7 @@ const ClienteDetail = () => {
             </div>
             <h2 className="text-xl font-bold text-slate-800 mb-2">Cliente no encontrado</h2>
             <p className="text-slate-500 mb-4">{error || 'El cliente solicitado no existe'}</p>
-            <Button variant="primary" onClick={function() { navigate('/clientes'); }}>
+            <Button variant="primary" onClick={() => navigate('/clientes')}>
               Volver a Clientes
             </Button>
           </div>
@@ -445,25 +562,20 @@ const ClienteDetail = () => {
   
   const tabs = [
     { id: 'info', label: 'Información' },
-    { id: 'contactos', label: 'Contactos (' + contactos.length + ')' },
+    { id: 'contactos', label: `Contactos (${contactos.length})` },
     { id: 'historial', label: 'Historial' },
   ];
-
-  const canEdit = hasPermission('clientes', 'editar');
-  const canDelete = hasPermission('clientes', 'eliminar');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <FloatingHeader />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* HEADER */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={function() { navigate('/clientes'); }}
+              onClick={() => navigate('/clientes')}
               className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -477,28 +589,28 @@ const ClienteDetail = () => {
                   <h1 className="text-2xl font-bold text-slate-800">{cliente.razon_social}</h1>
                   <StatusChip status={cliente.estado} />
                 </div>
-                <p className="text-slate-500">NIT: {cliente.nit}</p>
+                <p className="text-slate-500">
+                  {cliente.codigo_cliente} • NIT: {cliente.nit}
+                </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             {canEdit && (
-              <Button variant="outline" icon={Pencil} onClick={function() { setEditModal(true); }}>
+              <Button variant="outline" icon={Pencil} onClick={() => setEditModal(true)}>
                 Editar
               </Button>
             )}
             {canDelete && (
-              <Button variant="danger" icon={Trash2} onClick={function() { setDeleteModal(true); }}>
+              <Button variant="danger" icon={Trash2} onClick={() => setDeleteModal(true)}>
                 Eliminar
               </Button>
             )}
           </div>
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* KPIs */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <KpiCard
             title="Operaciones del Mes"
@@ -508,8 +620,8 @@ const ClienteDetail = () => {
             iconColor="text-blue-600"
           />
           <KpiCard
-            title="Facturación del Mes"
-            value={formatCurrency(cliente.facturacion_mes)}
+            title="Crédito Aprobado"
+            value={formatCurrency(cliente.credito_aprobado)}
             icon={DollarSign}
             iconBg="bg-emerald-100"
             iconColor="text-emerald-600"
@@ -530,29 +642,28 @@ const ClienteDetail = () => {
           />
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* TABS */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6">
           <div className="border-b border-gray-100">
             <nav className="flex px-6">
-              {tabs.map(function(tab) {
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={function() { setActiveTab(tab.id); }}
-                    className={
-                      'py-4 px-4 text-sm font-medium transition-colors relative ' +
-                      (activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700')
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    py-4 px-4 text-sm font-medium transition-colors relative
+                    ${activeTab === tab.id 
+                      ? 'text-orange-600' 
+                      : 'text-slate-500 hover:text-slate-700'
                     }
-                  >
-                    {tab.label}
-                    {activeTab === tab.id && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
-                    )}
-                  </button>
-                );
-              })}
+                  `}
+                >
+                  {tab.label}
+                  {activeTab === tab.id && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+                  )}
+                </button>
+              ))}
             </nav>
           </div>
 
@@ -567,20 +678,32 @@ const ClienteDetail = () => {
                     <div className="flex items-center gap-3 text-sm">
                       <Building2 className="w-5 h-5 text-slate-400" />
                       <span className="text-slate-500 w-32">Tipo:</span>
-                      <span className="text-slate-800 capitalize">{cliente.tipo_cliente || '-'}</span>
+                      <span className="text-slate-800">{formatTipoCliente(cliente.tipo_cliente)}</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <FileText className="w-5 h-5 text-slate-400" />
                       <span className="text-slate-500 w-32">Sector:</span>
-                      <span className="text-slate-800 capitalize">{cliente.sector || '-'}</span>
+                      <span className="text-slate-800">{formatSector(cliente.sector)}</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <Calendar className="w-5 h-5 text-slate-400" />
                       <span className="text-slate-500 w-32">Cliente desde:</span>
                       <span className="text-slate-800">
-                        {cliente.created_at ? new Date(cliente.created_at).toLocaleDateString('es-CO') : '-'}
+                        {cliente.fecha_inicio_relacion 
+                          ? new Date(cliente.fecha_inicio_relacion).toLocaleDateString('es-CO')
+                          : cliente.created_at 
+                            ? new Date(cliente.created_at).toLocaleDateString('es-CO')
+                            : '-'
+                        }
                       </span>
                     </div>
+                    {cliente.codigo_wms && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <Database className="w-5 h-5 text-slate-400" />
+                        <span className="text-slate-500 w-32">Código WMS:</span>
+                        <span className="text-slate-800 font-mono">{cliente.codigo_wms}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -592,7 +715,11 @@ const ClienteDetail = () => {
                       <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
                       <div>
                         <p className="text-slate-800">{cliente.direccion || '-'}</p>
-                        <p className="text-slate-500">{cliente.ciudad}, {cliente.departamento}</p>
+                        {(cliente.ciudad || cliente.departamento) && (
+                          <p className="text-slate-500">
+                            {[cliente.ciudad, cliente.departamento].filter(Boolean).join(', ')}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
@@ -606,7 +733,12 @@ const ClienteDetail = () => {
                     {cliente.sitio_web && (
                       <div className="flex items-center gap-3 text-sm">
                         <Globe className="w-5 h-5 text-slate-400" />
-                        <a href={cliente.sitio_web} target="_blank" rel="noopener noreferrer" className="text-orange-600 hover:underline">
+                        <a 
+                          href={cliente.sitio_web} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-orange-600 hover:underline"
+                        >
                           {cliente.sitio_web}
                         </a>
                       </div>
@@ -620,23 +752,18 @@ const ClienteDetail = () => {
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 text-sm">
                       <DollarSign className="w-5 h-5 text-slate-400" />
-                      <span className="text-slate-500 w-32">Límite crédito:</span>
-                      <span className="text-slate-800">{formatCurrency(cliente.limite_credito)}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <Calendar className="w-5 h-5 text-slate-400" />
-                      <span className="text-slate-500 w-32">Plazo pago:</span>
-                      <span className="text-slate-800">{cliente.plazo_pago || 30} días</span>
+                      <span className="text-slate-500 w-32">Crédito aprobado:</span>
+                      <span className="text-slate-800">{formatCurrency(cliente.credito_aprobado)}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Observaciones */}
-                {cliente.observaciones && (
+                {cliente.notas && (
                   <div className="space-y-4">
                     <h4 className="font-semibold text-slate-800">Observaciones</h4>
-                    <p className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl">
-                      {cliente.observaciones}
+                    <p className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl whitespace-pre-wrap">
+                      {cliente.notas}
                     </p>
                   </div>
                 )}
@@ -652,7 +779,7 @@ const ClienteDetail = () => {
                       variant="primary"
                       icon={Plus}
                       size="sm"
-                      onClick={function() { setContactoModal({ isOpen: true, contacto: null }); }}
+                      onClick={() => setContactoModal({ isOpen: true, contacto: null })}
                     >
                       Agregar Contacto
                     </Button>
@@ -661,30 +788,36 @@ const ClienteDetail = () => {
                 
                 {loadingContactos ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[0, 1, 2].map(function(i) {
-                      return (
-                        <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />
-                      );
-                    })}
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+                    ))}
                   </div>
                 ) : contactos.length === 0 ? (
                   <div className="text-center py-12">
                     <User className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-500">No hay contactos registrados</p>
+                    <p className="text-slate-500 mb-4">No hay contactos registrados</p>
+                    {canEdit && (
+                      <Button
+                        variant="primary"
+                        icon={Plus}
+                        size="sm"
+                        onClick={() => setContactoModal({ isOpen: true, contacto: null })}
+                      >
+                        Agregar Primer Contacto
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {contactos.map(function(contacto) {
-                      return (
-                        <ContactCard
-                          key={contacto.id}
-                          contacto={contacto}
-                          canEdit={canEdit}
-                          onEdit={function() { setContactoModal({ isOpen: true, contacto: contacto }); }}
-                          onDelete={function() { setDeleteContactoModal({ isOpen: true, contacto: contacto }); }}
-                        />
-                      );
-                    })}
+                    {contactos.map((contacto) => (
+                      <ContactCard
+                        key={contacto.id}
+                        contacto={contacto}
+                        canEdit={canEdit}
+                        onEdit={() => setContactoModal({ isOpen: true, contacto })}
+                        onDelete={() => setDeleteContactoModal({ isOpen: true, contacto })}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -695,22 +828,23 @@ const ClienteDetail = () => {
               <div>
                 {loadingHistorial ? (
                   <div className="space-y-4">
-                    {[0, 1, 2, 3].map(function(i) {
-                      return (
-                        <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />
-                      );
-                    })}
+                    {[0, 1, 2, 3].map((i) => (
+                      <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+                    ))}
                   </div>
                 ) : historial.length === 0 ? (
                   <div className="text-center py-12">
                     <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                     <p className="text-slate-500">No hay actividad registrada</p>
+                    <p className="text-xs text-slate-400 mt-2">
+                      El historial estará disponible próximamente
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {historial.map(function(actividad) {
-                      return <ActivityItem key={actividad.id} actividad={actividad} />;
-                    })}
+                    {historial.map((actividad) => (
+                      <ActivityItem key={actividad.id} actividad={actividad} />
+                    ))}
                   </div>
                 )}
               </div>
@@ -720,17 +854,15 @@ const ClienteDetail = () => {
 
         {/* Footer */}
         <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
-          © 2026 ISTHO S.A.S. - Sistema CRM Interno
+          © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
+          Centro Logístico Industrial del Norte, Girardota, Antioquia
         </footer>
       </main>
 
-      {/* ══════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      
       <ClienteForm
         isOpen={editModal}
-        onClose={function() { setEditModal(false); }}
+        onClose={() => setEditModal(false)}
         onSubmit={handleEditCliente}
         cliente={cliente}
         loading={formLoading}
@@ -738,10 +870,10 @@ const ClienteDetail = () => {
 
       <ConfirmDialog
         isOpen={deleteModal}
-        onClose={function() { setDeleteModal(false); }}
+        onClose={() => setDeleteModal(false)}
         onConfirm={handleDeleteCliente}
         title="Eliminar Cliente"
-        message={'¿Estás seguro de eliminar "' + cliente.razon_social + '"? Esta acción eliminará todos los datos asociados.'}
+        message={`¿Estás seguro de eliminar "${cliente.razon_social}"? Esta acción eliminará todos los datos asociados.`}
         confirmText="Eliminar"
         type="danger"
         loading={formLoading}
@@ -749,7 +881,7 @@ const ClienteDetail = () => {
 
       <ContactoFormModal
         isOpen={contactoModal.isOpen}
-        onClose={function() { setContactoModal({ isOpen: false, contacto: null }); }}
+        onClose={() => setContactoModal({ isOpen: false, contacto: null })}
         onSubmit={handleSaveContacto}
         contacto={contactoModal.contacto}
         loading={formLoading}
@@ -757,10 +889,10 @@ const ClienteDetail = () => {
 
       <ConfirmDialog
         isOpen={deleteContactoModal.isOpen}
-        onClose={function() { setDeleteContactoModal({ isOpen: false, contacto: null }); }}
+        onClose={() => setDeleteContactoModal({ isOpen: false, contacto: null })}
         onConfirm={handleDeleteContacto}
         title="Eliminar Contacto"
-        message={'¿Eliminar a "' + (deleteContactoModal.contacto ? deleteContactoModal.contacto.nombre : '') + '" de los contactos?'}
+        message={`¿Eliminar a "${deleteContactoModal.contacto?.nombre}" de los contactos?`}
         confirmText="Eliminar"
         type="danger"
         loading={formLoading}

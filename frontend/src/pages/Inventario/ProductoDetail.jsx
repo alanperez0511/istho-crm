@@ -1,15 +1,13 @@
 /**
  * ============================================================================
- * ISTHO CRM - ProductoDetail (Fase 5 - Integración Completa)
+ * ISTHO CRM - ProductoDetail (Versión Corregida)
  * ============================================================================
  * Vista de detalle del producto conectada al backend real.
  * 
- * CAMBIOS vs versión anterior:
- * - Eliminados MOCK_PRODUCTO, MOCK_MOVIMIENTOS, MOCK_ESTADISTICAS
- * - Conectado con useInventario hook
- * - Movimientos reales desde API
- * - Estadísticas calculadas desde backend
- * - Control de permisos
+ * CORRECCIONES:
+ * - Usa nombres correctos del hook useInventario
+ * - snake_case para campos del backend
+ * - Integración completa con movimientos y estadísticas
  * 
  * @author Coordinación TI ISTHO
  * @version 2.0.0
@@ -53,12 +51,24 @@ import { BarChart } from '../../components/charts';
 import ProductoForm from './components/ProductoForm';
 import MovimientoForm from './components/MovimientoForm';
 
-// ════════════════════════════════════════════════════════════════════════════
-// HOOKS INTEGRADOS
-// ════════════════════════════════════════════════════════════════════════════
+// Hooks
 import useInventario from '../../hooks/useInventario';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
+
+// ════════════════════════════════════════════════════════════════════════════
+// HELPER DE PERMISOS
+// ════════════════════════════════════════════════════════════════════════════
+
+const checkPermission = (userRole, action) => {
+  const permissions = {
+    admin: ['ver', 'crear', 'editar', 'eliminar', 'exportar', 'importar'],
+    supervisor: ['ver', 'crear', 'editar', 'exportar'],
+    operador: ['ver', 'crear', 'editar'],
+    cliente: ['ver'],
+  };
+  return permissions[userRole]?.includes(action) || false;
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTES INTERNOS
@@ -67,16 +77,12 @@ import { useAuth } from '../../context/AuthContext';
 /**
  * Gauge de stock visual
  */
-var StockGauge = function(props) {
-  var actual = props.actual;
-  var minimo = props.minimo;
-  var maximo = props.maximo;
+const StockGauge = ({ actual, minimo, maximo }) => {
+  const porcentaje = maximo > 0 ? (actual / maximo) * 100 : 0;
+  const minimoPos = maximo > 0 ? (minimo / maximo) * 100 : 0;
   
-  var porcentaje = maximo > 0 ? (actual / maximo) * 100 : 0;
-  var minimoPos = maximo > 0 ? (minimo / maximo) * 100 : 0;
-  
-  var statusColor = 'bg-emerald-500';
-  var statusText = 'Óptimo';
+  let statusColor = 'bg-emerald-500';
+  let statusText = 'Óptimo';
   
   if (actual === 0) {
     statusColor = 'bg-red-500';
@@ -96,23 +102,23 @@ var StockGauge = function(props) {
       <div className="relative h-8 bg-slate-100 rounded-full overflow-hidden mb-4">
         <div 
           className="absolute top-0 bottom-0 left-0 bg-red-100 opacity-50"
-          style={{ width: minimoPos + '%' }}
+          style={{ width: `${minimoPos}%` }}
         />
         
         <div 
-          className={'absolute top-0 bottom-0 left-0 transition-all duration-500 rounded-full ' + statusColor}
-          style={{ width: Math.min(porcentaje, 100) + '%' }}
+          className={`absolute top-0 bottom-0 left-0 transition-all duration-500 rounded-full ${statusColor}`}
+          style={{ width: `${Math.min(porcentaje, 100)}%` }}
         />
         
         <div 
           className="absolute top-0 bottom-0 w-0.5 bg-red-500"
-          style={{ left: minimoPos + '%' }}
+          style={{ left: `${minimoPos}%` }}
         />
       </div>
 
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
-          <span className={'w-3 h-3 rounded-full ' + statusColor} />
+          <span className={`w-3 h-3 rounded-full ${statusColor}`} />
           <span className="font-medium text-slate-700">{statusText}</span>
         </div>
         <span className="text-slate-500">
@@ -141,13 +147,11 @@ var StockGauge = function(props) {
 /**
  * Item de movimiento
  */
-var MovimientoItem = function(props) {
-  var movimiento = props.movimiento;
+const MovimientoItem = ({ movimiento }) => {
+  const isEntrada = movimiento.tipo === 'entrada';
+  const isAjuste = movimiento.tipo === 'ajuste';
   
-  var isEntrada = movimiento.tipo === 'entrada';
-  var isAjuste = movimiento.tipo === 'ajuste';
-  
-  var iconConfig = {
+  let iconConfig = {
     icon: PackageMinus,
     bg: 'bg-red-100',
     color: 'text-red-600',
@@ -170,20 +174,27 @@ var MovimientoItem = function(props) {
     };
   }
 
-  var Icon = iconConfig.icon;
+  const Icon = iconConfig.icon;
+  
+  // Usar snake_case para campos del backend
+  const cantidad = movimiento.cantidad || 0;
+  const stockResultante = movimiento.stock_resultante || movimiento.stockResultante || 0;
+  const documentoRef = movimiento.documento_referencia || movimiento.documento || 'N/A';
+  const usuarioNombre = movimiento.usuario_nombre || movimiento.responsable || 'Sistema';
+  const fecha = movimiento.fecha || movimiento.created_at;
 
   return (
     <div className="flex items-start gap-4 py-4 border-b border-gray-100 last:border-0">
-      <div className={'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ' + iconConfig.bg}>
-        <Icon className={'w-5 h-5 ' + iconConfig.color} />
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconConfig.bg}`}>
+        <Icon className={`w-5 h-5 ${iconConfig.color}`} />
       </div>
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className={'text-sm font-semibold ' + (isEntrada ? 'text-emerald-600' : isAjuste ? 'text-amber-600' : 'text-red-600')}>
-                {isEntrada ? '+' : ''}{(movimiento.cantidad || 0).toLocaleString()}
+              <span className={`text-sm font-semibold ${isEntrada ? 'text-emerald-600' : isAjuste ? 'text-amber-600' : 'text-red-600'}`}>
+                {cantidad > 0 ? '+' : ''}{cantidad.toLocaleString()}
               </span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                 {iconConfig.label}
@@ -193,7 +204,7 @@ var MovimientoItem = function(props) {
           </div>
           <div className="text-right">
             <p className="text-sm font-medium text-slate-800">
-              Stock: {(movimiento.stock_resultante || movimiento.stockResultante || 0).toLocaleString()}
+              Stock: {stockResultante.toLocaleString()}
             </p>
           </div>
         </div>
@@ -201,13 +212,13 @@ var MovimientoItem = function(props) {
         <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            {new Date(movimiento.fecha || movimiento.created_at).toLocaleString('es-CO')}
+            {fecha ? new Date(fecha).toLocaleString('es-CO') : '-'}
           </span>
           <span className="flex items-center gap-1">
             <FileText className="w-3 h-3" />
-            {movimiento.documento_referencia || movimiento.documento || 'N/A'}
+            {documentoRef}
           </span>
-          <span>{movimiento.usuario_nombre || movimiento.responsable || 'Sistema'}</span>
+          <span>{usuarioNombre}</span>
         </div>
       </div>
     </div>
@@ -217,55 +228,55 @@ var MovimientoItem = function(props) {
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
-var ProductoDetail = function() {
-  var params = useParams();
-  var id = params.id;
-  var navigate = useNavigate();
-  var authHook = useAuth();
-  var hasPermission = authHook.hasPermission;
-  var notif = useNotification();
-  var success = notif.success;
-  var apiError = notif.apiError;
-  var saved = notif.saved;
-  var deleted = notif.deleted;
+
+const ProductoDetail = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { success, error: notifyError, saved, deleted } = useNotification();
 
   // ──────────────────────────────────────────────────────────────────────────
-  // HOOK DE INVENTARIO
+  // HOOK DE INVENTARIO (nombres correctos)
   // ──────────────────────────────────────────────────────────────────────────
-  var inventarioHook = useInventario({ autoFetch: false });
-  
-  var currentProducto = inventarioHook.currentProducto;
-  var loading = inventarioHook.loading;
-  var error = inventarioHook.error;
-  var movimientos = inventarioHook.movimientos;
-  var loadingMovimientos = inventarioHook.loadingMovimientos;
-  var estadisticas = inventarioHook.estadisticas;
-  var fetchById = inventarioHook.fetchById;
-  var fetchMovimientos = inventarioHook.fetchMovimientos;
-  var fetchEstadisticas = inventarioHook.fetchEstadisticas;
-  var updateProducto = inventarioHook.updateProducto;
-  var deleteProducto = inventarioHook.deleteProducto;
-  var registrarMovimiento = inventarioHook.registrarMovimiento;
+  const {
+    // Detalle
+    currentProducto,
+    loadingDetail,
+    errorDetail,
+    // Movimientos
+    movimientos,
+    loadingMovimientos,
+    // Estadísticas
+    estadisticas,
+    loadingEstadisticas,
+    // Acciones
+    fetchById,
+    fetchMovimientos,
+    fetchEstadisticas,
+    updateProducto,
+    deleteProducto,
+    registrarMovimiento,
+  } = useInventario({ autoFetch: false });
 
   // ──────────────────────────────────────────────────────────────────────────
   // ESTADOS LOCALES
   // ──────────────────────────────────────────────────────────────────────────
-  var _a = useState('info'), activeTab = _a[0], setActiveTab = _a[1];
+  const [activeTab, setActiveTab] = useState('info');
 
   // Modals
-  var _b = useState(false), editModal = _b[0], setEditModal = _b[1];
-  var _c = useState(false), deleteModal = _c[0], setDeleteModal = _c[1];
-  var _d = useState({ isOpen: false, tipo: 'entrada' }), movimientoModal = _d[0], setMovimientoModal = _d[1];
-  var _e = useState(false), formLoading = _e[0], setFormLoading = _e[1];
+  const [editModal, setEditModal] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [movimientoModal, setMovimientoModal] = useState({ isOpen: false, tipo: 'entrada' });
+  const [formLoading, setFormLoading] = useState(false);
 
   // Permisos
-  var canEdit = hasPermission('inventario', 'editar');
-  var canDelete = hasPermission('inventario', 'eliminar');
+  const canEdit = checkPermission(user?.rol, 'editar');
+  const canDelete = checkPermission(user?.rol, 'eliminar');
 
   // ──────────────────────────────────────────────────────────────────────────
   // CARGAR DATOS
   // ──────────────────────────────────────────────────────────────────────────
-  useEffect(function() {
+  useEffect(() => {
     if (id) {
       fetchById(id);
       fetchMovimientos(id);
@@ -277,49 +288,51 @@ var ProductoDetail = function() {
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
   
-  var handleEditProducto = async function(data) {
+  const handleEditProducto = async (data) => {
     setFormLoading(true);
     try {
       await updateProducto(id, data);
       saved('Producto');
       setEditModal(false);
+      // Refrescar datos
+      fetchById(id);
     } catch (err) {
-      apiError(err);
+      notifyError(err.message || 'Error al actualizar producto');
     } finally {
       setFormLoading(false);
     }
   };
 
-  var handleDeleteProducto = async function() {
+  const handleDeleteProducto = async () => {
     setFormLoading(true);
     try {
       await deleteProducto(id);
       deleted('Producto');
       navigate('/inventario');
     } catch (err) {
-      apiError(err);
+      notifyError(err.message || 'Error al eliminar producto');
     } finally {
       setFormLoading(false);
     }
   };
 
-  var handleMovimientoSubmit = async function(data) {
+  const handleMovimientoSubmit = async (data) => {
     setFormLoading(true);
     try {
       await registrarMovimiento(id, {
         tipo: movimientoModal.tipo,
         cantidad: data.cantidad,
         motivo: data.motivo,
-        documento_referencia: data.documento,
+        documento_referencia: data.documento_referencia || data.documento,
         observaciones: data.observaciones,
       });
-      success('Movimiento de ' + movimientoModal.tipo + ' registrado correctamente');
+      success(`Movimiento de ${movimientoModal.tipo} registrado correctamente`);
       setMovimientoModal({ isOpen: false, tipo: 'entrada' });
       // Refrescar datos
       fetchById(id);
       fetchMovimientos(id);
     } catch (err) {
-      apiError(err);
+      notifyError(err.message || 'Error al registrar movimiento');
     } finally {
       setFormLoading(false);
     }
@@ -329,7 +342,7 @@ var ProductoDetail = function() {
   // FORMATTERS
   // ──────────────────────────────────────────────────────────────────────────
   
-  var formatCurrency = function(value) {
+  const formatCurrency = (value) => {
     if (!value) return '$0';
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -342,7 +355,7 @@ var ProductoDetail = function() {
   // LOADING STATE
   // ──────────────────────────────────────────────────────────────────────────
   
-  if (loading) {
+  if (loadingDetail) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <FloatingHeader />
@@ -350,9 +363,9 @@ var ProductoDetail = function() {
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-48" />
             <div className="grid grid-cols-4 gap-4">
-              {[0, 1, 2, 3].map(function(i) {
-                return <div key={i} className="h-32 bg-gray-200 rounded-2xl" />;
-              })}
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-32 bg-gray-200 rounded-2xl" />
+              ))}
             </div>
             <div className="h-96 bg-gray-200 rounded-2xl" />
           </div>
@@ -365,7 +378,7 @@ var ProductoDetail = function() {
   // ERROR STATE
   // ──────────────────────────────────────────────────────────────────────────
   
-  if (error || !currentProducto) {
+  if (errorDetail || !currentProducto) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <FloatingHeader />
@@ -375,8 +388,8 @@ var ProductoDetail = function() {
               <Package className="w-8 h-8 text-red-500" />
             </div>
             <h2 className="text-xl font-bold text-slate-800 mb-2">Producto no encontrado</h2>
-            <p className="text-slate-500 mb-4">{error || 'El producto solicitado no existe'}</p>
-            <Button variant="primary" onClick={function() { navigate('/inventario'); }}>
+            <p className="text-slate-500 mb-4">{errorDetail || 'El producto solicitado no existe'}</p>
+            <Button variant="primary" onClick={() => navigate('/inventario')}>
               Volver a Inventario
             </Button>
           </div>
@@ -386,41 +399,46 @@ var ProductoDetail = function() {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // VARIABLES CALCULADAS
+  // VARIABLES CALCULADAS (snake_case)
   // ──────────────────────────────────────────────────────────────────────────
   
-  var producto = currentProducto;
+  const producto = currentProducto;
+  
+  // Extraer campos con snake_case
+  const stockActual = producto.stock_actual || producto.cantidad || 0;
+  const stockMinimo = producto.stock_minimo || 0;
+  const stockMaximo = producto.stock_maximo || stockMinimo * 20 || 1000;
+  const costoUnitario = producto.costo_unitario || 0;
+  const precioVenta = producto.precio_venta || 0;
+  const clienteNombre = producto.cliente_nombre || producto.cliente?.razon_social || '-';
+  const bodegaNombre = producto.bodega_nombre || producto.zona || producto.bodega || '-';
+  const unidadMedida = producto.unidad_medida || 'UND';
+  const fechaVencimiento = producto.fecha_vencimiento || null;
   
   // KPIs calculados desde movimientos
-  var kpis = useMemo(function() {
-    var entradas = movimientos.filter(function(m) { return m.tipo === 'entrada'; });
-    var salidas = movimientos.filter(function(m) { return m.tipo === 'salida'; });
+  const kpis = useMemo(() => {
+    const entradas = movimientos.filter(m => m.tipo === 'entrada');
+    const salidas = movimientos.filter(m => m.tipo === 'salida');
     
-    var entradasMes = entradas.reduce(function(sum, m) { return sum + (m.cantidad || 0); }, 0);
-    var salidasMes = salidas.reduce(function(sum, m) { return sum + Math.abs(m.cantidad || 0); }, 0);
-    var stockActual = producto.stock_actual || producto.stockActual || 0;
-    var costoUnitario = producto.costo_unitario || producto.costoUnitario || 0;
+    const entradasMes = entradas.reduce((sum, m) => sum + Math.abs(m.cantidad || 0), 0);
+    const salidasMes = salidas.reduce((sum, m) => sum + Math.abs(m.cantidad || 0), 0);
     
     return {
       valorStock: stockActual * costoUnitario,
-      entradasMes: entradasMes,
-      salidasMes: salidasMes,
+      entradasMes,
+      salidasMes,
       rotacion: stockActual > 0 ? ((salidasMes / stockActual) * 100).toFixed(1) : '0',
     };
-  }, [movimientos, producto]);
+  }, [movimientos, stockActual, costoUnitario]);
 
-  // Datos para gráfico (usar estadísticas de API o calcular)
-  var chartData = estadisticas || [];
+  // Datos para gráfico
+  const chartData = estadisticas || [];
 
-  var tabs = [
+  const tabs = [
     { id: 'info', label: 'Información' },
-    { id: 'movimientos', label: 'Movimientos (' + movimientos.length + ')' },
+    { id: 'movimientos', label: `Movimientos (${movimientos.length})` },
     { id: 'estadisticas', label: 'Estadísticas' },
   ];
-
-  var stockActual = producto.stock_actual || producto.stockActual || 0;
-  var stockMinimo = producto.stock_minimo || producto.stockMinimo || 0;
-  var stockMaximo = producto.stock_maximo || producto.stockMaximo || stockMinimo * 20;
 
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -437,7 +455,7 @@ var ProductoDetail = function() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={function() { navigate('/inventario'); }}
+              onClick={() => navigate('/inventario')}
               className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -448,11 +466,13 @@ var ProductoDetail = function() {
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-slate-800">{producto.nombre}</h1>
+                  <h1 className="text-2xl font-bold text-slate-800">
+                    {producto.nombre || producto.producto}
+                  </h1>
                   <StatusChip status={producto.estado} />
                 </div>
                 <p className="text-slate-500">
-                  {producto.codigo || producto.sku} • {producto.cliente_nombre || producto.clienteNombre}
+                  {producto.codigo || producto.sku} • {clienteNombre}
                 </p>
               </div>
             </div>
@@ -464,25 +484,25 @@ var ProductoDetail = function() {
                 <Button 
                   variant="success" 
                   icon={PackagePlus}
-                  onClick={function() { setMovimientoModal({ isOpen: true, tipo: 'entrada' }); }}
+                  onClick={() => setMovimientoModal({ isOpen: true, tipo: 'entrada' })}
                 >
                   Entrada
                 </Button>
                 <Button 
                   variant="outline" 
                   icon={PackageMinus}
-                  onClick={function() { setMovimientoModal({ isOpen: true, tipo: 'salida' }); }}
+                  onClick={() => setMovimientoModal({ isOpen: true, tipo: 'salida' })}
                   disabled={stockActual === 0}
                 >
                   Salida
                 </Button>
-                <Button variant="outline" icon={Pencil} onClick={function() { setEditModal(true); }}>
+                <Button variant="outline" icon={Pencil} onClick={() => setEditModal(true)}>
                   Editar
                 </Button>
               </>
             )}
             {canDelete && (
-              <Button variant="danger" icon={Trash2} onClick={function() { setDeleteModal(true); }}>
+              <Button variant="danger" icon={Trash2} onClick={() => setDeleteModal(true)}>
                 Eliminar
               </Button>
             )}
@@ -502,21 +522,21 @@ var ProductoDetail = function() {
           />
           <KpiCard
             title="Entradas del Mes"
-            value={'+' + kpis.entradasMes.toLocaleString()}
+            value={`+${kpis.entradasMes.toLocaleString()}`}
             icon={TrendingUp}
             iconBg="bg-blue-100"
             iconColor="text-blue-600"
           />
           <KpiCard
             title="Salidas del Mes"
-            value={'-' + kpis.salidasMes.toLocaleString()}
+            value={`-${kpis.salidasMes.toLocaleString()}`}
             icon={TrendingDown}
             iconBg="bg-red-100"
             iconColor="text-red-600"
           />
           <KpiCard
             title="Rotación"
-            value={kpis.rotacion + '%'}
+            value={`${kpis.rotacion}%`}
             icon={Layers}
             iconBg="bg-violet-100"
             iconColor="text-violet-600"
@@ -550,7 +570,7 @@ var ProductoDetail = function() {
               </div>
             )}
 
-            {producto.estado === 'agotado' && (
+            {(producto.estado === 'agotado' || stockActual === 0) && (
               <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -570,23 +590,20 @@ var ProductoDetail = function() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
               <div className="border-b border-gray-100">
                 <nav className="flex px-6">
-                  {tabs.map(function(tab) {
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={function() { setActiveTab(tab.id); }}
-                        className={
-                          'py-4 px-4 text-sm font-medium transition-colors relative ' +
-                          (activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700')
-                        }
-                      >
-                        {tab.label}
-                        {activeTab === tab.id && (
-                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
-                        )}
-                      </button>
-                    );
-                  })}
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${
+                        activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {tab.label}
+                      {activeTab === tab.id && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+                      )}
+                    </button>
+                  ))}
                 </nav>
               </div>
 
@@ -610,12 +627,17 @@ var ProductoDetail = function() {
                         <div className="flex items-center gap-3 text-sm">
                           <Package className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Unidad:</span>
-                          <span className="text-slate-800 capitalize">{producto.unidad_medida || producto.unidadMedida || '-'}</span>
+                          <span className="text-slate-800 capitalize">{unidadMedida}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Calendar className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Vencimiento:</span>
-                          <span className="text-slate-800">{producto.fecha_vencimiento || producto.fechaVencimiento || 'N/A'}</span>
+                          <span className="text-slate-800">
+                            {fechaVencimiento 
+                              ? new Date(fechaVencimiento).toLocaleDateString('es-CO')
+                              : 'N/A'
+                            }
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -626,12 +648,12 @@ var ProductoDetail = function() {
                         <div className="flex items-center gap-3 text-sm">
                           <Building2 className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Cliente:</span>
-                          <span className="text-slate-800">{producto.cliente_nombre || producto.clienteNombre}</span>
+                          <span className="text-slate-800">{clienteNombre}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Warehouse className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Bodega:</span>
-                          <span className="text-slate-800">{producto.bodega_nombre || producto.bodegaNombre || producto.bodega}</span>
+                          <span className="text-slate-800">{bodegaNombre}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <MapPin className="w-5 h-5 text-slate-400" />
@@ -653,14 +675,14 @@ var ProductoDetail = function() {
                           <DollarSign className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Costo Unit.:</span>
                           <span className="text-slate-800 font-medium">
-                            {formatCurrency(producto.costo_unitario || producto.costoUnitario)}
+                            {formatCurrency(costoUnitario)}
                           </span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <DollarSign className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Precio Venta:</span>
                           <span className="text-slate-800 font-medium">
-                            {formatCurrency(producto.precio_venta || producto.precioVenta)}
+                            {formatCurrency(precioVenta)}
                           </span>
                         </div>
                       </div>
@@ -682,9 +704,9 @@ var ProductoDetail = function() {
                   <div className="space-y-0">
                     {loadingMovimientos ? (
                       <div className="space-y-3">
-                        {[0, 1, 2, 3].map(function(i) {
-                          return <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />;
-                        })}
+                        {[0, 1, 2, 3].map((i) => (
+                          <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+                        ))}
                       </div>
                     ) : movimientos.length === 0 ? (
                       <div className="py-12 text-center">
@@ -692,9 +714,9 @@ var ProductoDetail = function() {
                         <p className="text-slate-500">No hay movimientos registrados</p>
                       </div>
                     ) : (
-                      movimientos.map(function(movimiento) {
-                        return <MovimientoItem key={movimiento.id} movimiento={movimiento} />;
-                      })
+                      movimientos.map((movimiento) => (
+                        <MovimientoItem key={movimiento.id} movimiento={movimiento} />
+                      ))
                     )}
                   </div>
                 )}
@@ -702,7 +724,9 @@ var ProductoDetail = function() {
                 {/* Tab: Estadísticas */}
                 {activeTab === 'estadisticas' && (
                   <div>
-                    {chartData.length > 0 ? (
+                    {loadingEstadisticas ? (
+                      <div className="h-64 bg-gray-100 rounded-lg animate-pulse" />
+                    ) : chartData.length > 0 ? (
                       <BarChart
                         title="Entradas vs Salidas"
                         subtitle="Últimos 6 meses"
@@ -733,7 +757,7 @@ var ProductoDetail = function() {
       
       <ProductoForm
         isOpen={editModal}
-        onClose={function() { setEditModal(false); }}
+        onClose={() => setEditModal(false)}
         onSubmit={handleEditProducto}
         producto={producto}
         loading={formLoading}
@@ -741,7 +765,7 @@ var ProductoDetail = function() {
 
       <MovimientoForm
         isOpen={movimientoModal.isOpen}
-        onClose={function() { setMovimientoModal({ isOpen: false, tipo: 'entrada' }); }}
+        onClose={() => setMovimientoModal({ isOpen: false, tipo: 'entrada' })}
         onSubmit={handleMovimientoSubmit}
         tipo={movimientoModal.tipo}
         producto={producto}
@@ -750,10 +774,10 @@ var ProductoDetail = function() {
 
       <ConfirmDialog
         isOpen={deleteModal}
-        onClose={function() { setDeleteModal(false); }}
+        onClose={() => setDeleteModal(false)}
         onConfirm={handleDeleteProducto}
         title="Eliminar Producto"
-        message={'¿Estás seguro de eliminar "' + producto.nombre + '"? Se perderá todo el historial de movimientos.'}
+        message={`¿Estás seguro de eliminar "${producto.nombre || producto.producto}"? Se perderá todo el historial de movimientos.`}
         confirmText="Eliminar"
         type="danger"
         loading={formLoading}

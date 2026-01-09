@@ -1,8 +1,13 @@
 /**
+ * ============================================================================
  * ISTHO CRM - ClienteForm Component
- * Formulario para crear y editar clientes
+ * ============================================================================
+ * Formulario para crear y editar clientes.
+ * 
+ * IMPORTANTE: Los campos usan snake_case para coincidir con el backend.
  * 
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Enero 2026
  */
 
@@ -15,45 +20,184 @@ import {
   Phone, 
   Mail, 
   Globe,
-  User,
+  DollarSign,
+  Calendar,
+  FileEdit,
+  Database,
 } from 'lucide-react';
 import { Button, Modal } from '../../../components/common/index';
 
-// Campos del formulario
+// ============================================================================
+// CONFIGURACIÓN (Alineado con modelo Backend)
+// ============================================================================
+
+/**
+ * Tipos de cliente según ENUM del modelo Cliente
+ */
+const TIPOS_CLIENTE = [
+  { value: 'corporativo', label: 'Corporativo' },
+  { value: 'pyme', label: 'PyME' },
+  { value: 'persona_natural', label: 'Persona Natural' },
+];
+
+/**
+ * Sectores disponibles
+ */
+const SECTORES = [
+  { value: 'alimentos', label: 'Alimentos y Bebidas' },
+  { value: 'construccion', label: 'Construcción' },
+  { value: 'manufactura', label: 'Manufactura' },
+  { value: 'retail', label: 'Retail' },
+  { value: 'farmaceutico', label: 'Farmacéutico' },
+  { value: 'quimico', label: 'Químico' },
+  { value: 'textil', label: 'Textil' },
+  { value: 'tecnologia', label: 'Tecnología' },
+  { value: 'servicios', label: 'Servicios' },
+  { value: 'otro', label: 'Otro' },
+];
+
+/**
+ * Estados según ENUM del modelo Cliente
+ */
+const ESTADOS = [
+  { value: 'activo', label: 'Activo' },
+  { value: 'inactivo', label: 'Inactivo' },
+  { value: 'suspendido', label: 'Suspendido' },
+];
+
+/**
+ * Configuración de campos del formulario
+ * IMPORTANTE: Los nombres (name) usan snake_case para coincidir con el backend
+ */
 const FORM_FIELDS = {
   info: [
-    { name: 'razonSocial', label: 'Razón Social', type: 'text', required: true, icon: Building2, placeholder: 'Nombre de la empresa' },
-    { name: 'nit', label: 'NIT', type: 'text', required: true, icon: FileText, placeholder: '900.123.456-7' },
-    { name: 'tipoCliente', label: 'Tipo de Cliente', type: 'select', required: true, options: [
-      { value: 'corporativo', label: 'Corporativo' },
-      { value: 'pyme', label: 'PyME' },
-      { value: 'distribuidor', label: 'Distribuidor' },
-      { value: 'minorista', label: 'Minorista' },
-    ]},
-    { name: 'sector', label: 'Sector', type: 'select', required: false, options: [
-      { value: 'alimentos', label: 'Alimentos y Bebidas' },
-      { value: 'construccion', label: 'Construcción' },
-      { value: 'manufactura', label: 'Manufactura' },
-      { value: 'retail', label: 'Retail' },
-      { value: 'farmaceutico', label: 'Farmacéutico' },
-      { value: 'otro', label: 'Otro' },
-    ]},
+    { 
+      name: 'razon_social', 
+      label: 'Razón Social', 
+      type: 'text', 
+      required: true, 
+      icon: Building2, 
+      placeholder: 'Nombre de la empresa o persona',
+      maxLength: 200,
+    },
+    { 
+      name: 'nit', 
+      label: 'NIT', 
+      type: 'text', 
+      required: true, 
+      icon: FileText, 
+      placeholder: '900123456-7',
+      maxLength: 20,
+    },
+    { 
+      name: 'tipo_cliente', 
+      label: 'Tipo de Cliente', 
+      type: 'select', 
+      required: false, 
+      options: TIPOS_CLIENTE,
+    },
+    { 
+      name: 'sector', 
+      label: 'Sector', 
+      type: 'select', 
+      required: false, 
+      options: SECTORES,
+    },
   ],
   contacto: [
-    { name: 'direccion', label: 'Dirección', type: 'text', required: true, icon: MapPin, placeholder: 'Calle, número, ciudad' },
-    { name: 'ciudad', label: 'Ciudad', type: 'text', required: true, placeholder: 'Ciudad' },
-    { name: 'departamento', label: 'Departamento', type: 'text', required: true, placeholder: 'Departamento' },
-    { name: 'telefono', label: 'Teléfono', type: 'tel', required: true, icon: Phone, placeholder: '+57 300 123 4567' },
-    { name: 'email', label: 'Email', type: 'email', required: true, icon: Mail, placeholder: 'contacto@empresa.com' },
-    { name: 'sitioWeb', label: 'Sitio Web', type: 'url', required: false, icon: Globe, placeholder: 'https://www.empresa.com' },
+    { 
+      name: 'direccion', 
+      label: 'Dirección', 
+      type: 'text', 
+      required: false, 
+      icon: MapPin, 
+      placeholder: 'Calle, número, barrio',
+      maxLength: 255,
+    },
+    { 
+      name: 'ciudad', 
+      label: 'Ciudad', 
+      type: 'text', 
+      required: false, 
+      placeholder: 'Ciudad',
+      maxLength: 100,
+    },
+    { 
+      name: 'departamento', 
+      label: 'Departamento', 
+      type: 'text', 
+      required: false, 
+      placeholder: 'Departamento',
+      maxLength: 100,
+    },
+    { 
+      name: 'telefono', 
+      label: 'Teléfono', 
+      type: 'tel', 
+      required: false, 
+      icon: Phone, 
+      placeholder: '+57 604 123 4567',
+      maxLength: 50,
+    },
+    { 
+      name: 'email', 
+      label: 'Email', 
+      type: 'email', 
+      required: false, 
+      icon: Mail, 
+      placeholder: 'contacto@empresa.com',
+      maxLength: 150,
+    },
+    { 
+      name: 'sitio_web', 
+      label: 'Sitio Web', 
+      type: 'url', 
+      required: false, 
+      icon: Globe, 
+      placeholder: 'https://www.empresa.com',
+      maxLength: 200,
+    },
   ],
   comercial: [
-    { name: 'limiteCredito', label: 'Límite de Crédito', type: 'number', required: false, placeholder: '50000000' },
-    { name: 'plazoFacturacion', label: 'Plazo Facturación (días)', type: 'number', required: false, placeholder: '30' },
-    { name: 'vendedorAsignado', label: 'Vendedor Asignado', type: 'text', required: false, icon: User, placeholder: 'Nombre del vendedor' },
-    { name: 'observaciones', label: 'Observaciones', type: 'textarea', required: false, placeholder: 'Notas adicionales sobre el cliente...' },
+    { 
+      name: 'credito_aprobado', 
+      label: 'Límite de Crédito (COP)', 
+      type: 'number', 
+      required: false, 
+      icon: DollarSign,
+      placeholder: '50000000',
+      min: 0,
+    },
+    { 
+      name: 'fecha_inicio_relacion', 
+      label: 'Fecha Inicio Relación', 
+      type: 'date', 
+      required: false, 
+      icon: Calendar,
+    },
+    { 
+      name: 'codigo_wms', 
+      label: 'Código WMS', 
+      type: 'text', 
+      required: false,
+      icon: Database,
+      placeholder: 'Código en sistema WMS Copérnico',
+      maxLength: 50,
+    },
+    { 
+      name: 'notas', 
+      label: 'Observaciones', 
+      type: 'textarea', 
+      required: false, 
+      icon: FileEdit,
+      placeholder: 'Notas adicionales sobre el cliente...',
+    },
   ],
 };
+
+// ============================================================================
+// COMPONENTE INPUT FIELD
+// ============================================================================
 
 const InputField = ({ field, value, onChange, error }) => {
   const Icon = field.icon;
@@ -67,6 +211,17 @@ const InputField = ({ field, value, onChange, error }) => {
     ${error ? 'border-red-300' : 'border-slate-200'}
     ${Icon ? 'pl-10' : ''}
   `;
+
+  const handleChange = (e) => {
+    let newValue = e.target.value;
+    
+    // Para números, convertir a número o null
+    if (field.type === 'number') {
+      newValue = newValue === '' ? null : Number(newValue);
+    }
+    
+    onChange(field.name, newValue);
+  };
 
   return (
     <div className="space-y-1">
@@ -86,7 +241,7 @@ const InputField = ({ field, value, onChange, error }) => {
           <select
             name={field.name}
             value={value || ''}
-            onChange={(e) => onChange(field.name, e.target.value)}
+            onChange={handleChange}
             className={baseInputClasses}
           >
             <option value="">Seleccionar...</option>
@@ -100,8 +255,9 @@ const InputField = ({ field, value, onChange, error }) => {
           <textarea
             name={field.name}
             value={value || ''}
-            onChange={(e) => onChange(field.name, e.target.value)}
+            onChange={handleChange}
             placeholder={field.placeholder}
+            maxLength={field.maxLength}
             rows={3}
             className={baseInputClasses}
           />
@@ -109,9 +265,11 @@ const InputField = ({ field, value, onChange, error }) => {
           <input
             type={field.type}
             name={field.name}
-            value={value || ''}
-            onChange={(e) => onChange(field.name, e.target.value)}
+            value={value ?? ''}
+            onChange={handleChange}
             placeholder={field.placeholder}
+            maxLength={field.maxLength}
+            min={field.min}
             className={baseInputClasses}
           />
         )}
@@ -123,6 +281,10 @@ const InputField = ({ field, value, onChange, error }) => {
     </div>
   );
 };
+
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 
 const ClienteForm = ({
   isOpen,
@@ -137,12 +299,33 @@ const ClienteForm = ({
 
   const isEditing = !!cliente;
 
-  // Inicializar formulario
+  // ──────────────────────────────────────────────────────────────────────────
+  // INICIALIZAR FORMULARIO
+  // ──────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (cliente) {
-      setFormData(cliente);
-    } else {
+      // Edición: usar datos del cliente directamente
       setFormData({
+        razon_social: cliente.razon_social || '',
+        nit: cliente.nit || '',
+        tipo_cliente: cliente.tipo_cliente || 'corporativo',
+        sector: cliente.sector || '',
+        direccion: cliente.direccion || '',
+        ciudad: cliente.ciudad || '',
+        departamento: cliente.departamento || '',
+        telefono: cliente.telefono || '',
+        email: cliente.email || '',
+        sitio_web: cliente.sitio_web || '',
+        credito_aprobado: cliente.credito_aprobado || null,
+        fecha_inicio_relacion: cliente.fecha_inicio_relacion || '',
+        codigo_wms: cliente.codigo_wms || '',
+        notas: cliente.notas || '',
+        estado: cliente.estado || 'activo',
+      });
+    } else {
+      // Nuevo cliente: valores por defecto
+      setFormData({
+        tipo_cliente: 'corporativo',
         estado: 'activo',
       });
     }
@@ -150,6 +333,10 @@ const ClienteForm = ({
     setActiveTab('info');
   }, [cliente, isOpen]);
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ──────────────────────────────────────────────────────────────────────────
+  
   const handleChange = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     // Limpiar error del campo
@@ -161,21 +348,35 @@ const ClienteForm = ({
   const validateForm = () => {
     const newErrors = {};
     
-    // Validar campos requeridos
-    Object.values(FORM_FIELDS).flat().forEach((field) => {
-      if (field.required && !formData[field.name]) {
-        newErrors[field.name] = `${field.label} es requerido`;
-      }
-    });
+    // Validar razón social (requerido)
+    if (!formData.razon_social?.trim()) {
+      newErrors.razon_social = 'La razón social es requerida';
+    } else if (formData.razon_social.length < 3) {
+      newErrors.razon_social = 'La razón social debe tener al menos 3 caracteres';
+    }
+    
+    // Validar NIT (requerido)
+    if (!formData.nit?.trim()) {
+      newErrors.nit = 'El NIT es requerido';
+    }
 
-    // Validar email
+    // Validar email si se proporciona
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Email inválido';
     }
 
-    // Validar NIT
-    if (formData.nit && !/^\d{3}\.\d{3}\.\d{3}-\d$/.test(formData.nit)) {
-      newErrors.nit = 'Formato de NIT inválido (ej: 900.123.456-7)';
+    // Validar URL si se proporciona
+    if (formData.sitio_web && formData.sitio_web.trim()) {
+      try {
+        new URL(formData.sitio_web);
+      } catch {
+        newErrors.sitio_web = 'URL inválida (debe incluir https://)';
+      }
+    }
+
+    // Validar límite de crédito
+    if (formData.credito_aprobado !== null && formData.credito_aprobado < 0) {
+      newErrors.credito_aprobado = 'El límite de crédito no puede ser negativo';
     }
 
     setErrors(newErrors);
@@ -185,19 +386,22 @@ const ClienteForm = ({
   const handleSubmit = async () => {
     if (!validateForm()) {
       // Ir a la primera pestaña con errores
-      const tabs = ['info', 'contacto', 'comercial'];
-      for (const tab of tabs) {
-        const hasError = FORM_FIELDS[tab].some((field) => errors[field.name]);
-        if (hasError) {
-          setActiveTab(tab);
-          break;
-        }
+      const tabsWithErrors = ['info', 'contacto', 'comercial'].filter(tab =>
+        FORM_FIELDS[tab].some(field => errors[field.name])
+      );
+      if (tabsWithErrors.length > 0) {
+        setActiveTab(tabsWithErrors[0]);
       }
       return;
     }
 
+    // Enviar datos directamente (ya están en formato snake_case)
     await onSubmit?.(formData);
   };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────────────────
 
   const tabs = [
     { id: 'info', label: 'Información' },
@@ -210,7 +414,7 @@ const ClienteForm = ({
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Editar Cliente' : 'Nuevo Cliente'}
-      subtitle={isEditing ? `Editando: ${cliente?.razonSocial}` : 'Complete la información del cliente'}
+      subtitle={isEditing ? `Editando: ${cliente?.razon_social}` : 'Complete la información del cliente'}
       size="lg"
       footer={
         <>
@@ -271,20 +475,28 @@ const ClienteForm = ({
             Estado del Cliente
           </label>
           <div className="flex gap-4">
-            {['activo', 'inactivo', 'suspendido'].map((estado) => (
-              <label key={estado} className="flex items-center gap-2 cursor-pointer">
+            {ESTADOS.map((estado) => (
+              <label key={estado.value} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   name="estado"
-                  value={estado}
-                  checked={formData.estado === estado}
+                  value={estado.value}
+                  checked={formData.estado === estado.value}
                   onChange={(e) => handleChange('estado', e.target.value)}
                   className="w-4 h-4 text-orange-500 focus:ring-orange-500"
                 />
-                <span className="text-sm text-slate-700 capitalize">{estado}</span>
+                <span className="text-sm text-slate-700">{estado.label}</span>
               </label>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Código de cliente (solo en edición, solo lectura) */}
+      {isEditing && activeTab === 'info' && cliente?.codigo_cliente && (
+        <div className="mt-4 p-3 bg-blue-50 rounded-xl">
+          <p className="text-xs text-blue-600 font-medium">Código de Cliente</p>
+          <p className="text-sm text-blue-800 font-mono">{cliente.codigo_cliente}</p>
         </div>
       )}
     </Modal>

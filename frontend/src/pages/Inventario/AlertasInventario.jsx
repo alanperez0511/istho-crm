@@ -1,14 +1,8 @@
 /**
  * ============================================================================
- * ISTHO CRM - AlertasInventario (Fase 5 - Integración Completa)
+ * ISTHO CRM - AlertasInventario (Versión Corregida)
  * ============================================================================
  * Gestión de alertas de inventario conectada al backend real.
- * 
- * CAMBIOS vs versión anterior:
- * - Eliminado MOCK_ALERTAS
- * - Conectado con useInventario hook (fetchAlertas)
- * - Acciones de atender/descartar conectadas a API
- * - Movimientos de entrada conectados a API
  * 
  * @author Coordinación TI ISTHO
  * @version 2.0.0
@@ -18,212 +12,229 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   AlertTriangle,
   Package,
-  PackagePlus,
   Clock,
-  Bell,
   CheckCircle,
   XCircle,
   Filter,
   RefreshCw,
+  Eye,
+  PackagePlus,
+  Calendar,
+  Building2,
+  MapPin,
+  ArrowLeft,
 } from 'lucide-react';
 
 // Layout
 import FloatingHeader from '../../components/layout/FloatingHeader';
 
 // Components
-import { Button, StatusChip, FilterDropdown, KpiCard } from '../../components/common';
+import { Button, StatusChip, FilterDropdown, KpiCard, ConfirmDialog } from '../../components/common';
 
 // Local Components
 import MovimientoForm from './components/MovimientoForm';
 
-// ════════════════════════════════════════════════════════════════════════════
-// HOOKS INTEGRADOS
-// ════════════════════════════════════════════════════════════════════════════
+// Hooks
 import useInventario from '../../hooks/useInventario';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
 
 // ════════════════════════════════════════════════════════════════════════════
-// OPCIONES DE FILTROS
+// CONSTANTES
 // ════════════════════════════════════════════════════════════════════════════
-var FILTER_OPTIONS = {
+
+const TIPO_ALERTA_CONFIG = {
+  agotado: {
+    label: 'Agotado',
+    icon: Package,
+    bg: 'bg-red-100',
+    color: 'text-red-600',
+    border: 'border-red-200',
+  },
+  bajo_stock: {
+    label: 'Stock Bajo',
+    icon: AlertTriangle,
+    bg: 'bg-amber-100',
+    color: 'text-amber-600',
+    border: 'border-amber-200',
+  },
+  vencimiento: {
+    label: 'Por Vencer',
+    icon: Clock,
+    bg: 'bg-orange-100',
+    color: 'text-orange-600',
+    border: 'border-orange-200',
+  },
+};
+
+const PRIORIDAD_CONFIG = {
+  alta: { label: 'Alta', color: 'bg-red-500' },
+  media: { label: 'Media', color: 'bg-amber-500' },
+  baja: { label: 'Baja', color: 'bg-blue-500' },
+};
+
+const FILTER_OPTIONS = {
   tipo: [
-    { value: 'agotado', label: 'Agotado' },
+    { value: 'agotado', label: 'Agotados' },
     { value: 'bajo_stock', label: 'Stock Bajo' },
-    { value: 'vencimiento', label: 'Próximo a Vencer' },
+    { value: 'vencimiento', label: 'Por Vencer' },
   ],
   prioridad: [
     { value: 'alta', label: 'Alta' },
     { value: 'media', label: 'Media' },
     { value: 'baja', label: 'Baja' },
   ],
-  estado: [
-    { value: 'pendiente', label: 'Pendiente' },
-    { value: 'atendida', label: 'Atendida' },
-  ],
+};
+
+const checkPermission = (userRole, action) => {
+  const permissions = {
+    admin: ['ver', 'crear', 'editar', 'eliminar', 'atender'],
+    supervisor: ['ver', 'crear', 'editar', 'atender'],
+    operador: ['ver', 'atender'],
+    cliente: ['ver'],
+  };
+  return permissions[userRole]?.includes(action) || false;
 };
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTES INTERNOS
 // ════════════════════════════════════════════════════════════════════════════
 
-/**
- * Tarjeta de alerta
- */
-var AlertaCard = function(props) {
-  var alerta = props.alerta;
-  var onAction = props.onAction;
-  var onAtender = props.onAtender;
-  var onDescartar = props.onDescartar;
-  var canEdit = props.canEdit;
-  
-  var navigate = useNavigate();
-  
-  var tipoConfig = {
-    agotado: {
-      icon: XCircle,
-      bg: 'bg-red-50',
-      border: 'border-red-200',
-      iconBg: 'bg-red-100',
-      iconColor: 'text-red-600',
-      label: 'Producto Agotado',
-      labelBg: 'bg-red-100 text-red-700',
-    },
-    bajo_stock: {
-      icon: AlertTriangle,
-      bg: 'bg-amber-50',
-      border: 'border-amber-200',
-      iconBg: 'bg-amber-100',
-      iconColor: 'text-amber-600',
-      label: 'Stock Bajo',
-      labelBg: 'bg-amber-100 text-amber-700',
-    },
-    vencimiento: {
-      icon: Clock,
-      bg: 'bg-orange-50',
-      border: 'border-orange-200',
-      iconBg: 'bg-orange-100',
-      iconColor: 'text-orange-600',
-      label: 'Próximo a Vencer',
-      labelBg: 'bg-orange-100 text-orange-700',
-    },
-  };
+const AlertaCard = ({ alerta, onView, onAtender, onDescartar, onEntrada, canAtender }) => {
+  const config = TIPO_ALERTA_CONFIG[alerta.tipo] || TIPO_ALERTA_CONFIG.bajo_stock;
+  const prioridadConfig = PRIORIDAD_CONFIG[alerta.prioridad] || PRIORIDAD_CONFIG.media;
+  const Icon = config.icon;
 
-  var prioridadConfig = {
-    alta: { color: 'text-red-600', bg: 'bg-red-100' },
-    media: { color: 'text-amber-600', bg: 'bg-amber-100' },
-    baja: { color: 'text-slate-600', bg: 'bg-slate-100' },
-  };
-
-  var config = tipoConfig[alerta.tipo] || tipoConfig.bajo_stock;
-  var prioridad = prioridadConfig[alerta.prioridad] || prioridadConfig.media;
-  var Icon = config.icon;
-  var isAtendida = alerta.estado === 'atendida';
+  const stockActual = alerta.stock_actual ?? alerta.stockActual ?? 0;
+  const stockMinimo = alerta.stock_minimo ?? alerta.stockMinimo ?? 0;
+  const clienteNombre = alerta.cliente_nombre || alerta.cliente || '-';
+  const productoNombre = alerta.producto_nombre || alerta.nombre || 'Producto';
+  const productoCodigo = alerta.producto_codigo || alerta.codigo || '-';
+  const fechaVencimiento = alerta.fecha_vencimiento || alerta.fechaVencimiento;
+  const diasRestantes = alerta.dias_restantes;
 
   return (
-    <div className={
-      'rounded-2xl border p-5 transition-all duration-200 ' +
-      (isAtendida ? 'bg-slate-50 border-slate-200 opacity-60' : config.bg + ' ' + config.border)
-    }>
-      <div className="flex items-start gap-4">
-        {/* Icon */}
-        <div className={'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ' + config.iconBg}>
-          <Icon className={'w-6 h-6 ' + config.iconColor} />
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4">
+    <div className={`bg-white rounded-2xl border ${config.border} shadow-sm overflow-hidden hover:shadow-md transition-shadow`}>
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${config.bg}`}>
+              <Icon className={`w-5 h-5 ${config.color}`} />
+            </div>
             <div>
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className={'text-xs font-medium px-2 py-0.5 rounded-full ' + config.labelBg}>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${config.bg} ${config.color}`}>
                   {config.label}
                 </span>
-                <span className={'text-xs font-medium px-2 py-0.5 rounded-full ' + prioridad.bg + ' ' + prioridad.color}>
-                  {(alerta.prioridad || 'media').toUpperCase()}
-                </span>
-                {isAtendida && (
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                    ✓ Atendida
-                  </span>
-                )}
+                <span className={`w-2 h-2 rounded-full ${prioridadConfig.color}`} title={`Prioridad ${prioridadConfig.label}`} />
               </div>
-              <h3 
-                className="font-semibold text-slate-800 hover:text-orange-600 cursor-pointer"
-                onClick={function() { navigate('/inventario/productos/' + alerta.producto_id); }}
-              >
-                {alerta.producto_nombre || alerta.nombre}
-              </h3>
-              <p className="text-sm text-slate-500 mt-0.5">
-                {alerta.producto_codigo || alerta.codigo} • {alerta.cliente_nombre || alerta.cliente}
+              <p className="text-xs text-slate-400 mt-0.5">
+                {alerta.created_at ? new Date(alerta.created_at).toLocaleDateString('es-CO') : '-'}
               </p>
             </div>
           </div>
+          
+          {alerta.estado === 'atendida' && (
+            <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-600 rounded-full flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" />
+              Atendida
+            </span>
+          )}
+        </div>
 
-          {/* Details */}
-          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            <div>
-              <p className="text-slate-400 text-xs">Stock Actual</p>
-              <p className={'font-semibold ' + ((alerta.stock_actual || alerta.stockActual || 0) === 0 ? 'text-red-600' : 'text-slate-800')}>
-                {(alerta.stock_actual || alerta.stockActual || 0).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p className="text-slate-400 text-xs">Stock Mínimo</p>
-              <p className="font-semibold text-slate-800">{(alerta.stock_minimo || alerta.stockMinimo || 0).toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-slate-400 text-xs">Ubicación</p>
-              <p className="font-medium text-slate-600">{alerta.ubicacion || '-'}</p>
-            </div>
-            <div>
-              <p className="text-slate-400 text-xs">
-                {alerta.tipo === 'vencimiento' ? 'Vence' : 'Fecha Alerta'}
-              </p>
-              <p className="font-medium text-slate-600">
-                {alerta.tipo === 'vencimiento' 
-                  ? (alerta.fecha_vencimiento || alerta.fechaVencimiento)
-                  : (alerta.fecha_alerta || alerta.fechaAlerta || new Date(alerta.created_at).toLocaleDateString('es-CO'))
-                }
-              </p>
-            </div>
+        <div className="mb-4">
+          <h3 
+            className="text-lg font-semibold text-slate-800 hover:text-orange-600 cursor-pointer"
+            onClick={() => onView(alerta)}
+          >
+            {productoNombre}
+          </h3>
+          <p className="text-sm text-slate-500 font-mono">{productoCodigo}</p>
+        </div>
+
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Building2 className="w-4 h-4 text-slate-400" />
+            {clienteNombre}
           </div>
+          
+          {alerta.ubicacion && (
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <MapPin className="w-4 h-4 text-slate-400" />
+              {alerta.ubicacion}
+            </div>
+          )}
 
-          {/* Actions */}
-          {!isAtendida && canEdit && (
-            <div className="mt-4 flex items-center gap-2 flex-wrap">
-              {(alerta.tipo === 'agotado' || alerta.tipo === 'bajo_stock') && (
-                <Button 
-                  variant="success" 
-                  size="sm" 
-                  icon={PackagePlus}
-                  onClick={function() { onAction(alerta); }}
-                >
-                  Registrar Entrada
-                </Button>
+          {alerta.tipo === 'vencimiento' && fechaVencimiento && (
+            <div className="flex items-center gap-2 text-sm text-orange-600">
+              <Calendar className="w-4 h-4" />
+              Vence: {new Date(fechaVencimiento).toLocaleDateString('es-CO')}
+              {diasRestantes !== undefined && (
+                <span className="text-xs px-2 py-0.5 bg-orange-100 rounded-full">
+                  {diasRestantes} días
+                </span>
               )}
-              <Button 
-                variant="outline" 
-                size="sm"
-                icon={CheckCircle}
-                onClick={function() { onAtender(alerta); }}
-              >
-                Marcar Atendida
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={function() { onDescartar(alerta); }}
-              >
-                Descartar
-              </Button>
             </div>
           )}
         </div>
+
+        {(alerta.tipo === 'agotado' || alerta.tipo === 'bajo_stock') && (
+          <div className="bg-slate-50 rounded-xl p-3 mb-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">Stock Actual</span>
+              <span className={`font-bold ${stockActual === 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                {stockActual.toLocaleString()} {alerta.unidad_medida || 'UND'}
+              </span>
+            </div>
+            {stockMinimo > 0 && (
+              <>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <span className="text-slate-500">Stock Mínimo</span>
+                  <span className="text-slate-700">{stockMinimo.toLocaleString()}</span>
+                </div>
+                <div className="mt-2 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all ${stockActual === 0 ? 'bg-red-500' : 'bg-amber-500'}`}
+                    style={{ width: `${Math.min((stockActual / stockMinimo) * 100, 100)}%` }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {canAtender && alerta.estado !== 'atendida' && (
+          <div className="flex items-center gap-2">
+            {(alerta.tipo === 'agotado' || alerta.tipo === 'bajo_stock') && (
+              <Button
+                variant="success"
+                size="sm"
+                icon={PackagePlus}
+                onClick={() => onEntrada(alerta)}
+                className="flex-1"
+              >
+                Registrar Entrada
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              icon={CheckCircle}
+              onClick={() => onAtender(alerta)}
+            >
+              Atender
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={XCircle}
+              onClick={() => onDescartar(alerta)}
+              className="text-slate-400 hover:text-red-500"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -232,368 +243,198 @@ var AlertaCard = function(props) {
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
-var AlertasInventario = function() {
-  var navigate = useNavigate();
-  var authHook = useAuth();
-  var user = authHook.user;
-  var hasPermission = authHook.hasPermission;
-  var notif = useNotification();
-  var success = notif.success;
-  var apiError = notif.apiError;
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // HOOK DE INVENTARIO
-  // ──────────────────────────────────────────────────────────────────────────
-  var inventarioHook = useInventario({ autoFetch: false });
-  
-  var alertas = inventarioHook.alertas;
-  var loadingAlertas = inventarioHook.loadingAlertas;
-  var fetchAlertas = inventarioHook.fetchAlertas;
-  var atenderAlerta = inventarioHook.atenderAlerta;
-  var descartarAlerta = inventarioHook.descartarAlerta;
-  var registrarMovimiento = inventarioHook.registrarMovimiento;
+const AlertasInventario = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { success, error: notifyError, warning } = useNotification();
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // ESTADOS LOCALES
-  // ──────────────────────────────────────────────────────────────────────────
-  var _a = useState({}), filters = _a[0], setFilters = _a[1];
-  var _b = useState(false), showFilters = _b[0], setShowFilters = _b[1];
-  var _c = useState(false), isRefreshing = _c[0], setIsRefreshing = _c[1];
+  const {
+    alertas,
+    loadingAlertas,
+    fetchAlertas,
+    atenderAlerta,
+    descartarAlerta,
+    registrarMovimiento,
+  } = useInventario({ autoFetchAlertas: true });
 
-  // Modal
-  var _d = useState({ isOpen: false, producto: null }), movimientoModal = _d[0], setMovimientoModal = _d[1];
-  var _e = useState(false), formLoading = _e[0], setFormLoading = _e[1];
+  const [filters, setFilters] = useState({});
+  const [showFilters, setShowFilters] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [movimientoModal, setMovimientoModal] = useState({ isOpen: false, alerta: null });
+  const [atenderModal, setAtenderModal] = useState({ isOpen: false, alerta: null });
+  const [descartarModal, setDescartarModal] = useState({ isOpen: false, alerta: null });
+  const [formLoading, setFormLoading] = useState(false);
 
-  // Permisos
-  var canEdit = hasPermission('inventario', 'editar');
+  const canAtender = checkPermission(user?.rol, 'atender');
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // CARGAR DATOS
-  // ──────────────────────────────────────────────────────────────────────────
-  useEffect(function() {
-    var clienteFilter = user && user.rol === 'cliente' ? { cliente_id: user.cliente_id } : {};
-    fetchAlertas(clienteFilter);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // FILTRAR ALERTAS
-  // ──────────────────────────────────────────────────────────────────────────
-  var filteredAlertas = useMemo(function() {
-    return alertas.filter(function(alerta) {
-      if (filters.tipo && alerta.tipo !== filters.tipo) return false;
-      if (filters.prioridad && alerta.prioridad !== filters.prioridad) return false;
-      if (filters.estado && alerta.estado !== filters.estado) return false;
-      return true;
-    });
+  const filteredAlertas = useMemo(() => {
+    let result = [...alertas];
+    if (filters.tipo) result = result.filter(a => a.tipo === filters.tipo);
+    if (filters.prioridad) result = result.filter(a => a.prioridad === filters.prioridad);
+    return result;
   }, [alertas, filters]);
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // KPIs
-  // ──────────────────────────────────────────────────────────────────────────
-  var kpis = useMemo(function() {
-    var pendientes = alertas.filter(function(a) { return a.estado === 'pendiente'; }).length;
-    var agotados = alertas.filter(function(a) { return a.tipo === 'agotado' && a.estado === 'pendiente'; }).length;
-    var bajoStock = alertas.filter(function(a) { return a.tipo === 'bajo_stock' && a.estado === 'pendiente'; }).length;
-    var porVencer = alertas.filter(function(a) { return a.tipo === 'vencimiento' && a.estado === 'pendiente'; }).length;
-    
-    return { pendientes: pendientes, agotados: agotados, bajoStock: bajoStock, porVencer: porVencer };
+  const kpis = useMemo(() => {
+    const pendientes = alertas.filter(a => a.estado !== 'atendida');
+    return {
+      total: alertas.length,
+      agotados: alertas.filter(a => a.tipo === 'agotado').length,
+      bajoStock: alertas.filter(a => a.tipo === 'bajo_stock').length,
+      porVencer: alertas.filter(a => a.tipo === 'vencimiento').length,
+      altaPrioridad: pendientes.filter(a => a.prioridad === 'alta').length,
+    };
   }, [alertas]);
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // HANDLERS
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  var handleRefresh = async function() {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    try {
-      var clienteFilter = user && user.rol === 'cliente' ? { cliente_id: user.cliente_id } : {};
-      await fetchAlertas(clienteFilter);
-    } finally {
-      setIsRefreshing(false);
-    }
+    try { await fetchAlertas(); } finally { setIsRefreshing(false); }
   };
 
-  var handleFilterChange = function(key, value) {
-    var newFilters = Object.assign({}, filters);
-    if (value) {
-      newFilters[key] = value;
-    } else {
-      delete newFilters[key];
-    }
-    setFilters(newFilters);
-  };
-
-  var handleClearFilters = function() {
-    setFilters({});
-  };
-
-  var handleAction = function(alerta) {
-    // Abrir modal de entrada con el producto
-    setMovimientoModal({ 
-      isOpen: true, 
-      producto: {
-        id: alerta.producto_id,
-        nombre: alerta.producto_nombre || alerta.nombre,
-        stock_actual: alerta.stock_actual || alerta.stockActual,
-        unidad_medida: alerta.unidad_medida || 'unidad',
-      }
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => {
+      const newFilters = { ...prev };
+      if (value) newFilters[key] = value;
+      else delete newFilters[key];
+      return newFilters;
     });
   };
 
-  var handleAtender = async function(alerta) {
-    try {
-      if (atenderAlerta) {
-        await atenderAlerta(alerta.id);
-      }
-      success('Alerta marcada como atendida');
-      handleRefresh();
-    } catch (err) {
-      apiError(err);
-    }
-  };
+  const handleView = (alerta) => navigate(`/inventario/productos/${alerta.producto_id}`);
+  const handleEntrada = (alerta) => setMovimientoModal({ isOpen: true, alerta });
+  const handleAtender = (alerta) => setAtenderModal({ isOpen: true, alerta });
+  const handleDescartar = (alerta) => setDescartarModal({ isOpen: true, alerta });
 
-  var handleDescartar = async function(alerta) {
-    try {
-      if (descartarAlerta) {
-        await descartarAlerta(alerta.id);
-      }
-      success('Alerta descartada');
-      handleRefresh();
-    } catch (err) {
-      apiError(err);
-    }
-  };
-
-  var handleMovimientoSubmit = async function(data) {
+  const handleMovimientoSubmit = async (data) => {
     setFormLoading(true);
     try {
-      await registrarMovimiento(movimientoModal.producto.id, {
+      await registrarMovimiento(movimientoModal.alerta.producto_id, {
         tipo: 'entrada',
         cantidad: data.cantidad,
-        motivo: data.motivo || 'Reposición de stock',
-        documento_referencia: data.documento,
+        motivo: data.motivo || 'Reposición por alerta de stock',
+        documento_referencia: data.documento_referencia || data.documento,
         observaciones: data.observaciones,
       });
-      
       success('Entrada registrada correctamente');
-      setMovimientoModal({ isOpen: false, producto: null });
-      
-      // Refrescar alertas
-      handleRefresh();
+      setMovimientoModal({ isOpen: false, alerta: null });
+      fetchAlertas();
     } catch (err) {
-      apiError(err);
+      notifyError(err.message || 'Error al registrar entrada');
     } finally {
       setFormLoading(false);
     }
   };
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ──────────────────────────────────────────────────────────────────────────
-  
+  const handleConfirmAtender = async () => {
+    setFormLoading(true);
+    try {
+      await atenderAlerta(atenderModal.alerta.id);
+      success('Alerta marcada como atendida');
+      setAtenderModal({ isOpen: false, alerta: null });
+    } catch (err) {
+      notifyError(err.message || 'Error al atender alerta');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleConfirmDescartar = async () => {
+    setFormLoading(true);
+    try {
+      await descartarAlerta(descartarModal.alerta.id);
+      warning('Alerta descartada');
+      setDescartarModal({ isOpen: false, alerta: null });
+    } catch (err) {
+      notifyError(err.message || 'Error al descartar alerta');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader notificationCount={kpis.pendientes} />
+      <FloatingHeader notificationCount={kpis.altaPrioridad} />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* ════════════════════════════════════════════════════════════════ */}
-        {/* HEADER */}
-        {/* ════════════════════════════════════════════════════════════════ */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <button
-              onClick={function() { navigate('/inventario'); }}
-              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors"
-            >
+            <button onClick={() => navigate('/inventario')} className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
               <h1 className="text-3xl font-bold text-slate-800">Alertas de Inventario</h1>
-              <p className="text-slate-500 mt-1">
-                Gestiona las alertas de stock bajo, agotados y vencimientos
-              </p>
+              <p className="text-slate-500 mt-1">Gestiona las alertas de stock bajo, agotados y vencimientos</p>
             </div>
           </div>
-          
-          <Button 
-            variant="ghost" 
-            icon={RefreshCw} 
-            onClick={handleRefresh}
-            loading={isRefreshing}
-            title="Actualizar alertas"
-          />
-        </div>
-
-        {/* ════════════════════════════════════════════════════════════════ */}
-        {/* KPIs */}
-        {/* ════════════════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <KpiCard
-            title="Alertas Pendientes"
-            value={kpis.pendientes}
-            icon={Bell}
-            iconBg="bg-slate-100"
-            iconColor="text-slate-600"
-          />
-          <KpiCard
-            title="Productos Agotados"
-            value={kpis.agotados}
-            icon={XCircle}
-            iconBg="bg-red-100"
-            iconColor="text-red-600"
-            onClick={function() { handleFilterChange('tipo', 'agotado'); }}
-            className="cursor-pointer hover:shadow-md transition-shadow"
-          />
-          <KpiCard
-            title="Stock Bajo"
-            value={kpis.bajoStock}
-            icon={AlertTriangle}
-            iconBg="bg-amber-100"
-            iconColor="text-amber-600"
-            onClick={function() { handleFilterChange('tipo', 'bajo_stock'); }}
-            className="cursor-pointer hover:shadow-md transition-shadow"
-          />
-          <KpiCard
-            title="Por Vencer"
-            value={kpis.porVencer}
-            icon={Clock}
-            iconBg="bg-orange-100"
-            iconColor="text-orange-600"
-            onClick={function() { handleFilterChange('tipo', 'vencimiento'); }}
-            className="cursor-pointer hover:shadow-md transition-shadow"
-          />
-        </div>
-
-        {/* ════════════════════════════════════════════════════════════════ */}
-        {/* FILTERS */}
-        {/* ════════════════════════════════════════════════════════════════ */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500">
-              {filteredAlertas.length} alerta{filteredAlertas.length !== 1 ? 's' : ''} encontrada{filteredAlertas.length !== 1 ? 's' : ''}
-            </p>
-            <Button
-              variant={showFilters ? 'secondary' : 'outline'}
-              icon={Filter}
-              size="sm"
-              onClick={function() { setShowFilters(!showFilters); }}
-            >
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" icon={RefreshCw} onClick={handleRefresh} loading={isRefreshing} />
+            <Button variant={showFilters ? 'secondary' : 'outline'} icon={Filter} onClick={() => setShowFilters(!showFilters)}>
               Filtros
               {Object.keys(filters).length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded-full">
-                  {Object.keys(filters).length}
-                </span>
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded-full">{Object.keys(filters).length}</span>
               )}
             </Button>
           </div>
-
-          {showFilters && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FilterDropdown
-                  label="Tipo"
-                  options={FILTER_OPTIONS.tipo}
-                  value={filters.tipo}
-                  onChange={function(v) { handleFilterChange('tipo', v); }}
-                  placeholder="Todos los tipos"
-                />
-                <FilterDropdown
-                  label="Prioridad"
-                  options={FILTER_OPTIONS.prioridad}
-                  value={filters.prioridad}
-                  onChange={function(v) { handleFilterChange('prioridad', v); }}
-                  placeholder="Todas las prioridades"
-                />
-                <FilterDropdown
-                  label="Estado"
-                  options={FILTER_OPTIONS.estado}
-                  value={filters.estado}
-                  onChange={function(v) { handleFilterChange('estado', v); }}
-                  placeholder="Todos los estados"
-                />
-              </div>
-              
-              {Object.keys(filters).length > 0 && (
-                <div className="mt-4 flex justify-end">
-                  <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-                    Limpiar filtros
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
-        {/* ALERTAS LIST */}
-        {/* ════════════════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <KpiCard title="Agotados" value={kpis.agotados} icon={Package} iconBg="bg-red-100" iconColor="text-red-600" onClick={() => handleFilterChange('tipo', 'agotado')} className="cursor-pointer hover:shadow-md" />
+          <KpiCard title="Stock Bajo" value={kpis.bajoStock} icon={AlertTriangle} iconBg="bg-amber-100" iconColor="text-amber-600" onClick={() => handleFilterChange('tipo', 'bajo_stock')} className="cursor-pointer hover:shadow-md" />
+          <KpiCard title="Por Vencer" value={kpis.porVencer} icon={Clock} iconBg="bg-orange-100" iconColor="text-orange-600" onClick={() => handleFilterChange('tipo', 'vencimiento')} className="cursor-pointer hover:shadow-md" />
+          <KpiCard title="Prioridad Alta" value={kpis.altaPrioridad} icon={AlertTriangle} iconBg="bg-purple-100" iconColor="text-purple-600" onClick={() => handleFilterChange('prioridad', 'alta')} className="cursor-pointer hover:shadow-md" />
+        </div>
+
+        {showFilters && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FilterDropdown label="Tipo de Alerta" options={FILTER_OPTIONS.tipo} value={filters.tipo} onChange={(v) => handleFilterChange('tipo', v)} placeholder="Todos los tipos" />
+              <FilterDropdown label="Prioridad" options={FILTER_OPTIONS.prioridad} value={filters.prioridad} onChange={(v) => handleFilterChange('prioridad', v)} placeholder="Todas las prioridades" />
+              <div className="flex items-end">
+                {Object.keys(filters).length > 0 && <Button variant="ghost" size="sm" onClick={() => setFilters({})}>Limpiar filtros</Button>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mb-4">
+          <p className="text-sm text-slate-500">{filteredAlertas.length} alerta{filteredAlertas.length !== 1 ? 's' : ''} encontrada{filteredAlertas.length !== 1 ? 's' : ''}</p>
+        </div>
+
         {loadingAlertas ? (
-          <div className="space-y-4">
-            {[0, 1, 2].map(function(i) {
-              return (
-                <div key={i} className="bg-white rounded-2xl p-6 animate-pulse">
-                  <div className="flex gap-4">
-                    <div className="w-12 h-12 bg-gray-200 rounded-xl" />
-                    <div className="flex-1 space-y-3">
-                      <div className="h-4 bg-gray-200 rounded w-1/3" />
-                      <div className="h-3 bg-gray-100 rounded w-1/4" />
-                      <div className="h-3 bg-gray-100 rounded w-1/2" />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-64 bg-gray-200 rounded-2xl animate-pulse" />)}
           </div>
         ) : filteredAlertas.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 py-16 text-center">
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-emerald-600" />
+              <CheckCircle className="w-8 h-8 text-emerald-500" />
             </div>
-            <h3 className="text-lg font-medium text-slate-800 mb-1">
-              ¡Todo en orden!
-            </h3>
-            <p className="text-slate-500">
-              {Object.keys(filters).length > 0
-                ? 'No hay alertas que coincidan con los filtros'
-                : 'No hay alertas pendientes en este momento'}
-            </p>
+            <h3 className="text-lg font-medium text-slate-800 mb-1">{Object.keys(filters).length > 0 ? 'No hay alertas con estos filtros' : '¡Todo en orden!'}</h3>
+            <p className="text-slate-500">{Object.keys(filters).length > 0 ? 'Intenta ajustar los filtros de búsqueda' : 'No hay alertas de inventario pendientes'}</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredAlertas.map(function(alerta) {
-              return (
-                <AlertaCard
-                  key={alerta.id}
-                  alerta={alerta}
-                  canEdit={canEdit}
-                  onAction={handleAction}
-                  onAtender={handleAtender}
-                  onDescartar={handleDescartar}
-                />
-              );
-            })}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredAlertas.map((alerta) => (
+              <AlertaCard key={alerta.id} alerta={alerta} onView={handleView} onAtender={handleAtender} onDescartar={handleDescartar} onEntrada={handleEntrada} canAtender={canAtender} />
+            ))}
           </div>
         )}
 
-        {/* Footer */}
-        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
-          © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
-          Centro Logístico Industrial del Norte, Girardota, Antioquia
-        </footer>
+        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">© 2026 ISTHO S.A.S. - Sistema CRM Interno</footer>
       </main>
 
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      {/* MODAL */}
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      
       <MovimientoForm
         isOpen={movimientoModal.isOpen}
-        onClose={function() { setMovimientoModal({ isOpen: false, producto: null }); }}
+        onClose={() => setMovimientoModal({ isOpen: false, alerta: null })}
         onSubmit={handleMovimientoSubmit}
         tipo="entrada"
-        producto={movimientoModal.producto}
+        producto={movimientoModal.alerta ? { id: movimientoModal.alerta.producto_id, nombre: movimientoModal.alerta.producto_nombre || movimientoModal.alerta.nombre, codigo: movimientoModal.alerta.producto_codigo || movimientoModal.alerta.codigo, stock_actual: movimientoModal.alerta.stock_actual ?? 0, unidad_medida: movimientoModal.alerta.unidad_medida || 'UND' } : null}
         loading={formLoading}
       />
+
+      <ConfirmDialog isOpen={atenderModal.isOpen} onClose={() => setAtenderModal({ isOpen: false, alerta: null })} onConfirm={handleConfirmAtender} title="Marcar como Atendida" message={`¿Confirmas que la alerta para "${atenderModal.alerta?.producto_nombre || atenderModal.alerta?.nombre || ''}" ha sido atendida?`} confirmText="Confirmar" type="success" loading={formLoading} />
+
+      <ConfirmDialog isOpen={descartarModal.isOpen} onClose={() => setDescartarModal({ isOpen: false, alerta: null })} onConfirm={handleConfirmDescartar} title="Descartar Alerta" message={`¿Estás seguro de descartar la alerta para "${descartarModal.alerta?.producto_nombre || descartarModal.alerta?.nombre || ''}"?`} confirmText="Descartar" type="warning" loading={formLoading} />
     </div>
   );
 };

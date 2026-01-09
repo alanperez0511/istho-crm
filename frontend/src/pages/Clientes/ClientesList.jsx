@@ -1,21 +1,17 @@
 /**
  * ============================================================================
- * ISTHO CRM - ClientesList (Fase 5 - Integración Completa)
+ * ISTHO CRM - ClientesList
  * ============================================================================
- * Lista de clientes conectada al backend real mediante hooks.
+ * Lista de clientes conectada al backend real.
  * 
- * CAMBIOS vs versión anterior:
- * - Eliminados datos MOCK
- * - Conectado con useClientes hook
- * - Integrado con sistema de notificaciones
- * - CRUD completo conectado a API
+ * ACTUALIZADO: Filtros alineados con ENUMs del modelo Cliente
  * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.1.0
  * @date Enero 2026
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -46,24 +42,24 @@ import {
 // Local Components
 import ClienteForm from './components/ClienteForm';
 
-// ════════════════════════════════════════════════════════════════════════════
-// HOOKS INTEGRADOS
-// ════════════════════════════════════════════════════════════════════════════
+// Hooks
 import useClientes from '../../hooks/useClientes';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
 import { ProtectedAction } from '../../components/auth/PrivateRoute';
 
 // ════════════════════════════════════════════════════════════════════════════
-// CONFIGURACIÓN DE FILTROS
+// CONFIGURACIÓN DE FILTROS (Alineados con modelo Cliente del Backend)
 // ════════════════════════════════════════════════════════════════════════════
+
 const FILTER_OPTIONS = {
+  // Tipos según ENUM del modelo Cliente
   tipo_cliente: [
     { value: 'corporativo', label: 'Corporativo' },
     { value: 'pyme', label: 'PyME' },
-    { value: 'distribuidor', label: 'Distribuidor' },
-    { value: 'minorista', label: 'Minorista' },
+    { value: 'persona_natural', label: 'Persona Natural' },
   ],
+  // Sectores disponibles
   sector: [
     { value: 'alimentos', label: 'Alimentos y Bebidas' },
     { value: 'construccion', label: 'Construcción' },
@@ -71,7 +67,11 @@ const FILTER_OPTIONS = {
     { value: 'retail', label: 'Retail' },
     { value: 'farmaceutico', label: 'Farmacéutico' },
     { value: 'quimico', label: 'Químico' },
+    { value: 'textil', label: 'Textil' },
+    { value: 'tecnologia', label: 'Tecnología' },
+    { value: 'servicios', label: 'Servicios' },
   ],
+  // Estados según ENUM del modelo Cliente
   estado: [
     { value: 'activo', label: 'Activo' },
     { value: 'inactivo', label: 'Inactivo' },
@@ -80,8 +80,22 @@ const FILTER_OPTIONS = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// HELPER: Formatear tipo de cliente
+// ════════════════════════════════════════════════════════════════════════════
+
+const formatTipoCliente = (tipo) => {
+  const tipos = {
+    corporativo: 'Corporativo',
+    pyme: 'PyME',
+    persona_natural: 'Persona Natural',
+  };
+  return tipos[tipo] || tipo || '-';
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE ROW ACTIONS
 // ════════════════════════════════════════════════════════════════════════════
+
 const RowActions = ({ cliente, onView, onEdit, onDelete, onChangeStatus }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -109,7 +123,6 @@ const RowActions = ({ cliente, onView, onEdit, onDelete, onChangeStatus }) => {
               Ver detalle
             </button>
             
-            {/* Solo admin y supervisor pueden editar */}
             <ProtectedAction module="clientes" action="editar">
               <button
                 onClick={() => { onEdit(cliente); setIsOpen(false); }}
@@ -120,7 +133,6 @@ const RowActions = ({ cliente, onView, onEdit, onDelete, onChangeStatus }) => {
               </button>
             </ProtectedAction>
 
-            {/* Solo admin puede cambiar estado */}
             <ProtectedAction module="clientes" action="cambiar_estado">
               <button
                 onClick={() => { onChangeStatus(cliente); setIsOpen(false); }}
@@ -131,7 +143,6 @@ const RowActions = ({ cliente, onView, onEdit, onDelete, onChangeStatus }) => {
               </button>
             </ProtectedAction>
             
-            {/* Solo admin puede eliminar */}
             <ProtectedAction module="clientes" action="eliminar">
               <button
                 onClick={() => { onDelete(cliente); setIsOpen(false); }}
@@ -151,6 +162,7 @@ const RowActions = ({ cliente, onView, onEdit, onDelete, onChangeStatus }) => {
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
+
 const ClientesList = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -159,34 +171,26 @@ const ClientesList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HOOKS
   // ──────────────────────────────────────────────────────────────────────────
-  const { success, error: showError, apiError, saved, deleted } = useNotification();
+  const { success, apiError, saved, deleted } = useNotification();
   
-  // Hook de clientes con autoFetch
   const {
-    // Lista
     clientes,
     pagination,
     loading,
     error,
-    // Acciones CRUD
     fetchClientes,
     createCliente,
     updateCliente,
     deleteCliente,
     changeStatus,
-    // Paginación
     goToPage,
-    setPageSize,
-    // Filtros
     applyFilters,
     clearFilters,
     search,
-    // Utilidades
     refresh,
   } = useClientes({ 
     autoFetch: true,
     initialFilters: {
-      // Aplicar filtros de URL si existen
       estado: searchParams.get('estado') || undefined,
       sector: searchParams.get('sector') || undefined,
     }
@@ -197,7 +201,7 @@ const ClientesList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    tipo_cliente: searchParams.get('tipo') || '',
+    tipo_cliente: searchParams.get('tipo_cliente') || '',
     sector: searchParams.get('sector') || '',
     estado: searchParams.get('estado') || '',
   });
@@ -221,11 +225,8 @@ const ClientesList = () => {
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value || undefined };
     setFilters(newFilters);
-    
-    // Aplicar filtros al hook
     applyFilters(newFilters);
     
-    // Actualizar URL
     const params = new URLSearchParams();
     Object.entries(newFilters).forEach(([k, v]) => {
       if (v) params.set(k, v);
@@ -264,16 +265,13 @@ const ClientesList = () => {
     setStatusModal({ isOpen: true, cliente });
   };
 
-  // Submit del formulario (crear/editar)
   const handleFormSubmit = async (data) => {
     setFormLoading(true);
     try {
       if (formModal.cliente) {
-        // Editar cliente existente
         await updateCliente(formModal.cliente.id, data);
         saved('Cliente');
       } else {
-        // Crear nuevo cliente
         await createCliente(data);
         saved('Cliente');
       }
@@ -285,7 +283,6 @@ const ClientesList = () => {
     }
   };
 
-  // Confirmar eliminación
   const handleConfirmDelete = async () => {
     setFormLoading(true);
     try {
@@ -299,7 +296,6 @@ const ClientesList = () => {
     }
   };
 
-  // Confirmar cambio de estado
   const handleConfirmStatusChange = async (nuevoEstado) => {
     setFormLoading(true);
     try {
@@ -314,20 +310,6 @@ const ClientesList = () => {
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // FORMATTERS
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  const formatCurrency = (value) => {
-    if (!value) return '$0';
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
   
@@ -336,9 +318,7 @@ const ClientesList = () => {
       <FloatingHeader />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* PAGE HEADER */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">Clientes</h1>
@@ -348,21 +328,18 @@ const ClientesList = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Exportar - Solo supervisor y admin */}
             <ProtectedAction module="clientes" action="exportar">
               <Button variant="outline" icon={Download} size="md">
                 Exportar
               </Button>
             </ProtectedAction>
 
-            {/* Importar - Solo admin */}
             <ProtectedAction module="clientes" action="importar">
               <Button variant="outline" icon={Upload} size="md">
                 Importar
               </Button>
             </ProtectedAction>
 
-            {/* Crear - Admin y Supervisor */}
             <ProtectedAction module="clientes" action="crear">
               <Button variant="primary" icon={Plus} onClick={handleCreate}>
                 Nuevo Cliente
@@ -371,9 +348,7 @@ const ClientesList = () => {
           </div>
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* ERROR STATE */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
             <p className="font-medium">Error al cargar clientes</p>
@@ -387,12 +362,9 @@ const ClientesList = () => {
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* SEARCH & FILTERS BAR */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search */}
             <div className="flex-1">
               <SearchBar
                 placeholder="Buscar por nombre, NIT o ciudad..."
@@ -402,7 +374,6 @@ const ClientesList = () => {
               />
             </div>
 
-            {/* Filter Toggle */}
             <Button
               variant={showFilters ? 'secondary' : 'outline'}
               icon={Filter}
@@ -416,7 +387,6 @@ const ClientesList = () => {
               )}
             </Button>
 
-            {/* Refresh */}
             <Button
               variant="outline"
               icon={RefreshCw}
@@ -427,7 +397,6 @@ const ClientesList = () => {
             </Button>
           </div>
 
-          {/* Expanded Filters */}
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -465,21 +434,16 @@ const ClientesList = () => {
           )}
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* RESULTS COUNT */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="mb-4">
           <p className="text-sm text-slate-500">
             {pagination.total} cliente{pagination.total !== 1 && 's'} encontrado{pagination.total !== 1 && 's'}
           </p>
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* TABLE */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
-            // Loading skeleton
             <div className="p-4">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50 animate-pulse">
@@ -493,7 +457,6 @@ const ClientesList = () => {
               ))}
             </div>
           ) : clientes.length === 0 ? (
-            // Empty state
             <div className="py-16 text-center">
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Building2 className="w-8 h-8 text-slate-400" />
@@ -515,7 +478,6 @@ const ClientesList = () => {
               )}
             </div>
           ) : (
-            // Table
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -558,23 +520,25 @@ const ClientesList = () => {
                             >
                               {cliente.razon_social}
                             </p>
-                            <p className="text-xs text-slate-500">{cliente.email}</p>
+                            <p className="text-xs text-slate-500">
+                              {cliente.codigo_cliente} • {cliente.email || 'Sin email'}
+                            </p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-sm text-slate-600">
+                      <td className="py-4 px-4 text-sm text-slate-600 font-mono">
                         {cliente.nit}
                       </td>
-                      <td className="py-4 px-4 text-sm text-slate-600 capitalize">
-                        {cliente.tipo_cliente || '-'}
+                      <td className="py-4 px-4 text-sm text-slate-600">
+                        {formatTipoCliente(cliente.tipo_cliente)}
                       </td>
                       <td className="py-4 px-4 text-sm text-slate-600">
-                        {cliente.ciudad}
+                        {cliente.ciudad || '-'}
                       </td>
                       <td className="py-4 px-4 text-center">
                         <StatusChip status={cliente.estado} />
                       </td>
-                      <td className="py-4 px-4 text-center">
+                      <td className="py-4 px-4  text-center">
                         <RowActions
                           cliente={cliente}
                           onView={handleView}
@@ -590,7 +554,6 @@ const ClientesList = () => {
             </div>
           )}
 
-          {/* Pagination */}
           {!loading && pagination.totalPages > 1 && (
             <Pagination
               currentPage={pagination.page}
@@ -602,20 +565,14 @@ const ClientesList = () => {
           )}
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* FOOTER */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
           © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
           Centro Logístico Industrial del Norte, Girardota, Antioquia
         </footer>
       </main>
 
-      {/* ══════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      
-      {/* Form Modal (Crear/Editar) */}
       <ClienteForm
         isOpen={formModal.isOpen}
         onClose={() => setFormModal({ isOpen: false, cliente: null })}
@@ -624,7 +581,6 @@ const ClientesList = () => {
         loading={formLoading}
       />
 
-      {/* Delete Confirmation */}
       <ConfirmDialog
         isOpen={deleteModal.isOpen}
         onClose={() => setDeleteModal({ isOpen: false, cliente: null })}
@@ -636,7 +592,6 @@ const ClientesList = () => {
         loading={formLoading}
       />
 
-      {/* Status Change Modal */}
       {statusModal.isOpen && (
         <ConfirmDialog
           isOpen={statusModal.isOpen}
