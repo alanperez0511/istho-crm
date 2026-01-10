@@ -2,7 +2,10 @@
  * ISTHO CRM - BarChart Component
  * Gráfico de barras comparativo
  * 
+ * CORRECCIÓN: Template literal en viewBox corregido
+ * 
  * @author Coordinación TI ISTHO
+ * @version 2.1.0
  * @date Enero 2026
  */
 
@@ -10,7 +13,7 @@ import { useState } from 'react';
 import PropTypes from 'prop-types';
 
 const BarChart = ({ 
-  data, 
+  data = [], 
   title, 
   subtitle,
   legend = [],
@@ -18,8 +21,30 @@ const BarChart = ({
 }) => {
   const [hoveredBar, setHoveredBar] = useState(null);
 
-  // Calcular el valor máximo para escalar
-  const maxValue = Math.max(...data.flatMap(d => [d.value1, d.value2]));
+  // Validar que hay datos
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
+            {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-48 text-slate-400">
+          No hay datos disponibles
+        </div>
+      </div>
+    );
+  }
+
+  // Calcular el valor máximo para escalar (con fallback a 1 para evitar división por 0)
+  const allValues = data.flatMap(d => [
+    d.value1 ?? d.value ?? 0, 
+    d.value2 ?? 0
+  ]).filter(v => !isNaN(v));
+  
+  const maxValue = Math.max(...allValues, 1);
   const chartHeight = height - 60; // Espacio para labels
 
   // Calcular ancho de barras
@@ -88,8 +113,15 @@ const BarChart = ({
           {/* Bars */}
           {data.map((item, idx) => {
             const x = 50 + idx * groupWidth;
-            const height1 = (item.value1 / maxValue) * chartHeight;
-            const height2 = (item.value2 / maxValue) * chartHeight;
+            
+            // Obtener valores con fallback
+            const val1 = item.value1 ?? item.value ?? 0;
+            const val2 = item.value2 ?? 0;
+            
+            // Calcular alturas (evitar NaN)
+            const height1 = isNaN(val1) ? 0 : (val1 / maxValue) * chartHeight;
+            const height2 = isNaN(val2) ? 0 : (val2 / maxValue) * chartHeight;
+            
             const isHovered = hoveredBar === idx;
 
             return (
@@ -104,24 +136,26 @@ const BarChart = ({
                   x={x}
                   y={chartHeight - height1}
                   width={barWidth}
-                  height={height1}
+                  height={Math.max(height1, 0)}
                   rx="4"
                   fill={legend[0]?.color || '#3b82f6'}
                   opacity={isHovered ? 1 : 0.9}
                   className="transition-opacity duration-200"
                 />
                 
-                {/* Bar 2 - Entregas */}
-                <rect
-                  x={x + barWidth + 4}
-                  y={chartHeight - height2}
-                  width={barWidth}
-                  height={height2}
-                  rx="4"
-                  fill={legend[1]?.color || '#10b981'}
-                  opacity={isHovered ? 1 : 0.9}
-                  className="transition-opacity duration-200"
-                />
+                {/* Bar 2 - Entregas (solo si hay valor) */}
+                {val2 > 0 && (
+                  <rect
+                    x={x + barWidth + 4}
+                    y={chartHeight - height2}
+                    width={barWidth}
+                    height={Math.max(height2, 0)}
+                    rx="4"
+                    fill={legend[1]?.color || '#10b981'}
+                    opacity={isHovered ? 1 : 0.9}
+                    className="transition-opacity duration-200"
+                  />
+                )}
 
                 {/* Month label */}
                 <text
@@ -130,7 +164,7 @@ const BarChart = ({
                   textAnchor="middle"
                   className="text-xs fill-slate-500"
                 >
-                  {item.label}
+                  {item.label || item.name || ''}
                 </text>
 
                 {/* Tooltip */}
@@ -143,7 +177,7 @@ const BarChart = ({
                       height="48"
                       rx="8"
                       fill="#1e293b"
-                      opacity="1.05"
+                      opacity="0.95"
                     />
                     <text
                       x={x + 30}
@@ -151,16 +185,18 @@ const BarChart = ({
                       textAnchor="middle"
                       className="text-xs fill-white font-medium"
                     >
-                      {legend[0]?.label}: {item.value1}
+                      {legend[0]?.label || 'Valor 1'}: {val1}
                     </text>
-                    <text
-                      x={x + 30}
-                      y={chartHeight - Math.max(height1, height2) - 16}
-                      textAnchor="middle"
-                      className="text-xs fill-white font-medium"
-                    >
-                      {legend[1]?.label}: {item.value2}
-                    </text>
+                    {val2 > 0 && (
+                      <text
+                        x={x + 30}
+                        y={chartHeight - Math.max(height1, height2) - 16}
+                        textAnchor="middle"
+                        className="text-xs fill-white font-medium"
+                      >
+                        {legend[1]?.label || 'Valor 2'}: {val2}
+                      </text>
+                    )}
                   </g>
                 )}
               </g>
@@ -173,14 +209,16 @@ const BarChart = ({
 };
 
 BarChart.propTypes = {
-  /** Datos del gráfico [{label, value1, value2}] */
+  /** Datos del gráfico [{label, value1, value2}] o [{name, value}] */
   data: PropTypes.arrayOf(
     PropTypes.shape({
-      label: PropTypes.string.isRequired,
-      value1: PropTypes.number.isRequired,
-      value2: PropTypes.number.isRequired,
+      label: PropTypes.string,
+      name: PropTypes.string,
+      value: PropTypes.number,
+      value1: PropTypes.number,
+      value2: PropTypes.number,
     })
-  ).isRequired,
+  ),
   /** Título del gráfico */
   title: PropTypes.string.isRequired,
   /** Subtítulo opcional */

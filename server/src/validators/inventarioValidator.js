@@ -3,8 +3,11 @@
  * 
  * Esquemas de validación para endpoints de inventario.
  * 
+ * CORRECCIÓN v1.1.0:
+ * - Agregados 'bajo_stock' y 'agotado' como valores válidos de estado
+ * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const { body, param, query, validationResult } = require('express-validator');
@@ -47,9 +50,14 @@ const crearInventarioValidator = [
     .isInt({ min: 1 }).withMessage('ID de cliente inválido'),
   
   body('sku')
+    .optional()
     .trim()
-    .notEmpty().withMessage('El SKU es requerido')
     .isLength({ max: 50 }).withMessage('El SKU no puede exceder 50 caracteres'),
+  
+  body('codigo')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('El código no puede exceder 50 caracteres'),
   
   body('codigo_barras')
     .optional()
@@ -57,9 +65,14 @@ const crearInventarioValidator = [
     .isLength({ max: 50 }).withMessage('El código de barras no puede exceder 50 caracteres'),
   
   body('producto')
+    .optional()
     .trim()
-    .notEmpty().withMessage('El nombre del producto es requerido')
     .isLength({ min: 2, max: 200 }).withMessage('El producto debe tener entre 2 y 200 caracteres'),
+  
+  body('nombre')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 200 }).withMessage('El nombre debe tener entre 2 y 200 caracteres'),
   
   body('descripcion')
     .optional()
@@ -77,8 +90,12 @@ const crearInventarioValidator = [
     .isLength({ max: 20 }).withMessage('La unidad de medida no puede exceder 20 caracteres'),
   
   body('cantidad')
-    .notEmpty().withMessage('La cantidad es requerida')
+    .optional()
     .isFloat({ min: 0 }).withMessage('La cantidad debe ser un número positivo'),
+  
+  body('stock_actual')
+    .optional()
+    .isFloat({ min: 0 }).withMessage('El stock actual debe ser un número positivo'),
   
   body('cantidad_reservada')
     .optional()
@@ -101,6 +118,11 @@ const crearInventarioValidator = [
     .optional()
     .trim()
     .isLength({ max: 50 }).withMessage('La zona no puede exceder 50 caracteres'),
+  
+  body('bodega')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('La bodega no puede exceder 50 caracteres'),
   
   body('lote')
     .optional()
@@ -146,6 +168,21 @@ const crearInventarioValidator = [
     .trim()
     .isLength({ max: 2000 }).withMessage('Las notas no pueden exceder 2000 caracteres'),
   
+  // Validación custom: debe tener producto o nombre, y sku o codigo
+  (req, res, next) => {
+    if (!req.body.producto && !req.body.nombre) {
+      return errorResponse(res, 'El nombre del producto es requerido', 400, [
+        { field: 'producto', message: 'El nombre del producto es requerido' }
+      ], 'VALIDATION_ERROR');
+    }
+    if (!req.body.sku && !req.body.codigo) {
+      return errorResponse(res, 'El código/SKU es requerido', 400, [
+        { field: 'sku', message: 'El código/SKU es requerido' }
+      ], 'VALIDATION_ERROR');
+    }
+    next();
+  },
+  
   validar
 ];
 
@@ -161,6 +198,11 @@ const actualizarInventarioValidator = [
     .trim()
     .isLength({ max: 50 }).withMessage('El SKU no puede exceder 50 caracteres'),
   
+  body('codigo')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('El código no puede exceder 50 caracteres'),
+  
   body('codigo_barras')
     .optional()
     .trim()
@@ -170,6 +212,11 @@ const actualizarInventarioValidator = [
     .optional()
     .trim()
     .isLength({ min: 2, max: 200 }).withMessage('El producto debe tener entre 2 y 200 caracteres'),
+  
+  body('nombre')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 200 }).withMessage('El nombre debe tener entre 2 y 200 caracteres'),
   
   body('descripcion')
     .optional()
@@ -189,6 +236,10 @@ const actualizarInventarioValidator = [
   body('cantidad')
     .optional()
     .isFloat({ min: 0 }).withMessage('La cantidad debe ser un número positivo'),
+  
+  body('stock_actual')
+    .optional()
+    .isFloat({ min: 0 }).withMessage('El stock actual debe ser un número positivo'),
   
   body('cantidad_reservada')
     .optional()
@@ -211,6 +262,11 @@ const actualizarInventarioValidator = [
     .optional()
     .trim()
     .isLength({ max: 50 }).withMessage('La zona no puede exceder 50 caracteres'),
+  
+  body('bodega')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('La bodega no puede exceder 50 caracteres'),
   
   body('lote')
     .optional()
@@ -266,6 +322,9 @@ const clienteIdParamValidator = [
 
 /**
  * Validación de query params para listado
+ * 
+ * CORRECCIÓN: Agregados 'bajo_stock' y 'agotado' como estados virtuales
+ * para filtrar desde el frontend
  */
 const listarInventarioValidator = [
   query('page')
@@ -280,9 +339,19 @@ const listarInventarioValidator = [
     .optional()
     .isInt({ min: 1 }).withMessage('ID de cliente inválido'),
   
+  // CORREGIDO: Agregados bajo_stock y agotado
   query('estado')
     .optional()
-    .isIn(['disponible', 'reservado', 'dañado', 'cuarentena', 'vencido', 'todos'])
+    .isIn([
+      'disponible', 
+      'reservado', 
+      'dañado', 
+      'cuarentena', 
+      'vencido', 
+      'bajo_stock',  // Estado virtual - filtra por cantidad <= stock_minimo
+      'agotado',     // Estado virtual - filtra por cantidad = 0
+      'todos'
+    ])
     .withMessage('Estado no válido'),
   
   query('categoria')
@@ -290,6 +359,10 @@ const listarInventarioValidator = [
     .trim(),
   
   query('zona')
+    .optional()
+    .trim(),
+  
+  query('bodega')
     .optional()
     .trim(),
   
@@ -301,9 +374,13 @@ const listarInventarioValidator = [
     .optional()
     .isIn(['true', 'false']).withMessage('por_vencer debe ser true o false'),
   
+  query('search')
+    .optional()
+    .trim(),
+  
   query('sort')
     .optional()
-    .isIn(['producto', 'sku', 'cantidad', 'ubicacion', 'fecha_vencimiento', 'created_at'])
+    .isIn(['producto', 'sku', 'cantidad', 'ubicacion', 'fecha_vencimiento', 'created_at', 'estado'])
     .withMessage('Campo de ordenamiento no válido'),
   
   query('order')
@@ -332,6 +409,21 @@ const ajustarCantidadValidator = [
     .optional()
     .trim()
     .isLength({ max: 500 }).withMessage('El motivo no puede exceder 500 caracteres'),
+  
+  body('documento_referencia')
+    .optional()
+    .trim()
+    .isLength({ max: 100 }).withMessage('El documento de referencia no puede exceder 100 caracteres'),
+  
+  body('documento')
+    .optional()
+    .trim()
+    .isLength({ max: 100 }).withMessage('El documento no puede exceder 100 caracteres'),
+  
+  body('observaciones')
+    .optional()
+    .trim()
+    .isLength({ max: 1000 }).withMessage('Las observaciones no pueden exceder 1000 caracteres'),
   
   validar
 ];

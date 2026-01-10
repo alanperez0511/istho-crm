@@ -2,12 +2,18 @@
  * ISTHO CRM - ConfirmDialog Component
  * Diálogo de confirmación para acciones destructivas
  * 
+ * CORRECCIONES v1.1:
+ * - Agregado tipo 'success'
+ * - Corregidos template literals
+ * - Agregado fallback para tipos no definidos
+ * 
  * @author Coordinación TI ISTHO
+ * @version 1.1.0
  * @date Enero 2026
  */
 
 import PropTypes from 'prop-types';
-import { AlertTriangle, Trash2, Info } from 'lucide-react';
+import { AlertTriangle, Trash2, Info, CheckCircle } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import Button from '../Button/Button';
 
@@ -30,6 +36,20 @@ const DIALOG_TYPES = {
     iconColor: 'text-blue-600',
     confirmVariant: 'secondary',
   },
+  success: {
+    icon: CheckCircle,
+    iconBg: 'bg-emerald-100',
+    iconColor: 'text-emerald-600',
+    confirmVariant: 'success',
+  },
+};
+
+// Configuración por defecto (fallback)
+const DEFAULT_CONFIG = {
+  icon: Info,
+  iconBg: 'bg-slate-100',
+  iconColor: 'text-slate-600',
+  confirmVariant: 'primary',
 };
 
 const ConfirmDialog = ({
@@ -43,7 +63,8 @@ const ConfirmDialog = ({
   type = 'danger',
   loading = false,
 }) => {
-  const config = DIALOG_TYPES[type];
+  // Usar config del tipo o fallback si no existe
+  const config = DIALOG_TYPES[type] || DEFAULT_CONFIG;
   const Icon = config.icon;
 
   const handleConfirm = async () => {
@@ -107,7 +128,7 @@ ConfirmDialog.propTypes = {
   message: PropTypes.string,
   confirmText: PropTypes.string,
   cancelText: PropTypes.string,
-  type: PropTypes.oneOf(['danger', 'warning', 'info']),
+  type: PropTypes.oneOf(['danger', 'warning', 'info', 'success']),
   loading: PropTypes.bool,
 };
 

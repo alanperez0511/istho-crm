@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * ISTHO CRM - Controlador de Inventario (Versión Completa)
+ * ISTHO CRM - Controlador de Inventario (Versión Corregida)
  * ============================================================================
  * Maneja todas las operaciones de inventario incluyendo:
  * - CRUD de productos
@@ -8,8 +8,11 @@
  * - Alertas de stock
  * - Estadísticas y reportes
  * 
+ * CORRECCIÓN v2.1.0:
+ * - Función listar ahora procesa estados virtuales: bajo_stock, agotado
+ * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 2.0.0
+ * @version 2.1.0
  * @date Enero 2026
  */
 
@@ -52,6 +55,10 @@ const CAMPOS_ORDENAMIENTO = ['producto', 'sku', 'cantidad', 'ubicacion', 'fecha_
 /**
  * GET /inventario
  * Listar inventario con paginación, filtros y búsqueda
+ * 
+ * CORREGIDO: Ahora procesa estados virtuales:
+ * - estado=bajo_stock → filtra cantidad <= stock_minimo
+ * - estado=agotado → filtra cantidad = 0
  */
 const listar = async (req, res) => {
   try {
@@ -66,9 +73,29 @@ const listar = async (req, res) => {
       where.cliente_id = req.query.cliente_id;
     }
     
-    // Filtro por estado
+    // ═══════════════════════════════════════════════════════════════════════
+    // FILTRO POR ESTADO (incluyendo estados virtuales)
+    // ═══════════════════════════════════════════════════════════════════════
     if (req.query.estado && req.query.estado !== 'todos') {
-      where.estado = req.query.estado;
+      switch (req.query.estado) {
+        case 'bajo_stock':
+          // Estado virtual: productos con stock bajo (cantidad <= stock_minimo pero > 0)
+          where[Op.and] = [
+            sequelize.literal('cantidad <= stock_minimo'),
+            { stock_minimo: { [Op.gt]: 0 } },
+            { cantidad: { [Op.gt]: 0 } }
+          ];
+          break;
+          
+        case 'agotado':
+          // Estado virtual: productos sin stock
+          where.cantidad = 0;
+          break;
+          
+        default:
+          // Estados normales de la base de datos
+          where.estado = req.query.estado;
+      }
     }
     
     // Filtro por categoría
@@ -86,8 +113,8 @@ const listar = async (req, res) => {
       where.ubicacion = { [Op.like]: `%${sanitizarBusqueda(req.query.ubicacion)}%` };
     }
     
-    // Filtro por stock bajo
-    if (req.query.stock_bajo === 'true') {
+    // Filtro por stock bajo (parámetro alternativo)
+    if (req.query.stock_bajo === 'true' && !req.query.estado) {
       where[Op.and] = [
         sequelize.literal('cantidad <= stock_minimo'),
         { stock_minimo: { [Op.gt]: 0 } }
@@ -819,14 +846,13 @@ const eliminar = async (req, res) => {
 /**
  * POST /inventario/:id/ajustar
  * Ajustar cantidad (entrada, salida, ajuste)
- * También usado como POST /inventario/:id/movimientos
  */
 const ajustarCantidad = async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
     const { id } = req.params;
-    const { cantidad, tipo, motivo, documento_referencia, observaciones } = req.body;
+    const { cantidad, tipo, motivo, documento_referencia, documento, observaciones } = req.body;
     
     const item = await Inventario.findByPk(id);
     
@@ -873,7 +899,7 @@ const ajustarCantidad = async (req, res) => {
       cantidad: cantidadMovimiento,
       stock_anterior: cantidadAnterior,
       stock_resultante: cantidadNueva,
-      documento_referencia: documento_referencia,
+      documento_referencia: documento_referencia || documento,
       observaciones: observaciones,
       costo_unitario: item.costo_unitario,
       ip_address: getClientIP(req),

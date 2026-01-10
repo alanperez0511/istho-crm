@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * ISTHO CRM - Servicio de Inventario (Versión Completa)
+ * ISTHO CRM - Servicio de Inventario (Versión Corregida)
  * ============================================================================
  * Gestiona todas las operaciones relacionadas con inventario:
  * - CRUD de productos
@@ -8,12 +8,15 @@
  * - Alertas de stock
  * - Estadísticas y KPIs
  * 
+ * CORRECCIÓN v2.1.0:
+ * - Eliminado .data extra (client.js ya devuelve response.data)
+ * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.1.0
  * @date Enero 2026
  */
 
-import apiClient from './axios';
+import apiClient from './client';
 import { INVENTARIO_ENDPOINTS } from './endpoints';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -42,11 +45,12 @@ const inventarioService = {
   getAll: async (params = {}) => {
     try {
       const response = await apiClient.get(INVENTARIO_ENDPOINTS.BASE, { params });
-      return response.data;
+      // client.js ya devuelve response.data, así que response = { success, data, ... }
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al obtener inventario',
+        message: error.message || 'Error al obtener inventario',
         code: 'GET_INVENTARIO_ERROR',
       };
     }
@@ -65,11 +69,11 @@ const inventarioService = {
   getById: async (id) => {
     try {
       const response = await apiClient.get(INVENTARIO_ENDPOINTS.BY_ID(id));
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al obtener producto',
+        message: error.message || 'Error al obtener producto',
         code: 'GET_PRODUCTO_ERROR',
       };
     }
@@ -92,11 +96,11 @@ const inventarioService = {
         INVENTARIO_ENDPOINTS.BY_CLIENTE(clienteId), 
         { params }
       );
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al obtener inventario del cliente',
+        message: error.message || 'Error al obtener inventario del cliente',
         code: 'GET_CLIENTE_INVENTARIO_ERROR',
       };
     }
@@ -115,12 +119,12 @@ const inventarioService = {
   create: async (data) => {
     try {
       const response = await apiClient.post(INVENTARIO_ENDPOINTS.BASE, data);
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al crear producto',
-        errors: error.response?.data?.errors || [],
+        message: error.message || 'Error al crear producto',
+        errors: error.errors || [],
         code: 'CREATE_PRODUCTO_ERROR',
       };
     }
@@ -140,12 +144,12 @@ const inventarioService = {
   update: async (id, data) => {
     try {
       const response = await apiClient.put(INVENTARIO_ENDPOINTS.BY_ID(id), data);
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al actualizar producto',
-        errors: error.response?.data?.errors || [],
+        message: error.message || 'Error al actualizar producto',
+        errors: error.errors || [],
         code: 'UPDATE_PRODUCTO_ERROR',
       };
     }
@@ -164,11 +168,11 @@ const inventarioService = {
   delete: async (id) => {
     try {
       const response = await apiClient.delete(INVENTARIO_ENDPOINTS.BY_ID(id));
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al eliminar producto',
+        message: error.message || 'Error al eliminar producto',
         code: 'DELETE_PRODUCTO_ERROR',
       };
     }
@@ -193,11 +197,11 @@ const inventarioService = {
   ajustar: async (id, data) => {
     try {
       const response = await apiClient.post(INVENTARIO_ENDPOINTS.AJUSTAR(id), data);
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al ajustar inventario',
+        message: error.message || 'Error al ajustar inventario',
         code: 'AJUSTAR_ERROR',
       };
     }
@@ -227,11 +231,11 @@ const inventarioService = {
         INVENTARIO_ENDPOINTS.MOVIMIENTOS(id), 
         { params }
       );
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al obtener movimientos',
+        message: error.message || 'Error al obtener movimientos',
         code: 'GET_MOVIMIENTOS_ERROR',
       };
     }
@@ -250,11 +254,11 @@ const inventarioService = {
   getStats: async (params = {}) => {
     try {
       const response = await apiClient.get(INVENTARIO_ENDPOINTS.STATS, { params });
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al obtener estadísticas',
+        message: error.message || 'Error al obtener estadísticas',
         code: 'GET_STATS_ERROR',
       };
     }
@@ -273,11 +277,11 @@ const inventarioService = {
         INVENTARIO_ENDPOINTS.ESTADISTICAS_PRODUCTO(id),
         { params }
       );
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al obtener estadísticas del producto',
+        message: error.message || 'Error al obtener estadísticas del producto',
         code: 'GET_ESTADISTICAS_PRODUCTO_ERROR',
       };
     }
@@ -298,11 +302,11 @@ const inventarioService = {
   getAlertas: async (params = {}) => {
     try {
       const response = await apiClient.get(INVENTARIO_ENDPOINTS.ALERTAS, { params });
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al obtener alertas',
+        message: error.message || 'Error al obtener alertas',
         code: 'GET_ALERTAS_ERROR',
       };
     }
@@ -321,11 +325,11 @@ const inventarioService = {
         INVENTARIO_ENDPOINTS.ATENDER_ALERTA(alertaId),
         data
       );
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al atender alerta',
+        message: error.message || 'Error al atender alerta',
         code: 'ATENDER_ALERTA_ERROR',
       };
     }
@@ -342,11 +346,11 @@ const inventarioService = {
       const response = await apiClient.delete(
         INVENTARIO_ENDPOINTS.DESCARTAR_ALERTA(alertaId)
       );
-      return response.data;
+      return response;
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || 'Error al descartar alerta',
+        message: error.message || 'Error al descartar alerta',
         code: 'DESCARTAR_ALERTA_ERROR',
       };
     }

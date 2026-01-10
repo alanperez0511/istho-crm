@@ -1,11 +1,14 @@
 /**
  * ============================================================================
- * ISTHO CRM - AlertasInventario (Versión Corregida)
+ * ISTHO CRM - AlertasInventario (Versión Corregida v2.2)
  * ============================================================================
  * Gestión de alertas de inventario conectada al backend real.
  * 
+ * CORRECCIONES v2.2:
+ * - Corregidos TODOS los template literals (className, navigate, message)
+ * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.2.0
  * @date Enero 2026
  */
 
@@ -128,7 +131,10 @@ const AlertaCard = ({ alerta, onView, onAtender, onDescartar, onEntrada, canAten
                 <span className={`text-xs px-2 py-0.5 rounded-full ${config.bg} ${config.color}`}>
                   {config.label}
                 </span>
-                <span className={`w-2 h-2 rounded-full ${prioridadConfig.color}`} title={`Prioridad ${prioridadConfig.label}`} />
+                <span 
+                  className={`w-2 h-2 rounded-full ${prioridadConfig.color}`}
+                  title={`Prioridad ${prioridadConfig.label}`}
+                />
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 {alerta.created_at ? new Date(alerta.created_at).toLocaleDateString('es-CO') : '-'}
@@ -248,7 +254,7 @@ const AlertasInventario = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { success, error: notifyError, warning } = useNotification();
-
+  
   const {
     alertas,
     loadingAlertas,
@@ -288,7 +294,11 @@ const AlertasInventario = () => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    try { await fetchAlertas(); } finally { setIsRefreshing(false); }
+    try { 
+      await fetchAlertas(); 
+    } finally { 
+      setIsRefreshing(false); 
+    }
   };
 
   const handleFilterChange = (key, value) => {
@@ -300,10 +310,21 @@ const AlertasInventario = () => {
     });
   };
 
-  const handleView = (alerta) => navigate(`/inventario/productos/${alerta.producto_id}`);
-  const handleEntrada = (alerta) => setMovimientoModal({ isOpen: true, alerta });
-  const handleAtender = (alerta) => setAtenderModal({ isOpen: true, alerta });
-  const handleDescartar = (alerta) => setDescartarModal({ isOpen: true, alerta });
+  const handleView = (alerta) => {
+    navigate(`/inventario/productos/${alerta.producto_id}`);
+  };
+
+  const handleEntrada = (alerta) => {
+    setMovimientoModal({ isOpen: true, alerta });
+  };
+
+  const handleAtender = (alerta) => {
+    setAtenderModal({ isOpen: true, alerta });
+  };
+
+  const handleDescartar = (alerta) => {
+    setDescartarModal({ isOpen: true, alerta });
+  };
 
   const handleMovimientoSubmit = async (data) => {
     setFormLoading(true);
@@ -354,11 +375,17 @@ const AlertasInventario = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <FloatingHeader notificationCount={kpis.altaPrioridad} />
-
+      
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* HEADER */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/inventario')} className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors">
+            <button 
+              onClick={() => navigate('/inventario')} 
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors"
+            >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
@@ -366,75 +393,194 @@ const AlertasInventario = () => {
               <p className="text-slate-500 mt-1">Gestiona las alertas de stock bajo, agotados y vencimientos</p>
             </div>
           </div>
+          
           <div className="flex items-center gap-3">
-            <Button variant="ghost" icon={RefreshCw} onClick={handleRefresh} loading={isRefreshing} />
-            <Button variant={showFilters ? 'secondary' : 'outline'} icon={Filter} onClick={() => setShowFilters(!showFilters)}>
+            <Button 
+              variant="ghost" 
+              icon={RefreshCw} 
+              onClick={handleRefresh} 
+              loading={isRefreshing} 
+            />
+            <Button 
+              variant={showFilters ? 'secondary' : 'outline'} 
+              icon={Filter} 
+              onClick={() => setShowFilters(!showFilters)}
+            >
               Filtros
               {Object.keys(filters).length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded-full">{Object.keys(filters).length}</span>
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded-full">
+                  {Object.keys(filters).length}
+                </span>
               )}
             </Button>
           </div>
         </div>
 
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* KPIs */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <KpiCard title="Agotados" value={kpis.agotados} icon={Package} iconBg="bg-red-100" iconColor="text-red-600" onClick={() => handleFilterChange('tipo', 'agotado')} className="cursor-pointer hover:shadow-md" />
-          <KpiCard title="Stock Bajo" value={kpis.bajoStock} icon={AlertTriangle} iconBg="bg-amber-100" iconColor="text-amber-600" onClick={() => handleFilterChange('tipo', 'bajo_stock')} className="cursor-pointer hover:shadow-md" />
-          <KpiCard title="Por Vencer" value={kpis.porVencer} icon={Clock} iconBg="bg-orange-100" iconColor="text-orange-600" onClick={() => handleFilterChange('tipo', 'vencimiento')} className="cursor-pointer hover:shadow-md" />
-          <KpiCard title="Prioridad Alta" value={kpis.altaPrioridad} icon={AlertTriangle} iconBg="bg-purple-100" iconColor="text-purple-600" onClick={() => handleFilterChange('prioridad', 'alta')} className="cursor-pointer hover:shadow-md" />
+          <KpiCard 
+            title="Agotados" 
+            value={kpis.agotados} 
+            icon={Package} 
+            iconBg="bg-red-100" 
+            iconColor="text-red-600" 
+            onClick={() => handleFilterChange('tipo', 'agotado')} 
+            className="cursor-pointer hover:shadow-md" 
+          />
+          <KpiCard 
+            title="Stock Bajo" 
+            value={kpis.bajoStock} 
+            icon={AlertTriangle} 
+            iconBg="bg-amber-100" 
+            iconColor="text-amber-600" 
+            onClick={() => handleFilterChange('tipo', 'bajo_stock')} 
+            className="cursor-pointer hover:shadow-md" 
+          />
+          <KpiCard 
+            title="Por Vencer" 
+            value={kpis.porVencer} 
+            icon={Clock} 
+            iconBg="bg-orange-100" 
+            iconColor="text-orange-600" 
+            onClick={() => handleFilterChange('tipo', 'vencimiento')} 
+            className="cursor-pointer hover:shadow-md" 
+          />
+          <KpiCard 
+            title="Prioridad Alta" 
+            value={kpis.altaPrioridad} 
+            icon={AlertTriangle} 
+            iconBg="bg-purple-100" 
+            iconColor="text-purple-600" 
+            onClick={() => handleFilterChange('prioridad', 'alta')} 
+            className="cursor-pointer hover:shadow-md" 
+          />
         </div>
 
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* FILTERS */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         {showFilters && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FilterDropdown label="Tipo de Alerta" options={FILTER_OPTIONS.tipo} value={filters.tipo} onChange={(v) => handleFilterChange('tipo', v)} placeholder="Todos los tipos" />
-              <FilterDropdown label="Prioridad" options={FILTER_OPTIONS.prioridad} value={filters.prioridad} onChange={(v) => handleFilterChange('prioridad', v)} placeholder="Todas las prioridades" />
+              <FilterDropdown 
+                label="Tipo de Alerta" 
+                options={FILTER_OPTIONS.tipo} 
+                value={filters.tipo} 
+                onChange={(v) => handleFilterChange('tipo', v)} 
+                placeholder="Todos los tipos" 
+              />
+              <FilterDropdown 
+                label="Prioridad" 
+                options={FILTER_OPTIONS.prioridad} 
+                value={filters.prioridad} 
+                onChange={(v) => handleFilterChange('prioridad', v)} 
+                placeholder="Todas las prioridades" 
+              />
               <div className="flex items-end">
-                {Object.keys(filters).length > 0 && <Button variant="ghost" size="sm" onClick={() => setFilters({})}>Limpiar filtros</Button>}
+                {Object.keys(filters).length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => setFilters({})}>
+                    Limpiar filtros
+                  </Button>
+                )}
               </div>
             </div>
           </div>
         )}
 
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* RESULTS COUNT */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="mb-4">
-          <p className="text-sm text-slate-500">{filteredAlertas.length} alerta{filteredAlertas.length !== 1 ? 's' : ''} encontrada{filteredAlertas.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-slate-500">
+            {filteredAlertas.length} alerta{filteredAlertas.length !== 1 ? 's' : ''} encontrada{filteredAlertas.length !== 1 ? 's' : ''}
+          </p>
         </div>
 
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* ALERTS GRID */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         {loadingAlertas ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-64 bg-gray-200 rounded-2xl animate-pulse" />)}
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-64 bg-gray-200 rounded-2xl animate-pulse" />
+            ))}
           </div>
         ) : filteredAlertas.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 py-16 text-center">
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-emerald-500" />
             </div>
-            <h3 className="text-lg font-medium text-slate-800 mb-1">{Object.keys(filters).length > 0 ? 'No hay alertas con estos filtros' : '¡Todo en orden!'}</h3>
-            <p className="text-slate-500">{Object.keys(filters).length > 0 ? 'Intenta ajustar los filtros de búsqueda' : 'No hay alertas de inventario pendientes'}</p>
+            <h3 className="text-lg font-medium text-slate-800 mb-1">
+              {Object.keys(filters).length > 0 ? 'No hay alertas con estos filtros' : '¡Todo en orden!'}
+            </h3>
+            <p className="text-slate-500">
+              {Object.keys(filters).length > 0 ? 'Intenta ajustar los filtros de búsqueda' : 'No hay alertas de inventario pendientes'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredAlertas.map((alerta) => (
-              <AlertaCard key={alerta.id} alerta={alerta} onView={handleView} onAtender={handleAtender} onDescartar={handleDescartar} onEntrada={handleEntrada} canAtender={canAtender} />
+              <AlertaCard 
+                key={alerta.id} 
+                alerta={alerta} 
+                onView={handleView} 
+                onAtender={handleAtender} 
+                onDescartar={handleDescartar} 
+                onEntrada={handleEntrada} 
+                canAtender={canAtender} 
+              />
             ))}
           </div>
         )}
 
-        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">© 2026 ISTHO S.A.S. - Sistema CRM Interno</footer>
+        {/* Footer */}
+        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
+          © 2026 ISTHO S.A.S. - Sistema CRM Interno
+        </footer>
       </main>
 
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* MODALS */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      
       <MovimientoForm
         isOpen={movimientoModal.isOpen}
         onClose={() => setMovimientoModal({ isOpen: false, alerta: null })}
         onSubmit={handleMovimientoSubmit}
         tipo="entrada"
-        producto={movimientoModal.alerta ? { id: movimientoModal.alerta.producto_id, nombre: movimientoModal.alerta.producto_nombre || movimientoModal.alerta.nombre, codigo: movimientoModal.alerta.producto_codigo || movimientoModal.alerta.codigo, stock_actual: movimientoModal.alerta.stock_actual ?? 0, unidad_medida: movimientoModal.alerta.unidad_medida || 'UND' } : null}
+        producto={movimientoModal.alerta ? {
+          id: movimientoModal.alerta.producto_id,
+          nombre: movimientoModal.alerta.producto_nombre || movimientoModal.alerta.nombre,
+          codigo: movimientoModal.alerta.producto_codigo || movimientoModal.alerta.codigo,
+          stock_actual: movimientoModal.alerta.stock_actual ?? 0,
+          unidad_medida: movimientoModal.alerta.unidad_medida || 'UND'
+        } : null}
         loading={formLoading}
       />
 
-      <ConfirmDialog isOpen={atenderModal.isOpen} onClose={() => setAtenderModal({ isOpen: false, alerta: null })} onConfirm={handleConfirmAtender} title="Marcar como Atendida" message={`¿Confirmas que la alerta para "${atenderModal.alerta?.producto_nombre || atenderModal.alerta?.nombre || ''}" ha sido atendida?`} confirmText="Confirmar" type="success" loading={formLoading} />
+      <ConfirmDialog 
+        isOpen={atenderModal.isOpen} 
+        onClose={() => setAtenderModal({ isOpen: false, alerta: null })} 
+        onConfirm={handleConfirmAtender} 
+        title="Marcar como Atendida" 
+        message={`¿Confirmas que la alerta para "${atenderModal.alerta?.producto_nombre || atenderModal.alerta?.nombre || ''}" ha sido atendida?`}
+        confirmText="Confirmar" 
+        type="success" 
+        loading={formLoading} 
+      />
 
-      <ConfirmDialog isOpen={descartarModal.isOpen} onClose={() => setDescartarModal({ isOpen: false, alerta: null })} onConfirm={handleConfirmDescartar} title="Descartar Alerta" message={`¿Estás seguro de descartar la alerta para "${descartarModal.alerta?.producto_nombre || descartarModal.alerta?.nombre || ''}"?`} confirmText="Descartar" type="warning" loading={formLoading} />
+      <ConfirmDialog 
+        isOpen={descartarModal.isOpen} 
+        onClose={() => setDescartarModal({ isOpen: false, alerta: null })} 
+        onConfirm={handleConfirmDescartar} 
+        title="Descartar Alerta" 
+        message={`¿Estás seguro de descartar la alerta para "${descartarModal.alerta?.producto_nombre || descartarModal.alerta?.nombre || ''}"?`}
+        confirmText="Descartar" 
+        type="warning" 
+        loading={formLoading} 
+      />
     </div>
   );
 };

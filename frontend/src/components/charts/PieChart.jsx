@@ -2,7 +2,13 @@
  * ISTHO CRM - PieChart Component
  * Gráfico circular para distribución
  * 
+ * CORRECCIÓN v2.1.0:
+ * - Manejo de datos vacíos
+ * - Protección contra división por 0 (NaN)
+ * - Validación de valores numéricos
+ * 
  * @author Coordinación TI ISTHO
+ * @version 2.1.0
  * @date Enero 2026
  */
 
@@ -20,7 +26,7 @@ const COLORS = [
 ];
 
 const PieChart = ({ 
-  data, 
+  data = [], 
   title, 
   subtitle,
   size = 200,
@@ -28,19 +34,63 @@ const PieChart = ({
 }) => {
   const [hoveredSlice, setHoveredSlice] = useState(null);
 
-  // Calcular total y porcentajes
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+  // ══════════════════════════════════════════════════════════════════════════
+  // VALIDACIÓN DE DATOS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Filtrar datos válidos (con valores numéricos > 0)
+  const validData = (data || []).filter(item => {
+    const value = Number(item?.value);
+    return !isNaN(value) && value > 0;
+  });
+
+  // Si no hay datos válidos, mostrar estado vacío
+  if (validData.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
+          {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+        </div>
+        <div className="flex items-center justify-center" style={{ height: size }}>
+          <div className="text-center">
+            <svg 
+              width="64" 
+              height="64" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="1.5"
+              className="mx-auto text-slate-300 mb-3"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+            <p className="text-slate-400 text-sm">Sin datos disponibles</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CÁLCULOS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Calcular total (ya sabemos que es > 0 por la validación)
+  const total = validData.reduce((sum, item) => sum + Number(item.value), 0);
   
   // Calcular paths del pie
   const radius = size / 2 - 10;
   const centerX = size / 2;
   const centerY = size / 2;
-
+  
   let currentAngle = -90; // Empezar desde arriba
 
-  const slices = data.map((item, idx) => {
-    const percentage = (item.value / total) * 100;
-    const angle = (item.value / total) * 360;
+  const slices = validData.map((item, idx) => {
+    const value = Number(item.value);
+    const percentage = (value / total) * 100;
+    const angle = (value / total) * 360;
     const startAngle = currentAngle;
     const endAngle = currentAngle + angle;
     
@@ -53,24 +103,47 @@ const PieChart = ({
     const x2 = centerX + radius * Math.cos(endRad);
     const y2 = centerY + radius * Math.sin(endRad);
     
+    // Validar que los puntos son números válidos
+    if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) {
+      currentAngle = endAngle;
+      return null;
+    }
+    
     const largeArcFlag = angle > 180 ? 1 : 0;
     
-    const path = `
-      M ${centerX} ${centerY}
-      L ${x1} ${y1}
-      A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}
-      Z
-    `;
-
+    // Caso especial: si solo hay un elemento (100%), dibujar círculo completo
+    let path;
+    if (validData.length === 1) {
+      // Dibujar círculo completo
+      path = `
+        M ${centerX} ${centerY - radius}
+        A ${radius} ${radius} 0 1 1 ${centerX} ${centerY + radius}
+        A ${radius} ${radius} 0 1 1 ${centerX} ${centerY - radius}
+        Z
+      `;
+    } else {
+      path = `
+        M ${centerX} ${centerY}
+        L ${x1.toFixed(2)} ${y1.toFixed(2)}
+        A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}
+        Z
+      `;
+    }
+    
     currentAngle = endAngle;
-
+    
     return {
       ...item,
+      value,
       path,
       percentage,
       color: item.color || COLORS[idx % COLORS.length],
     };
-  });
+  }).filter(Boolean); // Filtrar nulls
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════════════════════════
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -111,7 +184,7 @@ const PieChart = ({
               x={centerX}
               y={centerY - 8}
               textAnchor="middle"
-              className="text-1xl font-bold fill-slate-800"
+              className="text-xl font-bold fill-slate-800"
             >
               {total.toLocaleString()}
             </text>
@@ -126,13 +199,13 @@ const PieChart = ({
           </svg>
 
           {/* Tooltip */}
-          {hoveredSlice !== null && (
+          {hoveredSlice !== null && slices[hoveredSlice] && (
             <div 
               className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
                          bg-slate-800 text-white px-3 py-2 rounded-lg text-sm pointer-events-none
                          shadow-lg z-10"
             >
-              <p className="font-medium">{slices[hoveredSlice].label}</p>
+              <p className="font-medium">{slices[hoveredSlice].label || slices[hoveredSlice].name}</p>
               <p className="text-slate-300">
                 {slices[hoveredSlice].value.toLocaleString()} ({slices[hoveredSlice].percentage.toFixed(1)}%)
               </p>
@@ -159,7 +232,9 @@ const PieChart = ({
                     className="w-3 h-3 rounded-full" 
                     style={{ backgroundColor: slice.color }}
                   />
-                  <span className="text-sm text-slate-700">{slice.label}</span>
+                  <span className="text-sm text-slate-700">
+                    {slice.label || slice.name || `Segmento ${idx + 1}`}
+                  </span>
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-semibold text-slate-800">
@@ -179,11 +254,12 @@ PieChart.propTypes = {
   /** Datos del gráfico [{label, value, color?}] */
   data: PropTypes.arrayOf(
     PropTypes.shape({
-      label: PropTypes.string.isRequired,
+      label: PropTypes.string,
+      name: PropTypes.string,
       value: PropTypes.number.isRequired,
       color: PropTypes.string,
     })
-  ).isRequired,
+  ),
   /** Título del gráfico */
   title: PropTypes.string.isRequired,
   /** Subtítulo opcional */

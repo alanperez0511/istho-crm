@@ -1,14 +1,19 @@
 /**
  * ============================================================================
- * ISTHO CRM - Servicio de Usuario (CORREGIDO)
+ * ISTHO CRM - Servicio de Usuario (CORREGIDO v1.2.0)
  * ============================================================================
  * Gestiona operaciones del perfil de usuario.
  * 
  * ⚠️ NOTA: getPermisos genera permisos localmente basándose en el rol,
  * ya que el backend no tiene endpoint de permisos.
  * 
+ * CORRECCIONES v1.2.0:
+ * - Compatible con client.js v1.1.0 (ya devuelve response.data)
+ * - Eliminada definición duplicada de actualizarPerfil
+ * - Eliminado doble acceso a .data
+ * 
  * @author Coordinación TI ISTHO
- * @version 1.1.0
+ * @version 1.2.0
  * @date Enero 2026
  */
 
@@ -68,36 +73,6 @@ const PERMISOS_POR_ROL = {
 
 const usuarioService = {
   
-  /**
-   * Actualizar datos del perfil
-   * @param {Object} datos - Datos a actualizar (nombre, apellido, telefono)
-   * @returns {Promise<Object>}
-   */
-  actualizarPerfil: async (datos) => {
-    try {
-      const response = await apiClient.put(AUTH_ENDPOINTS.ME, datos);
-      
-      // Actualizar también en localStorage
-      if (response.data.success && response.data.data) {
-        const currentUser = usuarioService.getStoredUser();
-        if (currentUser) {
-          localStorage.setItem('istho_user', JSON.stringify({
-            ...currentUser,
-            ...response.data.data,
-          }));
-        }
-      }
-      
-      return response.data;
-    } catch (error) {
-      return {
-        success: false,
-        message: error.response?.data?.message || error.message || 'Error al actualizar perfil',
-        code: error.code || 'UPDATE_PERFIL_ERROR',
-      };
-    }
-  },
-  
   // ──────────────────────────────────────────────────────────────────────────
   // OBTENER PERFIL
   // ──────────────────────────────────────────────────────────────────────────
@@ -108,8 +83,9 @@ const usuarioService = {
    */
   getPerfil: async () => {
     try {
+      // client.js v1.1.0 ya devuelve response.data directamente
       const response = await apiClient.get(AUTH_ENDPOINTS.ME);
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -125,15 +101,28 @@ const usuarioService = {
   
   /**
    * Actualizar datos del perfil
-   * @param {Object} datos - Datos a actualizar
+   * @param {Object} datos - Datos a actualizar (nombre, apellido, telefono)
    * @returns {Promise<Object>}
    */
   actualizarPerfil: async (datos) => {
     try {
+      // client.js v1.1.0 ya devuelve response.data directamente
       const response = await apiClient.put(AUTH_ENDPOINTS.ME, datos);
-      return response.data;
+      
+      // Actualizar también en localStorage
+      if (response.success && response.data) {
+        const currentUser = usuarioService.getStoredUser();
+        if (currentUser) {
+          localStorage.setItem('istho_user', JSON.stringify({
+            ...currentUser,
+            ...response.data,
+          }));
+        }
+      }
+      
+      return response; // ✅ Sin .data adicional
     } catch (error) {
-      throw {
+      return {
         success: false,
         message: error.message || 'Error al actualizar perfil',
         code: error.code || 'UPDATE_PERFIL_ERROR',
@@ -153,7 +142,7 @@ const usuarioService = {
   cambiarPassword: async (passwords) => {
     try {
       const response = await apiClient.put(AUTH_ENDPOINTS.CAMBIAR_PASSWORD, passwords);
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,

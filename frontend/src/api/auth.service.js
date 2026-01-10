@@ -1,14 +1,15 @@
 /**
  * ============================================================================
- * ISTHO CRM - Servicio de Autenticación (CORREGIDO)
+ * ISTHO CRM - Servicio de Autenticación (CORREGIDO v1.2)
  * ============================================================================
  * Gestiona todas las operaciones relacionadas con autenticación.
  * 
- * ⚠️ IMPORTANTE: Usa setAuthToken/clearAuthToken del client.js
- * para mantener consistencia con el interceptor de Axios.
+ * ⚠️ IMPORTANTE: 
+ * - Usa setAuthToken/clearAuthToken del client.js
+ * - client.js ahora devuelve response.data directamente
  * 
  * @author Coordinación TI ISTHO
- * @version 1.1.0
+ * @version 1.2.0
  * @date Enero 2026
  */
 
@@ -40,36 +41,37 @@ const authService = {
    */
   login: async (credentials) => {
     try {
+      // client.js ahora devuelve response.data directamente
+      // Así que response = { success, message, data: { user, token } }
       const response = await apiClient.post(AUTH_ENDPOINTS.LOGIN, credentials);
       
-      if (response.data.success) {
-        const { token, user } = response.data.data;
+      if (response.success) {
+        const { token, user } = response.data;
         
-        // ⚠️ IMPORTANTE: Usar setAuthToken del client.js
-        // Esto guarda en 'istho_token' que es donde el interceptor lo busca
+        // Guardar token usando función del client.js
         setAuthToken(token);
         
-        // Guardar usuario
+        // Guardar usuario en localStorage
         localStorage.setItem(USER_KEY, JSON.stringify(user));
         
         console.log('✅ Login exitoso, token guardado');
         
         return {
           success: true,
-          data: response.data.data,
-          message: response.data.message || 'Inicio de sesión exitoso',
+          data: response.data,
+          message: response.message || 'Inicio de sesión exitoso',
         };
       }
       
       return {
         success: false,
-        message: response.data.message || 'Error al iniciar sesión',
+        message: response.message || 'Error al iniciar sesión',
       };
     } catch (error) {
       console.error('❌ Error en login:', error);
       return {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al iniciar sesión',
+        message: error.message || 'Error al iniciar sesión',
         code: error.code || 'LOGIN_ERROR',
       };
     }
@@ -92,8 +94,9 @@ const authService = {
       // Ignorar error si el token ya expiró
       console.warn('⚠️ Error al notificar logout al servidor:', error);
     } finally {
-      // ⚠️ IMPORTANTE: Usar clearAuthToken del client.js
+      // Limpiar tokens y datos locales
       clearAuthToken();
+      localStorage.removeItem(USER_KEY);
       
       return {
         success: true,
@@ -112,21 +115,22 @@ const authService = {
    */
   getCurrentUser: async () => {
     try {
+      // client.js devuelve response.data directamente
       const response = await apiClient.get(AUTH_ENDPOINTS.ME);
       
-      if (response.data.success) {
+      if (response.success) {
         // Actualizar usuario en localStorage
-        localStorage.setItem(USER_KEY, JSON.stringify(response.data.data));
+        localStorage.setItem(USER_KEY, JSON.stringify(response.data));
         
         return {
           success: true,
-          data: response.data.data,
+          data: response.data,
         };
       }
       
       return {
         success: false,
-        message: response.data.message || 'Error al obtener usuario',
+        message: response.message || 'Error al obtener usuario',
       };
     } catch (error) {
       console.error('❌ Error al obtener usuario:', error);
@@ -170,7 +174,7 @@ const authService = {
   register: async (userData) => {
     try {
       const response = await apiClient.post(AUTH_ENDPOINTS.REGISTRO, userData);
-      return response.data;
+      return response; // Ya viene como { success, data, message }
     } catch (error) {
       return {
         success: false,
@@ -195,7 +199,7 @@ const authService = {
   changePassword: async (passwords) => {
     try {
       const response = await apiClient.put(AUTH_ENDPOINTS.CAMBIAR_PASSWORD, passwords);
-      return response.data;
+      return response; // Ya viene como { success, data, message }
     } catch (error) {
       return {
         success: false,
@@ -218,10 +222,10 @@ const authService = {
     try {
       const response = await apiClient.post(AUTH_ENDPOINTS.REFRESH);
       
-      if (response.data.success) {
-        const { token } = response.data.data;
+      if (response.success) {
+        const { token } = response.data;
         setAuthToken(token);
-        return response.data;
+        return response;
       }
       
       return {
@@ -231,6 +235,7 @@ const authService = {
     } catch (error) {
       // Si falla el refresh, limpiar sesión
       clearAuthToken();
+      localStorage.removeItem(USER_KEY);
       return {
         success: false,
         message: 'Sesión expirada, por favor inicie sesión nuevamente',
@@ -253,7 +258,7 @@ const authService = {
       if (!token) return false;
       
       const response = await apiClient.get(AUTH_ENDPOINTS.ME);
-      return response.data.success;
+      return response.success === true;
     } catch {
       return false;
     }

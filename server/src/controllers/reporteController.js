@@ -3,8 +3,11 @@
  * 
  * Maneja la generación y descarga de reportes.
  * 
+ * CORRECCIÓN v1.1.0:
+ * - getDashboard ahora retorna porTipo y porEstado como objetos
+ * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const { Op } = require('sequelize');
@@ -319,6 +322,8 @@ const exportarClientesExcel = async (req, res) => {
 /**
  * GET /reportes/dashboard
  * Datos consolidados para dashboard
+ * 
+ * CORREGIDO: porTipo y porEstado ahora son objetos, no arrays
  */
 const getDashboard = async (req, res) => {
   try {
@@ -327,19 +332,22 @@ const getDashboard = async (req, res) => {
     const inicioSemana = new Date(hoy);
     inicioSemana.setDate(hoy.getDate() - hoy.getDay());
     
-    // Operaciones
+    // ═══════════════════════════════════════════════════════════════════════
+    // OPERACIONES
+    // ═══════════════════════════════════════════════════════════════════════
+    
     const [
       totalOperaciones,
       operacionesMes,
       operacionesSemana,
       operacionesPendientes,
-      operacionesPorTipo,
-      operacionesPorEstado
+      operacionesPorTipoRaw,
+      operacionesPorEstadoRaw
     ] = await Promise.all([
       Operacion.count(),
       Operacion.count({ where: { created_at: { [Op.gte]: inicioMes } } }),
       Operacion.count({ where: { created_at: { [Op.gte]: inicioSemana } } }),
-      Operacion.count({ where: { estado: ['pendiente', 'en_proceso'] } }),
+      Operacion.count({ where: { estado: { [Op.in]: ['pendiente', 'en_proceso'] } } }),
       Operacion.findAll({
         attributes: ['tipo', [sequelize.fn('COUNT', sequelize.col('id')), 'cantidad']],
         group: ['tipo'],
@@ -352,18 +360,46 @@ const getDashboard = async (req, res) => {
       })
     ]);
     
-    // Inventario
+    // Convertir arrays a objetos para el frontend
+    const porTipo = {
+      ingreso: 0,
+      salida: 0,
+      transferencia: 0,
+      ajuste: 0
+    };
+    operacionesPorTipoRaw.forEach(item => {
+      if (item.tipo) {
+        porTipo[item.tipo] = parseInt(item.cantidad) || 0;
+      }
+    });
+    
+    const porEstado = {
+      pendiente: 0,
+      en_proceso: 0,
+      cerrado: 0,
+      anulado: 0
+    };
+    operacionesPorEstadoRaw.forEach(item => {
+      if (item.estado) {
+        porEstado[item.estado] = parseInt(item.cantidad) || 0;
+      }
+    });
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // INVENTARIO
+    // ═══════════════════════════════════════════════════════════════════════
+    
     const [
       totalItems,
       totalUnidades,
-      valorInventario,
+      valorInventarioRaw,
       itemsStockBajo,
       itemsPorVencer
     ] = await Promise.all([
       Inventario.count(),
       Inventario.sum('cantidad'),
       Inventario.findAll({
-        attributes: [[sequelize.literal('SUM(cantidad * costo_unitario)'), 'valor']],
+        attributes: [[sequelize.literal('SUM(cantidad * COALESCE(costo_unitario, 0))'), 'valor']],
         raw: true
       }),
       Inventario.count({
@@ -378,7 +414,10 @@ const getDashboard = async (req, res) => {
       })
     ]);
     
-    // Clientes
+    // ═══════════════════════════════════════════════════════════════════════
+    // CLIENTES
+    // ═══════════════════════════════════════════════════════════════════════
+    
     const [
       totalClientes,
       clientesActivos,
@@ -389,7 +428,10 @@ const getDashboard = async (req, res) => {
       Cliente.count({ where: { created_at: { [Op.gte]: inicioMes } } })
     ]);
     
-    // Últimas operaciones
+    // ═══════════════════════════════════════════════════════════════════════
+    // ÚLTIMAS OPERACIONES
+    // ═══════════════════════════════════════════════════════════════════════
+    
     const ultimasOperaciones = await Operacion.findAll({
       limit: 5,
       order: [['created_at', 'DESC']],
@@ -397,37 +439,41 @@ const getDashboard = async (req, res) => {
       attributes: ['id', 'numero_operacion', 'tipo', 'estado', 'total_unidades', 'created_at']
     });
     
+    // ═══════════════════════════════════════════════════════════════════════
+    // RESPUESTA
+    // ═══════════════════════════════════════════════════════════════════════
+    
     return res.json({
       success: true,
       data: {
         operaciones: {
-          total: totalOperaciones,
-          mes: operacionesMes,
-          semana: operacionesSemana,
-          pendientes: operacionesPendientes,
-          porTipo: operacionesPorTipo,
-          porEstado: operacionesPorEstado
+          total: totalOperaciones || 0,
+          mes: operacionesMes || 0,
+          semana: operacionesSemana || 0,
+          pendientes: operacionesPendientes || 0,
+          porTipo,    // Ahora es objeto: { ingreso: N, salida: N, ... }
+          porEstado   // Ahora es objeto: { pendiente: N, en_proceso: N, ... }
         },
         inventario: {
-          totalItems,
+          totalItems: totalItems || 0,
           totalUnidades: parseFloat(totalUnidades) || 0,
-          valorTotal: parseFloat(valorInventario[0]?.valor) || 0,
+          valorTotal: parseFloat(valorInventarioRaw[0]?.valor) || 0,
           alertas: {
-            stockBajo: itemsStockBajo,
-            porVencer: itemsPorVencer
+            stockBajo: itemsStockBajo || 0,
+            porVencer: itemsPorVencer || 0
           }
         },
         clientes: {
-          total: totalClientes,
-          activos: clientesActivos,
-          nuevosMes: clientesNuevosMes
+          total: totalClientes || 0,
+          activos: clientesActivos || 0,
+          nuevosMes: clientesNuevosMes || 0
         },
-        ultimasOperaciones
+        ultimasOperaciones: ultimasOperaciones || []
       }
     });
     
   } catch (error) {
-    logger.error('Error al obtener dashboard:', { message: error.message });
+    logger.error('Error al obtener dashboard:', { message: error.message, stack: error.stack });
     return serverError(res, 'Error al obtener datos del dashboard', error);
   }
 };

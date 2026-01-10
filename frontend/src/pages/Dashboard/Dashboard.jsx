@@ -5,14 +5,12 @@
  * Dashboard conectado al backend real mediante hooks.
  * Muestra KPIs, gráficos, alertas y actividad reciente.
  * 
- * CAMBIOS vs versión anterior:
- * - Eliminados datos MOCK
- * - Conectado con useDashboard hook
- * - Conectado con useAuth para info de usuario
- * - Integrado con sistema de notificaciones
+ * CORRECCIONES v2.1.0:
+ * - Corregidos template literals
+ * - Notificación inteligente según tipos de alerta reales
  * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.1.0
  * @date Enero 2026
  */
 
@@ -26,6 +24,7 @@ import {
   AlertTriangle,
   RefreshCw,
   CheckCircle,
+  Clock,
 } from 'lucide-react';
 
 // Layout
@@ -112,6 +111,7 @@ const DESPACHOS_COLUMNS = [
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
+
 const Dashboard = () => {
   const navigate = useNavigate();
   
@@ -119,7 +119,7 @@ const Dashboard = () => {
   // HOOKS
   // ──────────────────────────────────────────────────────────────────────────
   const { user } = useAuth();
-  const { stockAlert, info } = useNotification();
+  const { inventoryAlert, info } = useNotification();
   
   // Hook principal del dashboard con auto-refresh cada 60 segundos
   const {
@@ -148,7 +148,21 @@ const Dashboard = () => {
   // Mostrar notificación de alertas al cargar (solo una vez)
   useEffect(() => {
     if (!loading && totalAlertas > 0) {
-      stockAlert(totalAlertas);
+      // Construir mensaje inteligente según tipos de alerta presentes
+      const tiposPresentes = [];
+      
+      if (alertasPorTipo.agotado?.length > 0) {
+        tiposPresentes.push(`${alertasPorTipo.agotado.length} agotado(s)`);
+      }
+      if (alertasPorTipo.stock_bajo?.length > 0) {
+        tiposPresentes.push(`${alertasPorTipo.stock_bajo.length} con stock bajo`);
+      }
+      if (alertasPorTipo.vencimiento?.length > 0) {
+        tiposPresentes.push(`${alertasPorTipo.vencimiento.length} por vencer`);
+      }
+      
+      // Usar la nueva función de alerta de inventario
+      inventoryAlert(totalAlertas, alertasPorTipo);
     }
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -162,9 +176,9 @@ const Dashboard = () => {
 
   const handleAlertClick = (alert) => {
     // Navegar según tipo de alerta
-    if (alert.tipo === 'stock_bajo' || alert.tipo === 'agotado') {
+    if (alert.type === 'inventario') {
       navigate('/inventario/alertas');
-    } else if (alert.tipo === 'vencimiento') {
+    } else if (alert.type === 'vencimiento') {
       navigate('/inventario/alertas?tipo=vencimiento');
     }
   };
@@ -200,7 +214,9 @@ const Dashboard = () => {
            alerta.tipo === 'agotado' ? `Agotado - ${alerta.nombre}` :
            `Por vencer - ${alerta.nombre}`,
     description: alerta.mensaje || `${alerta.cantidad_actual || 0} unidades disponibles`,
-    date: alerta.fecha_vencimiento ? `Vence: ${new Date(alerta.fecha_vencimiento).toLocaleDateString('es-CO')}` : 'Actualizado recientemente',
+    date: alerta.fecha_vencimiento 
+      ? `Vence: ${new Date(alerta.fecha_vencimiento).toLocaleDateString('es-CO')}` 
+      : 'Actualizado recientemente',
     originalData: alerta,
   }));
 
@@ -215,6 +231,7 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
+        
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* PAGE HEADER */}
         {/* ════════════════════════════════════════════════════════════════ */}
@@ -321,6 +338,7 @@ const Dashboard = () => {
         {/* BOTTOM ROW - TABLE & ALERTS */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
           {/* Despachos Recientes - 2 columnas */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -371,15 +389,6 @@ const Dashboard = () => {
               <div className="mt-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
                 <h4 className="text-sm font-medium text-slate-700 mb-3">Resumen de Alertas</h4>
                 <div className="space-y-2">
-                  {alertasPorTipo.stock_bajo?.length > 0 && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-amber-600 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        Stock Bajo
-                      </span>
-                      <span className="font-medium">{alertasPorTipo.stock_bajo.length}</span>
-                    </div>
-                  )}
                   {alertasPorTipo.agotado?.length > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-red-600 flex items-center gap-2">
@@ -389,10 +398,19 @@ const Dashboard = () => {
                       <span className="font-medium">{alertasPorTipo.agotado.length}</span>
                     </div>
                   )}
+                  {alertasPorTipo.stock_bajo?.length > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-amber-600 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Stock Bajo
+                      </span>
+                      <span className="font-medium">{alertasPorTipo.stock_bajo.length}</span>
+                    </div>
+                  )}
                   {alertasPorTipo.vencimiento?.length > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-orange-600 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" />
+                        <Clock className="w-4 h-4" />
                         Por Vencer
                       </span>
                       <span className="font-medium">{alertasPorTipo.vencimiento.length}</span>

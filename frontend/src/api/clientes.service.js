@@ -6,8 +6,12 @@
  * 
  * NOTA: Frontend y Backend usan snake_case, no se necesitan transformaciones.
  * 
+ * CORRECCIÓN v2.1.0:
+ * - Compatible con client.js v1.1.0 (ya devuelve response.data)
+ * - Eliminado doble acceso a .data
+ * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.1.0
  * @date Enero 2026
  */
 
@@ -38,12 +42,13 @@ const clientesService = {
    */
   getAll: async (params = {}) => {
     try {
+      // client.js v1.1.0 ya devuelve response.data directamente
       const response = await apiClient.get(CLIENTES_ENDPOINTS.BASE, { params });
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al obtener clientes',
+        message: error.message || 'Error al obtener clientes',
         code: error.code || 'GET_CLIENTES_ERROR',
       };
     }
@@ -62,11 +67,11 @@ const clientesService = {
   getById: async (id) => {
     try {
       const response = await apiClient.get(CLIENTES_ENDPOINTS.BY_ID(id));
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al obtener cliente',
+        message: error.message || 'Error al obtener cliente',
         code: error.code || 'GET_CLIENTE_ERROR',
       };
     }
@@ -87,14 +92,14 @@ const clientesService = {
       console.log('📤 [Clientes] Creando:', clienteData);
       
       const response = await apiClient.post(CLIENTES_ENDPOINTS.BASE, clienteData);
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
-      console.error('❌ [Clientes] Error al crear:', error.response?.data);
+      console.error('❌ [Clientes] Error al crear:', error);
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al crear cliente',
-        errors: error.response?.data?.errors || [],
-        code: error.response?.data?.code || 'CREATE_CLIENTE_ERROR',
+        message: error.message || 'Error al crear cliente',
+        errors: error.errors || [],
+        code: error.code || 'CREATE_CLIENTE_ERROR',
       };
     }
   },
@@ -115,14 +120,14 @@ const clientesService = {
       console.log('📤 [Clientes] Actualizando:', { id, data: clienteData });
       
       const response = await apiClient.put(CLIENTES_ENDPOINTS.BY_ID(id), clienteData);
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
-      console.error('❌ [Clientes] Error al actualizar:', error.response?.data);
+      console.error('❌ [Clientes] Error al actualizar:', error);
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al actualizar cliente',
-        errors: error.response?.data?.errors || [],
-        code: error.response?.data?.code || 'UPDATE_CLIENTE_ERROR',
+        message: error.message || 'Error al actualizar cliente',
+        errors: error.errors || [],
+        code: error.code || 'UPDATE_CLIENTE_ERROR',
       };
     }
   },
@@ -140,11 +145,11 @@ const clientesService = {
   delete: async (id) => {
     try {
       const response = await apiClient.delete(CLIENTES_ENDPOINTS.BY_ID(id));
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al eliminar cliente',
+        message: error.message || 'Error al eliminar cliente',
         code: error.code || 'DELETE_CLIENTE_ERROR',
       };
     }
@@ -177,11 +182,11 @@ const clientesService = {
   getStats: async () => {
     try {
       const response = await apiClient.get(CLIENTES_ENDPOINTS.STATS);
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al obtener estadísticas',
+        message: error.message || 'Error al obtener estadísticas',
         code: error.code || 'GET_STATS_ERROR',
       };
     }
@@ -200,11 +205,11 @@ const clientesService = {
   getContactos: async (clienteId) => {
     try {
       const response = await apiClient.get(CLIENTES_ENDPOINTS.CONTACTOS(clienteId));
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al obtener contactos',
+        message: error.message || 'Error al obtener contactos',
         code: error.code || 'GET_CONTACTOS_ERROR',
       };
     }
@@ -223,12 +228,12 @@ const clientesService = {
         CLIENTES_ENDPOINTS.CONTACTOS(clienteId), 
         contactoData
       );
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al crear contacto',
-        errors: error.response?.data?.errors || [],
+        message: error.message || 'Error al crear contacto',
+        errors: error.errors || [],
         code: error.code || 'CREATE_CONTACTO_ERROR',
       };
     }
@@ -248,12 +253,12 @@ const clientesService = {
         CLIENTES_ENDPOINTS.CONTACTO_BY_ID(clienteId, contactoId), 
         contactoData
       );
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al actualizar contacto',
-        errors: error.response?.data?.errors || [],
+        message: error.message || 'Error al actualizar contacto',
+        errors: error.errors || [],
         code: error.code || 'UPDATE_CONTACTO_ERROR',
       };
     }
@@ -271,11 +276,11 @@ const clientesService = {
       const response = await apiClient.delete(
         CLIENTES_ENDPOINTS.CONTACTO_BY_ID(clienteId, contactoId)
       );
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
-        message: error.response?.data?.message || error.message || 'Error al eliminar contacto',
+        message: error.message || 'Error al eliminar contacto',
         code: error.code || 'DELETE_CONTACTO_ERROR',
       };
     }

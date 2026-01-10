@@ -14,6 +14,7 @@ const clienteRoutes = require('./cliente.routes');
 const inventarioRoutes = require('./inventario.routes');
 const operacionRoutes = require('./operacion.routes');
 const reporteRoutes = require('./reporte.routes');
+const notificacionesRoutes = require('./notificacionesRoutes');
 
 // Info de la API
 router.get('/', (req, res) => {
@@ -26,7 +27,8 @@ router.get('/', (req, res) => {
       clientes: '/clientes - Gestión de clientes y contactos',
       inventario: '/inventario - Gestión de inventario y stock',
       operaciones: '/operaciones - Ingresos y salidas de mercancía',
-      reportes: '/reportes - Reportes y exportación'
+      reportes: '/reportes - Reportes y exportación',
+      notificaciones: '/notificaciones - Notificaciones'
     }
   });
 });
@@ -37,5 +39,6 @@ router.use('/clientes', clienteRoutes);
 router.use('/inventario', inventarioRoutes);
 router.use('/operaciones', operacionRoutes);
 router.use('/reportes', reporteRoutes);
+router.use('/notificaciones', notificacionesRoutes);
 
 module.exports = router;

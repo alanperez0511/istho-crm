@@ -56,6 +56,7 @@ export { default as clientesService } from './clientes.service';
 export { default as inventarioService } from './inventario.service';
 export { default as despachosService } from './despachos.service';
 export { default as reportesService } from './reportes.service';  // ← NUEVO
+export { default as notificacionesService } from './notificaciones.service';  // ← NUEVO
 
 // ============================================================================
 // OBJETO API CONSOLIDADO
@@ -66,7 +67,7 @@ import clientesService from './clientes.service';
 import inventarioService from './inventario.service';
 import despachosService from './despachos.service';
 import reportesService from './reportes.service';  // ← NUEVO
-
+import notificacionesService from './notificaciones.service';  // ← NUEVO
 
 /**
  * Objeto API consolidado para acceso simplificado
@@ -90,6 +91,7 @@ const api = {
   despachos: despachosService,
   operaciones: despachosService,
   reportes: reportesService,  // ← NUEVO
+  notificaciones: notificacionesService,  // ← NUEVO
 };
 
 export default api;

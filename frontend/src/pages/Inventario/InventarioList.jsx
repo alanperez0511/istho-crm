@@ -8,9 +8,10 @@
  * - Usa nombres correctos del hook useInventario
  * - snake_case para campos del backend
  * - Integración completa con API
+ * - Corregidos errores de sintaxis en template literals
  * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.1.0
  * @date Enero 2026
  */
 
@@ -116,6 +117,7 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
               <Eye className="w-4 h-4" />
               Ver detalle
             </button>
+
             {canEdit && (
               <button
                 onClick={() => { onEdit(producto); setIsOpen(false); }}
@@ -125,6 +127,7 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
                 Editar
               </button>
             )}
+
             {canEdit && (
               <>
                 <div className="border-t border-gray-100 my-1" />
@@ -147,6 +150,7 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
                 </button>
               </>
             )}
+
             {canDelete && (
               <>
                 <div className="border-t border-gray-100 my-1" />

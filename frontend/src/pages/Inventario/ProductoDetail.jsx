@@ -1,16 +1,17 @@
 /**
  * ============================================================================
- * ISTHO CRM - ProductoDetail (Versión Corregida)
+ * ISTHO CRM - ProductoDetail (Versión Corregida v2.3.0)
  * ============================================================================
  * Vista de detalle del producto conectada al backend real.
  * 
- * CORRECCIONES:
- * - Usa nombres correctos del hook useInventario
+ * CORRECCIONES v2.3.0:
+ * - Transformación de estadísticas para BarChart
+ * - Todos los hooks ANTES de returns condicionales
+ * - Template literals corregidos
  * - snake_case para campos del backend
- * - Integración completa con movimientos y estadísticas
  * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.3.0
  * @date Enero 2026
  */
 
@@ -35,7 +36,6 @@ import {
   AlertTriangle,
   Warehouse,
   FileText,
-  RefreshCw,
 } from 'lucide-react';
 
 // Layout
@@ -55,6 +55,26 @@ import MovimientoForm from './components/MovimientoForm';
 import useInventario from '../../hooks/useInventario';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONSTANTES
+// ════════════════════════════════════════════════════════════════════════════
+
+// Mapeo de nombres de meses inglés → español
+const MESES_ES = {
+  'January': 'Enero',
+  'February': 'Febrero', 
+  'March': 'Marzo',
+  'April': 'Abril',
+  'May': 'Mayo',
+  'June': 'Junio',
+  'July': 'Julio',
+  'August': 'Agosto',
+  'September': 'Septiembre',
+  'October': 'Octubre',
+  'November': 'Noviembre',
+  'December': 'Diciembre',
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPER DE PERMISOS
@@ -236,20 +256,16 @@ const ProductoDetail = () => {
   const { success, error: notifyError, saved, deleted } = useNotification();
 
   // ──────────────────────────────────────────────────────────────────────────
-  // HOOK DE INVENTARIO (nombres correctos)
+  // HOOK DE INVENTARIO
   // ──────────────────────────────────────────────────────────────────────────
   const {
-    // Detalle
     currentProducto,
     loadingDetail,
     errorDetail,
-    // Movimientos
     movimientos,
     loadingMovimientos,
-    // Estadísticas
     estadisticas,
     loadingEstadisticas,
-    // Acciones
     fetchById,
     fetchMovimientos,
     fetchEstadisticas,
@@ -259,11 +275,9 @@ const ProductoDetail = () => {
   } = useInventario({ autoFetch: false });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // ESTADOS LOCALES
+  // ESTADOS LOCALES (TODOS los hooks ANTES de cualquier return)
   // ──────────────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('info');
-
-  // Modals
   const [editModal, setEditModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
   const [movimientoModal, setMovimientoModal] = useState({ isOpen: false, tipo: 'entrada' });
@@ -274,7 +288,90 @@ const ProductoDetail = () => {
   const canDelete = checkPermission(user?.rol, 'eliminar');
 
   // ──────────────────────────────────────────────────────────────────────────
-  // CARGAR DATOS
+  // VARIABLES DERIVADAS
+  // ──────────────────────────────────────────────────────────────────────────
+  const producto = currentProducto || {};
+  
+  const stockActual = producto.stock_actual || producto.cantidad || 0;
+  const stockMinimo = producto.stock_minimo || 0;
+  const stockMaximo = producto.stock_maximo || stockMinimo * 20 || 1000;
+  const costoUnitario = producto.costo_unitario || 0;
+  const precioVenta = producto.precio_venta || 0;
+  const clienteNombre = producto.cliente_nombre || producto.cliente?.razon_social || '-';
+  const bodegaNombre = producto.bodega_nombre || producto.zona || producto.bodega || '-';
+  const unidadMedida = producto.unidad_medida || 'UND';
+  const fechaVencimiento = producto.fecha_vencimiento || null;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // MEMOS (SIEMPRE se ejecutan)
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  // KPIs calculados desde movimientos
+  const kpis = useMemo(() => {
+    const entradas = (movimientos || []).filter(m => m.tipo === 'entrada');
+    const salidas = (movimientos || []).filter(m => m.tipo === 'salida');
+    
+    const entradasMes = entradas.reduce((sum, m) => sum + Math.abs(m.cantidad || 0), 0);
+    const salidasMes = salidas.reduce((sum, m) => sum + Math.abs(m.cantidad || 0), 0);
+    
+    return {
+      valorStock: stockActual * costoUnitario,
+      entradasMes,
+      salidasMes,
+      rotacion: stockActual > 0 ? ((salidasMes / stockActual) * 100).toFixed(1) : '0',
+    };
+  }, [movimientos, stockActual, costoUnitario]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TRANSFORMACIÓN DE DATOS PARA BARCHART
+  // ═══════════════════════════════════════════════════════════════════════════
+  const chartData = useMemo(() => {
+    if (!estadisticas || estadisticas.length === 0) {
+      return [];
+    }
+    
+    return estadisticas.map(item => {
+      // Si ya viene con label y value1/value2 (backend actualizado)
+      if (item.label !== undefined && item.value1 !== undefined) {
+        return {
+          label: item.label,
+          value1: parseFloat(item.value1) || 0,
+          value2: parseFloat(item.value2) || 0,
+        };
+      }
+      
+      // Transformar formato antiguo del backend
+      // Puede venir como "January" (MONTHNAME) o como número
+      let mesLabel = item.periodo || '';
+      
+      if (item.mes) {
+        // Si es nombre en inglés, traducir
+        mesLabel = MESES_ES[item.mes]?.substring(0, 3) || item.mes.substring(0, 3);
+      } else if (item.periodo) {
+        // Extraer mes del periodo "2026-01" → "Ene"
+        const mesNum = parseInt(item.periodo.split('-')[1]);
+        const mesesCortos = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+                            'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        mesLabel = mesesCortos[mesNum] || item.periodo;
+      }
+      
+      return {
+        label: mesLabel,
+        value1: parseFloat(item.entradas) || 0,
+        value2: parseFloat(item.salidas) || 0,
+      };
+    });
+  }, [estadisticas]);
+
+  // Tabs
+  const tabs = useMemo(() => [
+    { id: 'info', label: 'Información' },
+    { id: 'movimientos', label: `Movimientos (${(movimientos || []).length})` },
+    { id: 'estadisticas', label: 'Estadísticas' },
+  ], [movimientos]);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // EFFECTS
   // ──────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (id) {
@@ -294,7 +391,6 @@ const ProductoDetail = () => {
       await updateProducto(id, data);
       saved('Producto');
       setEditModal(false);
-      // Refrescar datos
       fetchById(id);
     } catch (err) {
       notifyError(err.message || 'Error al actualizar producto');
@@ -328,7 +424,6 @@ const ProductoDetail = () => {
       });
       success(`Movimiento de ${movimientoModal.tipo} registrado correctamente`);
       setMovimientoModal({ isOpen: false, tipo: 'entrada' });
-      // Refrescar datos
       fetchById(id);
       fetchMovimientos(id);
     } catch (err) {
@@ -351,9 +446,9 @@ const ProductoDetail = () => {
     }).format(value);
   };
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // LOADING STATE
-  // ──────────────────────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // RENDERS CONDICIONALES (DESPUÉS de todos los hooks)
+  // ══════════════════════════════════════════════════════════════════════════
   
   if (loadingDetail) {
     return (
@@ -374,10 +469,6 @@ const ProductoDetail = () => {
     );
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // ERROR STATE
-  // ──────────────────────────────────────────────────────────────────────────
-  
   if (errorDetail || !currentProducto) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -398,60 +489,16 @@ const ProductoDetail = () => {
     );
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // VARIABLES CALCULADAS (snake_case)
-  // ──────────────────────────────────────────────────────────────────────────
-  
-  const producto = currentProducto;
-  
-  // Extraer campos con snake_case
-  const stockActual = producto.stock_actual || producto.cantidad || 0;
-  const stockMinimo = producto.stock_minimo || 0;
-  const stockMaximo = producto.stock_maximo || stockMinimo * 20 || 1000;
-  const costoUnitario = producto.costo_unitario || 0;
-  const precioVenta = producto.precio_venta || 0;
-  const clienteNombre = producto.cliente_nombre || producto.cliente?.razon_social || '-';
-  const bodegaNombre = producto.bodega_nombre || producto.zona || producto.bodega || '-';
-  const unidadMedida = producto.unidad_medida || 'UND';
-  const fechaVencimiento = producto.fecha_vencimiento || null;
-  
-  // KPIs calculados desde movimientos
-  const kpis = useMemo(() => {
-    const entradas = movimientos.filter(m => m.tipo === 'entrada');
-    const salidas = movimientos.filter(m => m.tipo === 'salida');
-    
-    const entradasMes = entradas.reduce((sum, m) => sum + Math.abs(m.cantidad || 0), 0);
-    const salidasMes = salidas.reduce((sum, m) => sum + Math.abs(m.cantidad || 0), 0);
-    
-    return {
-      valorStock: stockActual * costoUnitario,
-      entradasMes,
-      salidasMes,
-      rotacion: stockActual > 0 ? ((salidasMes / stockActual) * 100).toFixed(1) : '0',
-    };
-  }, [movimientos, stockActual, costoUnitario]);
-
-  // Datos para gráfico
-  const chartData = estadisticas || [];
-
-  const tabs = [
-    { id: 'info', label: 'Información' },
-    { id: 'movimientos', label: `Movimientos (${movimientos.length})` },
-    { id: 'estadisticas', label: 'Estadísticas' },
-  ];
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ──────────────────────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // RENDER PRINCIPAL
+  // ══════════════════════════════════════════════════════════════════════════
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <FloatingHeader />
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* HEADER */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
@@ -509,9 +556,7 @@ const ProductoDetail = () => {
           </div>
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* KPIs */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <KpiCard
             title="Valor en Stock"
@@ -543,9 +588,7 @@ const ProductoDetail = () => {
           />
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* MAIN CONTENT */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Stock Gauge */}
           <div className="lg:col-span-1">
@@ -555,7 +598,6 @@ const ProductoDetail = () => {
               maximo={stockMaximo}
             />
 
-            {/* Alerta si stock bajo */}
             {producto.estado === 'bajo_stock' && (
               <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
                 <div className="flex items-start gap-3">
@@ -708,13 +750,13 @@ const ProductoDetail = () => {
                           <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />
                         ))}
                       </div>
-                    ) : movimientos.length === 0 ? (
+                    ) : (movimientos || []).length === 0 ? (
                       <div className="py-12 text-center">
                         <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                         <p className="text-slate-500">No hay movimientos registrados</p>
                       </div>
                     ) : (
-                      movimientos.map((movimiento) => (
+                      (movimientos || []).map((movimiento) => (
                         <MovimientoItem key={movimiento.id} movimiento={movimiento} />
                       ))
                     )}
@@ -741,6 +783,9 @@ const ProductoDetail = () => {
                       <div className="py-12 text-center">
                         <TrendingUp className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                         <p className="text-slate-500">No hay suficientes datos para mostrar estadísticas</p>
+                        <p className="text-xs text-slate-400 mt-2">
+                          Los movimientos deben estar en el rango de los últimos 6 meses
+                        </p>
                       </div>
                     )}
                   </div>
@@ -751,10 +796,7 @@ const ProductoDetail = () => {
         </div>
       </main>
 
-      {/* ══════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      
       <ProductoForm
         isOpen={editModal}
         onClose={() => setEditModal(false)}

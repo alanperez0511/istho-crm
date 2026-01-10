@@ -1,94 +1,122 @@
 /**
  * ============================================================================
- * ISTHO CRM - Notificaciones Service
+ * ISTHO CRM - Servicio de Notificaciones (Frontend)
  * ============================================================================
- * Servicio para gestionar notificaciones del sistema.
+ * Conecta con el API de notificaciones del backend.
+ * 
+ * CORRECCIÓN: Compatible con client.js v1.1.0 (devuelve response.data directamente)
  * 
  * @author Coordinación TI ISTHO
- * @version 1.0.0
+ * @version 1.1.0
  * @date Enero 2026
  */
 
-import apiClient from './client';
+import client from './client';
 
-// ════════════════════════════════════════════════════════════════════════════
-// NOTIFICACIONES SERVICE
-// ════════════════════════════════════════════════════════════════════════════
+const BASE_URL = '/notificaciones';
 
-export const notificacionesService = {
+const notificacionesService = {
   /**
    * Obtener todas las notificaciones del usuario
-   * @returns {Promise<Array>} Lista de notificaciones
+   * @param {Object} params - { page, limit, tipo, no_leidas }
+   * @returns {Promise<Array>}
    */
-  getAll: async function() {
-    const response = await apiClient.get('/notificaciones');
-    return response.data.data || response.data;
+  async getAll(params = {}) {
+    try {
+      const response = await client.get(BASE_URL, { params });
+      // client.js v1.1.0 ya devuelve response.data
+      return response.data || response || [];
+    } catch (error) {
+      console.error('[notificacionesService] Error en getAll:', error);
+      return [];
+    }
   },
 
   /**
-   * Obtener notificaciones no leídas
-   * @returns {Promise<Array>} Lista de notificaciones no leídas
+   * Contar notificaciones no leídas
+   * @returns {Promise<number>}
    */
-  getNoLeidas: async function() {
-    const response = await apiClient.get('/notificaciones', {
-      params: { leida: false },
-    });
-    return response.data.data || response.data;
-  },
-
-  /**
-   * Obtener conteo de notificaciones no leídas
-   * @returns {Promise<number>} Cantidad de no leídas
-   */
-  getConteoNoLeidas: async function() {
-    const response = await apiClient.get('/notificaciones/count');
-    return response.data.count || response.data;
+  async getCount() {
+    try {
+      const response = await client.get(`${BASE_URL}/count`);
+      return response.data?.count || response?.count || 0;
+    } catch (error) {
+      console.error('[notificacionesService] Error en getCount:', error);
+      return 0;
+    }
   },
 
   /**
    * Marcar una notificación como leída
-   * @param {number|string} id - ID de la notificación
-   * @returns {Promise<Object>} Notificación actualizada
+   * @param {number} id - ID de la notificación
+   * @returns {Promise<boolean>}
    */
-  marcarLeida: async function(id) {
-    const response = await apiClient.patch('/notificaciones/' + id + '/leer');
-    return response.data;
+  async marcarLeida(id) {
+    try {
+      await client.put(`${BASE_URL}/${id}/leer`);
+      return true;
+    } catch (error) {
+      console.error('[notificacionesService] Error en marcarLeida:', error);
+      throw error;
+    }
   },
 
   /**
    * Marcar todas las notificaciones como leídas
-   * @returns {Promise<Object>} Resultado
+   * @returns {Promise<boolean>}
    */
-  marcarTodasLeidas: async function() {
-    const response = await apiClient.patch('/notificaciones/leer-todas');
-    return response.data;
+  async marcarTodasLeidas() {
+    try {
+      await client.put(`${BASE_URL}/leer-todas`);
+      return true;
+    } catch (error) {
+      console.error('[notificacionesService] Error en marcarTodasLeidas:', error);
+      throw error;
+    }
   },
 
   /**
    * Eliminar una notificación
-   * @param {number|string} id - ID de la notificación
-   * @returns {Promise<void>}
+   * @param {number} id - ID de la notificación
+   * @returns {Promise<boolean>}
    */
-  eliminar: async function(id) {
-    await apiClient.delete('/notificaciones/' + id);
+  async eliminar(id) {
+    try {
+      await client.delete(`${BASE_URL}/${id}`);
+      return true;
+    } catch (error) {
+      console.error('[notificacionesService] Error en eliminar:', error);
+      throw error;
+    }
   },
 
   /**
    * Eliminar todas las notificaciones leídas
-   * @returns {Promise<void>}
+   * @returns {Promise<boolean>}
    */
-  eliminarLeidas: async function() {
-    await apiClient.delete('/notificaciones/leidas');
+  async eliminarLeidas() {
+    try {
+      await client.delete(`${BASE_URL}/leidas`);
+      return true;
+    } catch (error) {
+      console.error('[notificacionesService] Error en eliminarLeidas:', error);
+      throw error;
+    }
   },
 
   /**
-   * Crear una nueva notificación (admin)
-   * @param {Object} data - Datos de la notificación
-   * @returns {Promise<Object>} Notificación creada
+   * Crear una notificación (admin)
+   * @param {Object} data - { usuario_id, tipo, titulo, mensaje, prioridad, accion_url }
+   * @returns {Promise<Object>}
    */
-  crear: async function(data) {
-    const response = await apiClient.post('/notificaciones', data);
-    return response.data;
+  async crear(data) {
+    try {
+      const response = await client.post(BASE_URL, data);
+      return response.data || response;
+    } catch (error) {
+      console.error('[notificacionesService] Error en crear:', error);
+      throw error;
+    }
   },
 };
 

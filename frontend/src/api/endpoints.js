@@ -6,7 +6,7 @@
  * Facilita mantenimiento y evita strings hardcodeados.
  * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 2.0.0
+ * @version 2.1.0
  * @date Enero 2026
  */
 
@@ -115,6 +115,10 @@ export const DOCUMENTOS_ENDPOINTS = {
 // ════════════════════════════════════════════════════════════════════════════
 
 export const REPORTES_ENDPOINTS = {
+  // Dashboard consolidado
+  DASHBOARD: '/reportes/dashboard',
+  
+  // Reportes específicos
   DESPACHOS: '/reportes/despachos',
   INVENTARIO: '/reportes/inventario',
   CLIENTES: '/reportes/clientes',
@@ -143,13 +147,13 @@ export const USUARIOS_ENDPOINTS = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-// DASHBOARD
+// DASHBOARD (Alias - usa reportes/dashboard)
 // ════════════════════════════════════════════════════════════════════════════
 
 export const DASHBOARD_ENDPOINTS = {
-  STATS: '/dashboard/stats',
-  KPIS: '/dashboard/kpis',
-  GRAFICOS: '/dashboard/graficos',
+  STATS: '/reportes/dashboard',
+  KPIS: '/reportes/dashboard',
+  GRAFICOS: '/reportes/dashboard',
 };
 
 // ════════════════════════════════════════════════════════════════════════════

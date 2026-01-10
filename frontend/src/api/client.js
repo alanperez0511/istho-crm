@@ -7,8 +7,12 @@
  * - Interceptores de response (manejo de errores, refresh token)
  * - Configuración base para todas las peticiones
  * 
+ * CORRECCIONES v1.1.0:
+ * - Template literals corregidos en console.log
+ * - Interceptor devuelve response.data directamente
+ * 
  * @author Coordinación TI ISTHO
- * @version 1.0.0
+ * @version 1.1.0
  * @date Enero 2026
  */
 
@@ -93,6 +97,7 @@ apiClient.interceptors.request.use(
 
 /**
  * Interceptor que maneja las respuestas y errores
+ * - Devuelve response.data directamente para simplificar el uso
  * - 401: Token inválido/expirado → Logout
  * - 403: Sin permisos → Notificar
  * - 500: Error del servidor → Notificar
@@ -107,7 +112,11 @@ apiClient.interceptors.response.use(
       });
     }
     
-    return response;
+    // ═══════════════════════════════════════════════════════════════════════
+    // IMPORTANTE: Devolver response.data directamente
+    // Así los servicios reciben { success: true, data: {...} } directamente
+    // ═══════════════════════════════════════════════════════════════════════
+    return response.data;
   },
   async (error) => {
     const originalRequest = error.config;
@@ -266,6 +275,16 @@ export const createUploadClient = () => {
     }
     return config;
   });
+  
+  // También normalizar respuesta para uploads
+  uploadClient.interceptors.response.use(
+    (response) => response.data,
+    (error) => Promise.reject({
+      success: false,
+      message: error.response?.data?.message || 'Error en upload',
+      status: error.response?.status,
+    })
+  );
   
   return uploadClient;
 };

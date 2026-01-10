@@ -4,7 +4,7 @@
  * Inicializa todos los modelos Sequelize y define sus relaciones.
  * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.0.0
+ * @version 2.0.0 - Agregado MovimientoInventario
  */
 
 const { sequelize } = require('../config/database');
@@ -21,6 +21,8 @@ const OperacionDetalleModel = require('./OperacionDetalle');
 const OperacionAveriaModel = require('./OperacionAveria');
 const OperacionDocumentoModel = require('./OperacionDocumento');
 const NotificacionEmailModel = require('./NotificacionEmail');
+const MovimientoInventarioModel = require('./MovimientoInventario'); // ← NUEVO
+const Notificacion = require('./Notificacion')(sequelize);
 
 // Inicializar modelos
 const Usuario = UsuarioModel(sequelize);
@@ -33,6 +35,7 @@ const OperacionDetalle = OperacionDetalleModel(sequelize);
 const OperacionAveria = OperacionAveriaModel(sequelize);
 const OperacionDocumento = OperacionDocumentoModel(sequelize);
 const NotificacionEmail = NotificacionEmailModel(sequelize);
+const MovimientoInventario = MovimientoInventarioModel(sequelize); // ← NUEVO
 
 // ============================================
 // DEFINIR ASOCIACIONES
@@ -165,6 +168,44 @@ Auditoria.belongsTo(Usuario, {
 });
 
 // ============================================
+// NUEVAS ASOCIACIONES - MovimientoInventario
+// ============================================
+
+// Inventario <-> MovimientoInventario (1:N)
+Inventario.hasMany(MovimientoInventario, {
+  foreignKey: 'inventario_id',
+  as: 'movimientos',
+  onDelete: 'CASCADE'
+});
+MovimientoInventario.belongsTo(Inventario, {
+  foreignKey: 'inventario_id',
+  as: 'inventario'
+});
+
+// Usuario <-> MovimientoInventario (1:N)
+Usuario.hasMany(MovimientoInventario, {
+  foreignKey: 'usuario_id',
+  as: 'movimientos_inventario'
+});
+MovimientoInventario.belongsTo(Usuario, {
+  foreignKey: 'usuario_id',
+  as: 'usuario'
+});
+
+// Operacion <-> MovimientoInventario (1:N) - Opcional
+Operacion.hasMany(MovimientoInventario, {
+  foreignKey: 'operacion_id',
+  as: 'movimientos_inventario'
+});
+MovimientoInventario.belongsTo(Operacion, {
+  foreignKey: 'operacion_id',
+  as: 'operacion'
+});
+
+Notificacion.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+Usuario.hasMany(Notificacion, { foreignKey: 'usuario_id', as: 'notificaciones' });
+
+// ============================================
 // EXPORTAR MODELOS
 // ============================================
 
@@ -182,7 +223,9 @@ const db = {
   OperacionDetalle,
   OperacionAveria,
   OperacionDocumento,
-  NotificacionEmail
+  NotificacionEmail,
+  MovimientoInventario,
+  Notificacion  // ← NUEVO
 };
 
 /**
