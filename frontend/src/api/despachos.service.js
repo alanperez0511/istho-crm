@@ -8,6 +8,10 @@
  * - El BACKEND usa "Operaciones" (integración con WMS)
  * - Este servicio hace el MAPEO TRANSPARENTE
  * 
+ * CORRECCIÓN v1.1.0:
+ * - Compatible con client.js v1.1.0 (ya devuelve response.data)
+ * - Eliminado doble acceso a .data
+ * 
  * Gestiona todas las operaciones relacionadas con despachos:
  * - CRUD de despachos (operaciones)
  * - Integración con documentos WMS
@@ -17,7 +21,7 @@
  * - Cierre con notificación por email
  * 
  * @author Coordinación TI ISTHO
- * @version 1.0.0
+ * @version 1.1.0
  * @date Enero 2026
  */
 
@@ -42,17 +46,11 @@ const despachosService = {
    * @param {string} [params.tipo] - Tipo de documento ('ingreso'|'salida')
    * @param {string} [params.cliente_codigo] - Código del cliente
    * @returns {Promise<Object>} Lista de documentos WMS disponibles
-   * 
-   * @example
-   * const docs = await despachosService.getDocumentosWMS({ tipo: 'salida' });
-   * // docs.data = [
-   * //   { numero_documento: 'SAL-2026-0001', fecha_documento, cliente_codigo, ... }
-   * // ]
    */
   getDocumentosWMS: async (params = {}) => {
     try {
       const response = await apiClient.get(OPERACIONES_ENDPOINTS.WMS_DOCUMENTOS, { params });
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -68,20 +66,11 @@ const despachosService = {
    * 
    * @param {string} numeroDocumento - Número del documento WMS
    * @returns {Promise<Object>} Detalle del documento con productos
-   * 
-   * @example
-   * const doc = await despachosService.getDocumentoWMS('SAL-2026-0001');
-   * // doc.data = {
-   * //   tipo: 'salida',
-   * //   numero_documento: 'SAL-2026-0001',
-   * //   cliente_codigo: 'CLI-0001',
-   * //   productos: [{ sku, producto, cantidad, ... }]
-   * // }
    */
   getDocumentoWMS: async (numeroDocumento) => {
     try {
       const response = await apiClient.get(OPERACIONES_ENDPOINTS.WMS_DOCUMENTO(numeroDocumento));
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -108,17 +97,11 @@ const despachosService = {
    * @param {string} [params.fecha_desde] - Fecha desde (YYYY-MM-DD)
    * @param {string} [params.fecha_hasta] - Fecha hasta (YYYY-MM-DD)
    * @returns {Promise<Object>} Lista de despachos con paginación
-   * 
-   * @example
-   * const result = await despachosService.getAll({ 
-   *   estado: 'en_proceso',
-   *   tipo: 'salida'
-   * });
    */
   getAll: async (params = {}) => {
     try {
       const response = await apiClient.get(OPERACIONES_ENDPOINTS.BASE, { params });
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -134,18 +117,11 @@ const despachosService = {
    * 
    * @param {number|string} id - ID del despacho (operación)
    * @returns {Promise<Object>} Datos completos del despacho
-   * 
-   * @example
-   * const despacho = await despachosService.getById(1);
-   * // despacho.data = { 
-   * //   id, numero_operacion, tipo, estado, cliente,
-   * //   detalles: [...], averias: [...], documentos: [...]
-   * // }
    */
   getById: async (id) => {
     try {
       const response = await apiClient.get(OPERACIONES_ENDPOINTS.BY_ID(id));
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -166,19 +142,11 @@ const despachosService = {
    * @param {string} [despachoData.proveedor] - Proveedor (para ingresos)
    * @param {string} [despachoData.destino] - Destino (para salidas)
    * @returns {Promise<Object>} Despacho creado
-   * 
-   * @example
-   * const result = await despachosService.create({
-   *   tipo: 'salida',
-   *   documento_wms: 'SAL-2026-0001',
-   *   cliente_id: 1,
-   *   observaciones: 'Despacho programado para mañana'
-   * });
    */
   create: async (despachoData) => {
     try {
       const response = await apiClient.post(OPERACIONES_ENDPOINTS.BASE, despachoData);
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -202,7 +170,7 @@ const despachosService = {
       const response = await apiClient.delete(OPERACIONES_ENDPOINTS.BY_ID(id), {
         data: { motivo }
       });
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -227,15 +195,6 @@ const despachosService = {
    * @param {string} [transporteData.conductor_cedula] - Cédula del conductor
    * @param {string} [transporteData.conductor_celular] - Celular del conductor
    * @returns {Promise<Object>} Despacho actualizado
-   * 
-   * @example
-   * await despachosService.updateTransporte(1, {
-   *   vehiculo_placa: 'ABC-123',
-   *   vehiculo_tipo: 'Turbo',
-   *   conductor_nombre: 'Juan Pérez',
-   *   conductor_cedula: '12345678',
-   *   conductor_celular: '3001234567'
-   * });
    */
   updateTransporte: async (id, transporteData) => {
     try {
@@ -243,7 +202,7 @@ const despachosService = {
         OPERACIONES_ENDPOINTS.TRANSPORTE(id), 
         transporteData
       );
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -270,16 +229,6 @@ const despachosService = {
    * @param {string} [averiaData.descripcion] - Descripción detallada
    * @param {File} [averiaData.foto] - Archivo de foto como evidencia
    * @returns {Promise<Object>} Avería registrada
-   * 
-   * @example
-   * const formData = new FormData();
-   * formData.append('tipo_averia', 'daño_fisico');
-   * formData.append('producto', 'Leche Entera 1L');
-   * formData.append('cantidad_afectada', 10);
-   * formData.append('descripcion', 'Empaques rotos');
-   * formData.append('foto', fileInput.files[0]);
-   * 
-   * await despachosService.registrarAveria(1, formData);
    */
   registrarAveria: async (id, averiaData) => {
     try {
@@ -299,7 +248,7 @@ const despachosService = {
         OPERACIONES_ENDPOINTS.AVERIAS(id), 
         formData
       );
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -337,14 +286,6 @@ const despachosService = {
    * @param {string} [documentoData.nombre] - Nombre descriptivo
    * @param {string} [documentoData.descripcion] - Descripción
    * @returns {Promise<Object>} Documento subido
-   * 
-   * @example
-   * const formData = new FormData();
-   * formData.append('archivo', pdfFile);
-   * formData.append('tipo_documento', 'cumplido');
-   * formData.append('nombre', 'Acta de recepción firmada');
-   * 
-   * await despachosService.subirDocumento(1, formData);
    */
   subirDocumento: async (id, documentoData) => {
     try {
@@ -363,7 +304,7 @@ const despachosService = {
         OPERACIONES_ENDPOINTS.DOCUMENTOS(id), 
         formData
       );
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -401,13 +342,6 @@ const despachosService = {
    * @param {boolean} [cierreData.enviar_correo=false] - Enviar notificación por email
    * @param {string[]} [cierreData.correos_destino] - Emails adicionales para notificar
    * @returns {Promise<Object>} Resultado del cierre
-   * 
-   * @example
-   * await despachosService.cerrar(1, {
-   *   observaciones_cierre: 'Operación completada sin novedades',
-   *   enviar_correo: true,
-   *   correos_destino: ['coordinador@cliente.com', 'logistica@cliente.com']
-   * });
    */
   cerrar: async (id, cierreData = {}) => {
     try {
@@ -415,7 +349,7 @@ const despachosService = {
         OPERACIONES_ENDPOINTS.CERRAR(id), 
         cierreData
       );
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,
@@ -438,21 +372,11 @@ const despachosService = {
    * @param {string} [params.fecha_desde] - Fecha desde
    * @param {string} [params.fecha_hasta] - Fecha hasta
    * @returns {Promise<Object>} Estadísticas
-   * 
-   * @example
-   * const stats = await despachosService.getStats();
-   * // stats.data = {
-   * //   total: 156,
-   * //   por_estado: { pendiente: 10, en_proceso: 5, cerrado: 140, anulado: 1 },
-   * //   por_tipo: { ingreso: 80, salida: 76 },
-   * //   este_mes: 45,
-   * //   tasa_cumplimiento: 98.5
-   * // }
    */
   getStats: async (params = {}) => {
     try {
       const response = await apiClient.get(OPERACIONES_ENDPOINTS.STATS, { params });
-      return response.data;
+      return response; // ✅ Sin .data adicional
     } catch (error) {
       throw {
         success: false,

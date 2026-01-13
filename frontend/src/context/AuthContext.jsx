@@ -1,15 +1,19 @@
 /**
  * ============================================================================
- * ISTHO CRM - Contexto de Autenticación (CORREGIDO)
+ * ISTHO CRM - Contexto de Autenticación (CORREGIDO v1.2.0)
  * ============================================================================
  * Provee estado global de autenticación para toda la aplicación:
  * - Estado del usuario actual
  * - Funciones de login/logout
  * - Verificación de sesión
+ * - Verificación de permisos
  * - Persistencia en localStorage
  * 
+ * CORRECCIÓN v1.2.0:
+ * - Agregada función hasPermission para verificación de permisos
+ * 
  * @author Coordinación TI ISTHO
- * @version 1.1.0
+ * @version 1.2.0
  * @date Enero 2026
  */
 
@@ -24,8 +28,6 @@ import {
 import PropTypes from 'prop-types';
 import authService from '../api/auth.service';
 import { clearAuthToken, isAuthenticated as checkToken } from '../api/client';
-
-// ❌ ELIMINADO: import { hasPermission } from '../components/auth/PrivateRoute';
 
 // ============================================================================
 // CONTEXTO
@@ -42,6 +44,61 @@ const INITIAL_STATE = {
   isAuthenticated: false,
   isLoading: true,
   error: null,
+};
+
+// ============================================================================
+// DEFINICIÓN DE PERMISOS POR ROL
+// ============================================================================
+
+/**
+ * Matriz de permisos por rol
+ * Define qué módulos y acciones tiene cada rol
+ */
+const PERMISOS_POR_ROL = {
+  admin: {
+    dashboard: ['ver', 'exportar'],
+    clientes: ['ver', 'crear', 'editar', 'eliminar', 'exportar'],
+    inventario: ['ver', 'crear', 'editar', 'eliminar', 'ajustar', 'exportar'],
+    operaciones: ['ver', 'crear', 'editar', 'cerrar', 'anular', 'exportar'],
+    despachos: ['ver', 'crear', 'editar', 'eliminar', 'exportar'],
+    reportes: ['ver', 'crear', 'exportar'],
+    usuarios: ['ver', 'crear', 'editar', 'eliminar'],
+    configuracion: ['ver', 'editar'],
+    notificaciones: ['ver', 'crear', 'editar', 'eliminar'],
+  },
+  supervisor: {
+    dashboard: ['ver', 'exportar'],
+    clientes: ['ver', 'crear', 'editar', 'exportar'],
+    inventario: ['ver', 'crear', 'editar', 'ajustar', 'exportar'],
+    operaciones: ['ver', 'crear', 'editar', 'cerrar', 'exportar'],
+    despachos: ['ver', 'crear', 'editar', 'exportar'],
+    reportes: ['ver', 'exportar'],
+    usuarios: ['ver'],
+    configuracion: ['ver'],
+    notificaciones: ['ver', 'editar'],
+  },
+  operador: {
+    dashboard: ['ver'],
+    clientes: ['ver'],
+    inventario: ['ver', 'ajustar'],
+    operaciones: ['ver', 'crear', 'editar'],
+    despachos: ['ver', 'crear', 'editar'],
+    reportes: ['ver'],
+    usuarios: [],
+    configuracion: [],
+    notificaciones: ['ver'],
+  },
+  cliente: {
+    dashboard: ['ver'],
+    clientes: [],
+    inventario: ['ver'],
+    operaciones: ['ver'],
+    despachos: ['ver'],
+    reportes: ['ver'],
+    usuarios: [],
+    configuracion: [],
+    notificaciones: ['ver'],
+  },
 };
 
 // ============================================================================
@@ -313,6 +370,49 @@ export const AuthProvider = ({ children }) => {
   const isCliente = useCallback(() => hasRole('cliente'), [hasRole]);
   
   // ──────────────────────────────────────────────────────────────────────────
+  // VERIFICACIÓN DE PERMISOS
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  /**
+   * Verificar si el usuario tiene un permiso específico
+   * @param {string} modulo - Módulo (ej: 'clientes', 'inventario', 'despachos')
+   * @param {string} accion - Acción (ej: 'ver', 'crear', 'editar', 'eliminar')
+   * @returns {boolean}
+   * 
+   * @example
+   * const canCreate = hasPermission('despachos', 'crear');
+   * const canEdit = hasPermission('clientes', 'editar');
+   */
+  const hasPermission = useCallback((modulo, accion) => {
+    if (!state.user) return false;
+    
+    const rol = state.user.rol || 'cliente';
+    const permisos = PERMISOS_POR_ROL[rol] || PERMISOS_POR_ROL.cliente;
+    
+    return permisos[modulo]?.includes(accion) || false;
+  }, [state.user]);
+  
+  /**
+   * Verificar si el usuario puede acceder a un módulo
+   * @param {string} modulo - Nombre del módulo
+   * @returns {boolean}
+   */
+  const canAccess = useCallback((modulo) => {
+    return hasPermission(modulo, 'ver');
+  }, [hasPermission]);
+  
+  /**
+   * Obtener todos los permisos del usuario actual
+   * @returns {Object} Permisos del usuario
+   */
+  const getPermisos = useCallback(() => {
+    if (!state.user) return {};
+    
+    const rol = state.user.rol || 'cliente';
+    return PERMISOS_POR_ROL[rol] || PERMISOS_POR_ROL.cliente;
+  }, [state.user]);
+  
+  // ──────────────────────────────────────────────────────────────────────────
   // VALOR DEL CONTEXTO
   // ──────────────────────────────────────────────────────────────────────────
   
@@ -336,6 +436,11 @@ export const AuthProvider = ({ children }) => {
     isSupervisorOrAbove,
     isOperadorOrAbove,
     isCliente,
+    
+    // ✅ NUEVO: Verificaciones de permisos
+    hasPermission,
+    canAccess,
+    getPermisos,
   }), [
     state,
     login,
@@ -348,6 +453,9 @@ export const AuthProvider = ({ children }) => {
     isSupervisorOrAbove,
     isOperadorOrAbove,
     isCliente,
+    hasPermission,
+    canAccess,
+    getPermisos,
   ]);
   
   return (
@@ -372,7 +480,11 @@ AuthProvider.propTypes = {
  * @throws {Error} Si se usa fuera de AuthProvider
  * 
  * @example
- * const { user, login, logout, isAuthenticated } = useAuth();
+ * const { user, login, logout, isAuthenticated, hasPermission } = useAuth();
+ * 
+ * // Verificar permisos
+ * const canCreate = hasPermission('despachos', 'crear');
+ * const canEdit = hasPermission('clientes', 'editar');
  */
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -381,7 +493,6 @@ export const useAuth = () => {
     throw new Error('useAuth debe ser usado dentro de un AuthProvider');
   }
   
-  // ✅ CORREGIDO: Retornar el contexto completo, no llamar a hasPermission
   return context;
 };
 

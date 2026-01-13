@@ -4,12 +4,13 @@
  * ============================================================================
  * Vista de detalle del cliente conectada al backend real.
  * 
- * CORREGIDO: 
- * - Usa nombres correctos del hook useClientes
- * - Verificación de permisos basada en rol del usuario
+ * CORRECCIONES v2.5.0:
+ * - Template literals corregidos
+ * - Carga de productos del cliente desde el backend
+ * - KPI "Productos en Bodega" conectado a datos reales
  * 
  * @author Coordinación TI ISTHO
- * @version 2.4.0
+ * @version 2.5.0
  * @date Enero 2026
  */
 
@@ -34,6 +35,7 @@ import {
   FileCheck,
   DollarSign,
   Database,
+  Package,
 } from 'lucide-react';
 
 // Layout
@@ -49,6 +51,9 @@ import ClienteForm from './components/ClienteForm';
 import useClientes from '../../hooks/useClientes';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
+
+// Services
+import inventarioService from '../../api/inventario.service';
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -158,6 +163,7 @@ const ContactCard = ({ contacto, onEdit, onDelete, canEdit }) => (
         </div>
       )}
     </div>
+
     <div className="mt-3 space-y-1.5 text-sm">
       {contacto.telefono && (
         <div className="flex items-center gap-2 text-slate-600">
@@ -351,7 +357,6 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
             />
             <span className="text-sm text-slate-700">Contacto principal</span>
           </label>
-
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -383,6 +388,7 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HOOK DE CLIENTES
   // ──────────────────────────────────────────────────────────────────────────
+  
   const {
     cliente,
     loadingDetail: loading,
@@ -399,11 +405,16 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // ESTADOS LOCALES
   // ──────────────────────────────────────────────────────────────────────────
+  
   const [activeTab, setActiveTab] = useState('info');
   const [contactos, setContactos] = useState([]);
   const [loadingContactos, setLoadingContactos] = useState(false);
   const [historial, setHistorial] = useState([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+  
+  // ✅ Estado para productos del cliente
+  const [productosCliente, setProductosCliente] = useState([]);
+  const [loadingProductos, setLoadingProductos] = useState(false);
   
   // Modals
   const [editModal, setEditModal] = useState(false);
@@ -415,6 +426,7 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // PERMISOS
   // ──────────────────────────────────────────────────────────────────────────
+  
   const canEdit = checkPermission(userRole, 'editar');
   const canDelete = checkPermission(userRole, 'eliminar');
 
@@ -437,13 +449,32 @@ const ClienteDetail = () => {
     }
   }, [fetchContactos]);
 
+  // ✅ NUEVO: Cargar productos del cliente
+  const loadProductosCliente = useCallback(async (clienteId) => {
+    setLoadingProductos(true);
+    try {
+      const response = await inventarioService.getByCliente(clienteId);
+      if (response?.success) {
+        setProductosCliente(response.data || []);
+      } else {
+        setProductosCliente([]);
+      }
+    } catch (err) {
+      console.error('Error cargando productos del cliente:', err);
+      setProductosCliente([]);
+    } finally {
+      setLoadingProductos(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (id) {
       fetchCliente(id);
       loadContactos(id);
+      loadProductosCliente(id);
       setHistorial([]);
     }
-  }, [id, fetchCliente, loadContactos]);
+  }, [id, fetchCliente, loadContactos, loadProductosCliente]);
 
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
@@ -566,6 +597,9 @@ const ClienteDetail = () => {
     { id: 'historial', label: 'Historial' },
   ];
 
+  // ✅ Calcular productos en bodega desde los datos cargados
+  const productosEnBodega = productosCliente.length;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <FloatingHeader />
@@ -628,10 +662,12 @@ const ClienteDetail = () => {
           />
           <KpiCard
             title="Productos en Bodega"
-            value={cliente.productos_en_bodega || 0}
-            icon={FileText}
+            value={loadingProductos ? '...' : productosEnBodega}
+            icon={Package}
             iconBg="bg-violet-100"
             iconColor="text-violet-600"
+            onClick={() => navigate(`/inventario?cliente_id=${id}`)}
+            className="cursor-pointer hover:shadow-md transition-shadow"
           />
           <KpiCard
             title="Contactos"

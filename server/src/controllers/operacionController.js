@@ -3,8 +3,13 @@
  * 
  * Maneja las operaciones de ingreso/salida de mercancía.
  * 
+ * MODIFICACIÓN v1.3.0:
+ * - Registro de movimientos en historial de inventario
+ * - Movimientos tipo: reserva, salida, entrada, liberacion
+ * - Integración completa con MovimientoInventario
+ * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.0.0
+ * @version 1.3.0
  */
 
 const { Op } = require('sequelize');
@@ -16,6 +21,8 @@ const {
   Cliente,
   Contacto,
   Usuario,
+  Inventario,
+  MovimientoInventario,  // ✅ AGREGADO
   Auditoria,
   sequelize
 } = require('../models');
@@ -59,6 +66,373 @@ const generarNumeroOperacion = async () => {
   }
   
   return `OP-${año}-${String(siguiente).padStart(4, '0')}`;
+};
+
+// =============================================
+// FUNCIONES DE GESTIÓN DE STOCK CON MOVIMIENTOS
+// =============================================
+
+/**
+ * Reservar stock para una operación de salida
+ * - Incrementa cantidad_reservada en el inventario
+ * - ✅ REGISTRA MOVIMIENTO TIPO 'reserva'
+ * 
+ * @param {Array} detalles - Detalles de la operación
+ * @param {number} clienteId - ID del cliente
+ * @param {string} numeroOperacion - Número de operación para referencia
+ * @param {number} usuarioId - ID del usuario que realiza la operación
+ * @param {string} ipAddress - IP del cliente
+ * @param {Transaction} transaction - Transacción de Sequelize
+ * @returns {Object} { success: boolean, errors: Array }
+ */
+const reservarStock = async (detalles, clienteId, numeroOperacion, usuarioId, ipAddress, transaction) => {
+  const errores = [];
+  const reservasRealizadas = [];
+  
+  for (const detalle of detalles) {
+    try {
+      // Buscar producto en inventario (por producto_id o por sku+cliente)
+      let inventario = null;
+      
+      if (detalle.producto_id) {
+        inventario = await Inventario.findOne({
+          where: { 
+            id: detalle.producto_id,
+            cliente_id: clienteId
+          },
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+      }
+      
+      // Si no encontró por ID, buscar por SKU
+      if (!inventario && detalle.sku) {
+        inventario = await Inventario.findOne({
+          where: { 
+            sku: detalle.sku,
+            cliente_id: clienteId
+          },
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+      }
+      
+      if (!inventario) {
+        errores.push({
+          sku: detalle.sku || 'N/A',
+          producto: detalle.producto || 'Desconocido',
+          mensaje: 'Producto no encontrado en inventario'
+        });
+        continue;
+      }
+      
+      // Calcular disponibilidad
+      const cantidadActual = parseFloat(inventario.cantidad) || 0;
+      const cantidadReservada = parseFloat(inventario.cantidad_reservada) || 0;
+      const disponible = cantidadActual - cantidadReservada;
+      const cantidadSolicitada = parseFloat(detalle.cantidad) || 0;
+      
+      if (cantidadSolicitada > disponible) {
+        errores.push({
+          sku: inventario.sku,
+          producto: inventario.producto,
+          mensaje: `Stock insuficiente. Disponible: ${disponible}, Solicitado: ${cantidadSolicitada}`
+        });
+        continue;
+      }
+      
+      const nuevaReserva = cantidadReservada + cantidadSolicitada;
+      
+      // Reservar stock
+      await inventario.update({
+        cantidad_reservada: nuevaReserva
+      }, { transaction });
+      
+      // ════════════════════════════════════════════════════════════════════
+      // ✅ REGISTRAR MOVIMIENTO DE RESERVA
+      // ════════════════════════════════════════════════════════════════════
+      await MovimientoInventario.registrar({
+        inventario_id: inventario.id,
+        usuario_id: usuarioId,
+        tipo: 'reserva',
+        motivo: `Reserva para despacho ${numeroOperacion}`,
+        cantidad: cantidadSolicitada,  // Positivo para reserva
+        stock_anterior: cantidadActual,
+        stock_resultante: cantidadActual,  // Stock no cambia, solo reserva
+        documento_referencia: numeroOperacion,
+        observaciones: `Cantidad reservada: ${cantidadReservada} → ${nuevaReserva}`,
+        ip_address: ipAddress
+      }, { transaction });
+      
+      reservasRealizadas.push({
+        inventario_id: inventario.id,
+        sku: inventario.sku,
+        cantidad: cantidadSolicitada
+      });
+      
+      // Guardar referencia del inventario en el detalle
+      detalle.inventario_id = inventario.id;
+      
+      logger.info('Stock reservado:', {
+        inventario_id: inventario.id,
+        sku: inventario.sku,
+        cantidad_reservada: cantidadSolicitada,
+        disponible_anterior: disponible,
+        disponible_nuevo: disponible - cantidadSolicitada
+      });
+      
+    } catch (error) {
+      logger.error('Error reservando stock:', { 
+        detalle, 
+        error: error.message 
+      });
+      errores.push({
+        sku: detalle.sku || 'N/A',
+        mensaje: `Error interno: ${error.message}`
+      });
+    }
+  }
+  
+  return {
+    success: errores.length === 0,
+    errors: errores,
+    reservas: reservasRealizadas
+  };
+};
+
+/**
+ * Liberar stock reservado (al anular operación)
+ * - Decrementa cantidad_reservada en el inventario
+ * - ✅ REGISTRA MOVIMIENTO TIPO 'liberacion'
+ * 
+ * @param {number} operacionId - ID de la operación
+ * @param {string} numeroOperacion - Número de operación para referencia
+ * @param {number} usuarioId - ID del usuario
+ * @param {string} ipAddress - IP del cliente
+ * @param {Transaction} transaction - Transacción de Sequelize
+ */
+const liberarStockReservado = async (operacionId, numeroOperacion, usuarioId, ipAddress, transaction) => {
+  const detalles = await OperacionDetalle.findAll({
+    where: { operacion_id: operacionId },
+    transaction
+  });
+  
+  const operacion = await Operacion.findByPk(operacionId, { transaction });
+  
+  for (const detalle of detalles) {
+    try {
+      let inventario = null;
+      
+      if (detalle.inventario_id) {
+        inventario = await Inventario.findByPk(detalle.inventario_id, {
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+      } else if (detalle.sku && operacion) {
+        inventario = await Inventario.findOne({
+          where: { 
+            sku: detalle.sku,
+            cliente_id: operacion.cliente_id
+          },
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+      }
+      
+      if (inventario) {
+        const cantidadActual = parseFloat(inventario.cantidad) || 0;
+        const cantidadReservada = parseFloat(inventario.cantidad_reservada) || 0;
+        const cantidadLiberar = parseFloat(detalle.cantidad) || 0;
+        const nuevaReserva = Math.max(0, cantidadReservada - cantidadLiberar);
+        
+        await inventario.update({
+          cantidad_reservada: nuevaReserva
+        }, { transaction });
+        
+        // ════════════════════════════════════════════════════════════════════
+        // ✅ REGISTRAR MOVIMIENTO DE LIBERACIÓN
+        // ════════════════════════════════════════════════════════════════════
+        await MovimientoInventario.registrar({
+          inventario_id: inventario.id,
+          usuario_id: usuarioId,
+          operacion_id: operacionId,
+          tipo: 'liberacion',
+          motivo: `Liberación por anulación de ${numeroOperacion}`,
+          cantidad: cantidadLiberar,  // Positivo para liberación
+          stock_anterior: cantidadActual,
+          stock_resultante: cantidadActual,  // Stock no cambia, solo reserva
+          documento_referencia: numeroOperacion,
+          observaciones: `Reserva liberada: ${cantidadReservada} → ${nuevaReserva}`,
+          ip_address: ipAddress
+        }, { transaction });
+        
+        logger.info('Stock liberado:', {
+          inventario_id: inventario.id,
+          sku: inventario.sku,
+          cantidad_liberada: cantidadLiberar
+        });
+      }
+    } catch (error) {
+      logger.error('Error liberando stock:', { 
+        detalle_id: detalle.id, 
+        error: error.message 
+      });
+    }
+  }
+};
+
+/**
+ * Confirmar movimiento de stock al cerrar operación
+ * - Salida: Reduce cantidad y cantidad_reservada
+ * - Ingreso: Incrementa cantidad
+ * - ✅ REGISTRA MOVIMIENTO TIPO 'salida' o 'entrada'
+ * 
+ * @param {Object} operacion - Operación a confirmar
+ * @param {number} usuarioId - ID del usuario
+ * @param {string} ipAddress - IP del cliente
+ * @param {Transaction} transaction - Transacción de Sequelize
+ */
+const confirmarMovimientoStock = async (operacion, usuarioId, ipAddress, transaction) => {
+  const detalles = await OperacionDetalle.findAll({
+    where: { operacion_id: operacion.id },
+    transaction
+  });
+  
+  for (const detalle of detalles) {
+    try {
+      let inventario = null;
+      
+      // Buscar inventario
+      if (detalle.inventario_id) {
+        inventario = await Inventario.findByPk(detalle.inventario_id, {
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+      } else if (detalle.sku) {
+        inventario = await Inventario.findOne({
+          where: { 
+            sku: detalle.sku,
+            cliente_id: operacion.cliente_id
+          },
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+      }
+      
+      if (!inventario) {
+        // Para ingresos, crear el producto si no existe
+        if (operacion.tipo === 'ingreso') {
+          inventario = await Inventario.create({
+            cliente_id: operacion.cliente_id,
+            sku: detalle.sku,
+            producto: detalle.producto,
+            cantidad: 0,
+            cantidad_reservada: 0,
+            unidad_medida: detalle.unidad_medida || 'UND',
+            lote: detalle.lote,
+            fecha_vencimiento: detalle.fecha_vencimiento,
+            estado: 'disponible'
+          }, { transaction });
+          
+          logger.info('Producto creado en inventario:', {
+            inventario_id: inventario.id,
+            sku: inventario.sku
+          });
+        } else {
+          logger.warn('Inventario no encontrado para confirmar:', {
+            detalle_id: detalle.id,
+            sku: detalle.sku
+          });
+          continue;
+        }
+      }
+      
+      const cantidadAnterior = parseFloat(inventario.cantidad) || 0;
+      const cantidadReservada = parseFloat(inventario.cantidad_reservada) || 0;
+      const cantidadMovimiento = parseFloat(detalle.cantidad) || 0;
+      const cantidadAveria = parseFloat(detalle.cantidad_averia) || 0;
+      const cantidadEfectiva = cantidadMovimiento - cantidadAveria;
+      
+      let cantidadNueva;
+      let tipoMovimiento;
+      let motivoMovimiento;
+      
+      if (operacion.tipo === 'salida') {
+        // ════════════════════════════════════════════════════════════════════
+        // SALIDA: Reducir cantidad y liberar reserva
+        // ════════════════════════════════════════════════════════════════════
+        cantidadNueva = Math.max(0, cantidadAnterior - cantidadEfectiva);
+        const nuevaReserva = Math.max(0, cantidadReservada - cantidadMovimiento);
+        
+        await inventario.update({
+          cantidad: cantidadNueva,
+          cantidad_reservada: nuevaReserva
+        }, { transaction });
+        
+        tipoMovimiento = 'salida';
+        motivoMovimiento = `Despacho ${operacion.numero_operacion}`;
+        
+        logger.info('Salida confirmada:', {
+          inventario_id: inventario.id,
+          sku: inventario.sku,
+          cantidad_anterior: cantidadAnterior,
+          cantidad_nueva: cantidadNueva,
+          averia: cantidadAveria
+        });
+        
+      } else if (operacion.tipo === 'ingreso') {
+        // ════════════════════════════════════════════════════════════════════
+        // INGRESO: Incrementar cantidad
+        // ════════════════════════════════════════════════════════════════════
+        cantidadNueva = cantidadAnterior + cantidadEfectiva;
+        
+        await inventario.update({
+          cantidad: cantidadNueva
+        }, { transaction });
+        
+        tipoMovimiento = 'entrada';
+        motivoMovimiento = `Ingreso ${operacion.numero_operacion}`;
+        
+        logger.info('Ingreso confirmado:', {
+          inventario_id: inventario.id,
+          sku: inventario.sku,
+          cantidad_anterior: cantidadAnterior,
+          cantidad_nueva: cantidadNueva,
+          averia: cantidadAveria
+        });
+      }
+      
+      // ════════════════════════════════════════════════════════════════════
+      // ✅ REGISTRAR MOVIMIENTO EN HISTORIAL
+      // ════════════════════════════════════════════════════════════════════
+      const cantidadRegistro = operacion.tipo === 'salida' 
+        ? -cantidadEfectiva  // Negativo para salidas
+        : cantidadEfectiva;   // Positivo para entradas
+      
+      await MovimientoInventario.registrar({
+        inventario_id: inventario.id,
+        usuario_id: usuarioId,
+        operacion_id: operacion.id,
+        tipo: tipoMovimiento,
+        motivo: motivoMovimiento,
+        cantidad: cantidadRegistro,
+        stock_anterior: cantidadAnterior,
+        stock_resultante: cantidadNueva,
+        documento_referencia: operacion.numero_operacion,
+        observaciones: cantidadAveria > 0 
+          ? `Cantidad despachada: ${cantidadMovimiento}, Avería: ${cantidadAveria}, Efectivo: ${cantidadEfectiva}`
+          : null,
+        costo_unitario: inventario.costo_unitario,
+        ip_address: ipAddress
+      }, { transaction });
+      
+    } catch (error) {
+      logger.error('Error confirmando movimiento:', { 
+        detalle_id: detalle.id, 
+        error: error.message 
+      });
+    }
+  }
 };
 
 // =============================================
@@ -253,92 +627,238 @@ const obtenerPorId = async (req, res) => {
 
 /**
  * POST /operaciones
- * Crear operación desde documento WMS
+ * Crear operación - Soporta dos modos:
+ * 
+ * MODO WMS: Si se envía documento_wms, busca en WMS y usa esos datos
+ * MODO MANUAL: Si NO se envía documento_wms, usa los datos del frontend
+ * 
+ * ✅ INCLUYE GESTIÓN DE STOCK Y REGISTRO DE MOVIMIENTOS
  */
 const crear = async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
     const datos = limpiarObjeto(req.body);
+    const ipAddress = getClientIP(req);
     
-    // Buscar documento en WMS
-    const docWMS = await wmsService.buscarDocumento(datos.documento_wms);
+    // ════════════════════════════════════════════════════════════════════
+    // VALIDACIONES BÁSICAS
+    // ════════════════════════════════════════════════════════════════════
     
-    if (!docWMS) {
+    if (!datos.tipo || !['ingreso', 'salida'].includes(datos.tipo)) {
       await transaction.rollback();
-      return notFound(res, `Documento ${datos.documento_wms} no encontrado en el WMS`);
+      return errorResponse(res, 'El tipo de operación es requerido (ingreso/salida)', 400);
     }
     
-    // Verificar que no exista operación con este documento
-    const existente = await Operacion.findOne({
-      where: { documento_wms: datos.documento_wms }
-    });
-    
-    if (existente) {
+    if (!datos.cliente_id) {
       await transaction.rollback();
-      return conflict(res, `Ya existe una operación para el documento ${datos.documento_wms}`);
+      return errorResponse(res, 'El cliente es requerido', 400);
     }
     
-    // Verificar cliente
     const cliente = await Cliente.findByPk(datos.cliente_id);
     if (!cliente) {
       await transaction.rollback();
       return notFound(res, 'Cliente no encontrado');
     }
     
-    // Generar número de operación
-    datos.numero_operacion = await generarNumeroOperacion();
-    datos.creado_por = req.user.id;
-    datos.fecha_documento = docWMS.fecha_documento;
-    datos.total_referencias = docWMS.productos.length;
-    datos.total_unidades = docWMS.productos.reduce((sum, p) => sum + p.cantidad, 0);
-    datos.estado = 'en_proceso';
+    // Generar número de operación primero (para referencias)
+    const numeroOperacion = await generarNumeroOperacion();
     
-    // Crear operación
-    const operacion = await Operacion.create(datos, { transaction });
+    // ════════════════════════════════════════════════════════════════════
+    // DETERMINAR MODO: WMS vs MANUAL
+    // ════════════════════════════════════════════════════════════════════
     
-    // Crear detalle desde productos del WMS
-    const detallesData = docWMS.productos.map(p => ({
+    let detallesData = [];
+    let modoOperacion = 'manual';
+    
+    if (datos.documento_wms) {
+      // ──────────────────────────────────────────────────────────────────
+      // MODO WMS
+      // ──────────────────────────────────────────────────────────────────
+      
+      modoOperacion = 'wms';
+      
+      const docWMS = await wmsService.buscarDocumento(datos.documento_wms);
+      
+      if (!docWMS) {
+        await transaction.rollback();
+        return notFound(res, `Documento ${datos.documento_wms} no encontrado en el WMS`);
+      }
+      
+      const existente = await Operacion.findOne({
+        where: { documento_wms: datos.documento_wms }
+      });
+      
+      if (existente) {
+        await transaction.rollback();
+        return conflict(res, `Ya existe una operación para el documento ${datos.documento_wms}`);
+      }
+      
+      datos.fecha_documento = docWMS.fecha_documento;
+      datos.total_referencias = docWMS.productos.length;
+      datos.total_unidades = docWMS.productos.reduce((sum, p) => sum + p.cantidad, 0);
+      
+      detallesData = docWMS.productos.map(p => ({
+        sku: p.sku,
+        producto: p.producto,
+        cantidad: p.cantidad,
+        unidad_medida: p.unidad_medida,
+        lote: p.lote,
+        fecha_vencimiento: p.fecha_vencimiento
+      }));
+      
+    } else {
+      // ──────────────────────────────────────────────────────────────────
+      // MODO MANUAL
+      // ──────────────────────────────────────────────────────────────────
+      
+      modoOperacion = 'manual';
+      
+      if (!datos.detalles || !Array.isArray(datos.detalles) || datos.detalles.length === 0) {
+        await transaction.rollback();
+        return errorResponse(res, 'Debe incluir al menos un producto en la operación', 400);
+      }
+      
+      for (let i = 0; i < datos.detalles.length; i++) {
+        const det = datos.detalles[i];
+        if (!det.cantidad || det.cantidad <= 0) {
+          await transaction.rollback();
+          return errorResponse(res, `El producto en posición ${i + 1} debe tener cantidad mayor a 0`, 400);
+        }
+      }
+      
+      datos.total_referencias = datos.detalles.length;
+      datos.total_unidades = datos.detalles.reduce((sum, d) => sum + (parseFloat(d.cantidad) || 0), 0);
+      
+      detallesData = datos.detalles.map(d => ({
+        sku: d.sku || d.codigo || '',
+        producto: d.producto || d.nombre || '',
+        cantidad: parseFloat(d.cantidad) || 0,
+        unidad_medida: d.unidad_medida || 'UND',
+        lote: d.lote || null,
+        fecha_vencimiento: d.fecha_vencimiento || null,
+        producto_id: d.producto_id || null
+      }));
+    }
+    
+    // ════════════════════════════════════════════════════════════════════
+    // ✅ RESERVAR STOCK PARA SALIDAS (con registro de movimiento)
+    // ════════════════════════════════════════════════════════════════════
+    
+    if (datos.tipo === 'salida') {
+      const resultadoReserva = await reservarStock(
+        detallesData, 
+        datos.cliente_id, 
+        numeroOperacion,
+        req.user.id,
+        ipAddress,
+        transaction
+      );
+      
+      if (!resultadoReserva.success) {
+        await transaction.rollback();
+        return errorResponse(res, 'Error al reservar stock', 400, resultadoReserva.errors, 'STOCK_ERROR');
+      }
+      
+      logger.info('Stock reservado para operación:', {
+        numero_operacion: numeroOperacion,
+        cliente_id: datos.cliente_id,
+        productos: resultadoReserva.reservas.length
+      });
+    }
+    
+    // ════════════════════════════════════════════════════════════════════
+    // CREAR OPERACIÓN
+    // ════════════════════════════════════════════════════════════════════
+    
+    const operacion = await Operacion.create({
+      numero_operacion: numeroOperacion,
+      tipo: datos.tipo,
+      cliente_id: datos.cliente_id,
+      documento_wms: datos.documento_wms || null,
+      fecha_operacion: datos.fecha_operacion || new Date().toISOString().split('T')[0],
+      fecha_documento: datos.fecha_documento || null,
+      origen: datos.origen || null,
+      destino: datos.destino || null,
+      vehiculo_placa: datos.vehiculo_placa || null,
+      vehiculo_tipo: datos.vehiculo_tipo || null,
+      conductor_nombre: datos.conductor_nombre || null,
+      conductor_cedula: datos.conductor_cedula || null,
+      conductor_telefono: datos.conductor_telefono || null,
+      total_referencias: datos.total_referencias,
+      total_unidades: datos.total_unidades,
+      prioridad: datos.prioridad || 'normal',
+      observaciones: datos.observaciones || null,
+      estado: 'pendiente',
+      creado_por: req.user.id
+    }, { transaction });
+    
+    // ════════════════════════════════════════════════════════════════════
+    // CREAR DETALLES (con referencia a inventario)
+    // ════════════════════════════════════════════════════════════════════
+    
+    const detallesConOperacion = detallesData.map(d => ({
       operacion_id: operacion.id,
-      sku: p.sku,
-      producto: p.producto,
-      cantidad: p.cantidad,
-      unidad_medida: p.unidad_medida,
-      lote: p.lote,
-      fecha_vencimiento: p.fecha_vencimiento
+      inventario_id: d.inventario_id || null,
+      sku: d.sku,
+      producto: d.producto,
+      cantidad: d.cantidad,
+      unidad_medida: d.unidad_medida,
+      lote: d.lote,
+      fecha_vencimiento: d.fecha_vencimiento
     }));
     
-    await OperacionDetalle.bulkCreate(detallesData, { transaction });
+    await OperacionDetalle.bulkCreate(detallesConOperacion, { transaction });
     
-    // Auditoría
+    // ════════════════════════════════════════════════════════════════════
+    // AUDITORÍA
+    // ════════════════════════════════════════════════════════════════════
+    
     await Auditoria.registrar({
       tabla: 'operaciones',
       registro_id: operacion.id,
       accion: 'crear',
       usuario_id: req.user.id,
       usuario_nombre: req.user.nombre_completo,
-      datos_nuevos: datos,
-      ip_address: getClientIP(req),
-      descripcion: `Operación creada: ${operacion.numero_operacion} (${operacion.tipo})`
+      datos_nuevos: {
+        numero_operacion: operacion.numero_operacion,
+        tipo: operacion.tipo,
+        cliente_id: operacion.cliente_id,
+        modo: modoOperacion,
+        total_referencias: operacion.total_referencias,
+        total_unidades: operacion.total_unidades,
+        stock_reservado: datos.tipo === 'salida'
+      },
+      ip_address: ipAddress,
+      descripcion: `Operación creada: ${operacion.numero_operacion} (${operacion.tipo}) - Modo: ${modoOperacion}${datos.tipo === 'salida' ? ' - Stock reservado' : ''}`
     });
     
     await transaction.commit();
     
-    // Recargar con relaciones
+    // ════════════════════════════════════════════════════════════════════
+    // RESPUESTA
+    // ════════════════════════════════════════════════════════════════════
+    
     await operacion.reload({
       include: [
-        { model: Cliente, as: 'cliente' },
+        { model: Cliente, as: 'cliente', attributes: ['id', 'codigo_cliente', 'razon_social'] },
         { model: OperacionDetalle, as: 'detalles' }
       ]
     });
     
-    logger.info('Operación creada:', { id: operacion.id, numero: operacion.numero_operacion });
+    logger.info('Operación creada:', { 
+      id: operacion.id, 
+      numero: operacion.numero_operacion,
+      modo: modoOperacion,
+      tipo: operacion.tipo,
+      stock_reservado: datos.tipo === 'salida'
+    });
     
     return created(res, 'Operación creada exitosamente', operacion);
     
   } catch (error) {
     await transaction.rollback();
-    logger.error('Error al crear operación:', { message: error.message });
+    logger.error('Error al crear operación:', { message: error.message, stack: error.stack });
     return serverError(res, 'Error al crear la operación', error);
   }
 };
@@ -425,7 +945,6 @@ const registrarAveria = async (req, res) => {
       return errorResponse(res, 'Esta operación ya no se puede modificar', 400);
     }
     
-    // Si hay archivo de evidencia
     let fotoData = {};
     if (req.file) {
       fotoData = {
@@ -436,7 +955,6 @@ const registrarAveria = async (req, res) => {
       };
     }
     
-    // Crear avería
     const averia = await OperacionAveria.create({
       operacion_id: id,
       detalle_id: datos.detalle_id,
@@ -448,7 +966,6 @@ const registrarAveria = async (req, res) => {
       registrado_por: req.user.id
     }, { transaction });
     
-    // Actualizar detalle si se especificó
     if (datos.detalle_id) {
       const detalle = await OperacionDetalle.findByPk(datos.detalle_id);
       if (detalle) {
@@ -461,7 +978,6 @@ const registrarAveria = async (req, res) => {
       }
     }
     
-    // Actualizar total de averías en operación
     const totalAverias = await OperacionAveria.sum('cantidad', {
       where: { operacion_id: id },
       transaction
@@ -530,24 +1046,26 @@ const subirDocumento = async (req, res) => {
 /**
  * POST /operaciones/:id/cerrar
  * Cerrar operación y enviar correo
+ * 
+ * ✅ CONFIRMA MOVIMIENTO DE STOCK Y REGISTRA EN HISTORIAL
  */
-// Agregar importación al inicio del archivo
 const emailService = require('../services/emailService');
 
-// Modificar la función cerrar (reemplazar el TODO)
 const cerrar = async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
     const { id } = req.params;
     const { observaciones_cierre, enviar_correo, correos_destino } = req.body;
+    const ipAddress = getClientIP(req);
     
     const operacion = await Operacion.findByPk(id, {
       include: [
         { model: Cliente, as: 'cliente' },
         { model: OperacionDetalle, as: 'detalles' },
         { model: OperacionDocumento, as: 'documentos' }
-      ]
+      ],
+      transaction
     });
     
     if (!operacion) {
@@ -560,13 +1078,27 @@ const cerrar = async (req, res) => {
       return errorResponse(res, 'Esta operación ya está cerrada', 400);
     }
     
-    // Verificar que tenga al menos un documento de cumplido
-    if (operacion.documentos.length === 0) {
+    if (operacion.estado === 'anulado') {
       await transaction.rollback();
-      return errorResponse(res, 'Debe subir al menos un documento de cumplido antes de cerrar', 400);
+      return errorResponse(res, 'No se puede cerrar una operación anulada', 400);
     }
     
-    // Obtener correos de contactos del cliente si no se especificaron
+    // ════════════════════════════════════════════════════════════════════
+    // ✅ CONFIRMAR MOVIMIENTO DE STOCK (con registro en historial)
+    // ════════════════════════════════════════════════════════════════════
+    
+    await confirmarMovimientoStock(operacion, req.user.id, ipAddress, transaction);
+    
+    logger.info('Movimiento de stock confirmado:', {
+      operacion_id: operacion.id,
+      tipo: operacion.tipo,
+      numero: operacion.numero_operacion
+    });
+    
+    // ════════════════════════════════════════════════════════════════════
+    // OBTENER CORREOS DE DESTINO
+    // ════════════════════════════════════════════════════════════════════
+    
     let correosEnvio = correos_destino;
     if (!correosEnvio && enviar_correo !== false) {
       const contactos = await Contacto.findAll({
@@ -580,7 +1112,10 @@ const cerrar = async (req, res) => {
       correosEnvio = contactos.map(c => c.email).join(', ');
     }
     
-    // Actualizar operación
+    // ════════════════════════════════════════════════════════════════════
+    // ACTUALIZAR OPERACIÓN
+    // ════════════════════════════════════════════════════════════════════
+    
     await operacion.update({
       estado: 'cerrado',
       fecha_cierre: new Date(),
@@ -597,19 +1132,18 @@ const cerrar = async (req, res) => {
       usuario_id: req.user.id,
       usuario_nombre: req.user.nombre_completo,
       datos_anteriores: { estado: 'en_proceso' },
-      datos_nuevos: { estado: 'cerrado' },
-      ip_address: getClientIP(req),
-      descripcion: `Operación cerrada: ${operacion.numero_operacion}`
+      datos_nuevos: { estado: 'cerrado', stock_actualizado: true },
+      ip_address: ipAddress,
+      descripcion: `Operación cerrada: ${operacion.numero_operacion} - Stock ${operacion.tipo === 'salida' ? 'descontado' : 'incrementado'}`
     });
     
     await transaction.commit();
     
-    // Enviar correo de cierre (fuera de la transacción)
+    // Enviar correo (fuera de transacción)
     let resultadoCorreo = { success: false };
     if (enviar_correo !== false && correosEnvio) {
       resultadoCorreo = await emailService.enviarCierreOperacion(operacion, correosEnvio);
       
-      // Actualizar estado del correo
       await operacion.update({
         correo_enviado: resultadoCorreo.success,
         fecha_correo_enviado: resultadoCorreo.success ? new Date() : null
@@ -618,15 +1152,18 @@ const cerrar = async (req, res) => {
     
     logger.info('Operación cerrada:', { 
       operacionId: id,
+      tipo: operacion.tipo,
+      stockActualizado: true,
       correoEnviado: resultadoCorreo.success
     });
     
     return successMessage(res, 'Operación cerrada exitosamente', {
       numero_operacion: operacion.numero_operacion,
       estado: 'cerrado',
+      stock_actualizado: true,
       correo_enviado: resultadoCorreo.success,
       correos_destino: correosEnvio,
-      preview_url: resultadoCorreo.previewUrl // Solo en desarrollo
+      preview_url: resultadoCorreo.previewUrl
     });
     
   } catch (error) {
@@ -639,6 +1176,8 @@ const cerrar = async (req, res) => {
 /**
  * DELETE /operaciones/:id
  * Anular operación
+ * 
+ * ✅ LIBERA STOCK RESERVADO Y REGISTRA EN HISTORIAL
  */
 const anular = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -646,8 +1185,9 @@ const anular = async (req, res) => {
   try {
     const { id } = req.params;
     const { motivo } = req.body;
+    const ipAddress = getClientIP(req);
     
-    const operacion = await Operacion.findByPk(id);
+    const operacion = await Operacion.findByPk(id, { transaction });
     
     if (!operacion) {
       await transaction.rollback();
@@ -659,7 +1199,35 @@ const anular = async (req, res) => {
       return errorResponse(res, 'No se puede anular una operación cerrada', 400);
     }
     
+    if (operacion.estado === 'anulado') {
+      await transaction.rollback();
+      return errorResponse(res, 'Esta operación ya está anulada', 400);
+    }
+    
     const estadoAnterior = operacion.estado;
+    
+    // ════════════════════════════════════════════════════════════════════
+    // ✅ LIBERAR STOCK RESERVADO (con registro en historial)
+    // ════════════════════════════════════════════════════════════════════
+    
+    if (operacion.tipo === 'salida') {
+      await liberarStockReservado(
+        id, 
+        operacion.numero_operacion, 
+        req.user.id, 
+        ipAddress, 
+        transaction
+      );
+      
+      logger.info('Stock liberado por anulación:', {
+        operacion_id: operacion.id,
+        numero: operacion.numero_operacion
+      });
+    }
+    
+    // ════════════════════════════════════════════════════════════════════
+    // ACTUALIZAR OPERACIÓN
+    // ════════════════════════════════════════════════════════════════════
     
     await operacion.update({
       estado: 'anulado',
@@ -673,15 +1241,25 @@ const anular = async (req, res) => {
       usuario_id: req.user.id,
       usuario_nombre: req.user.nombre_completo,
       datos_anteriores: { estado: estadoAnterior },
-      ip_address: getClientIP(req),
-      descripcion: `Operación anulada: ${operacion.numero_operacion}. Motivo: ${motivo || 'No especificado'}`
+      datos_nuevos: { 
+        estado: 'anulado',
+        stock_liberado: operacion.tipo === 'salida'
+      },
+      ip_address: ipAddress,
+      descripcion: `Operación anulada: ${operacion.numero_operacion}. Motivo: ${motivo || 'No especificado'}${operacion.tipo === 'salida' ? ' - Stock liberado' : ''}`
     });
     
     await transaction.commit();
     
-    logger.info('Operación anulada:', { operacionId: id });
+    logger.info('Operación anulada:', { 
+      operacionId: id,
+      stockLiberado: operacion.tipo === 'salida'
+    });
     
-    return successMessage(res, 'Operación anulada exitosamente');
+    return successMessage(res, 'Operación anulada exitosamente', {
+      numero_operacion: operacion.numero_operacion,
+      stock_liberado: operacion.tipo === 'salida'
+    });
     
   } catch (error) {
     await transaction.rollback();
@@ -689,7 +1267,6 @@ const anular = async (req, res) => {
     return serverError(res, 'Error al anular la operación', error);
   }
 };
-
 
 module.exports = {
   listarDocumentosWMS,

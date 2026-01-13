@@ -4,15 +4,14 @@
  * ============================================================================
  * Vista de detalle del despacho conectada al backend real.
  * 
- * CAMBIOS vs versión anterior:
- * - Eliminados MOCK_DESPACHO, MOCK_PRODUCTOS, MOCK_TIMELINE
- * - Conectado con useDespachos hook (fetchById, productos, timeline)
- * - Cambios de estado conectados a API
- * - Cancelación conectada a API
- * - Control de permisos
+ * CORRECCIÓN v2.1.0:
+ * - Usando useDespachoDetail en lugar de useDespachos
+ * - Nombres de funciones corregidos según el hook
+ * - Productos vienen del detalle del despacho (despacho.detalles)
+ * - Timeline usa auditoría del despacho si está disponible
  * 
  * @author Coordinación TI ISTHO
- * @version 2.0.0
+ * @version 2.1.0
  * @date Enero 2026
  */
 
@@ -50,9 +49,10 @@ import { Button, StatusChip, ConfirmDialog, Modal } from '../../components/commo
 import DespachoForm from './components/DespachoForm';
 
 // ════════════════════════════════════════════════════════════════════════════
-// HOOKS INTEGRADOS
+// HOOKS INTEGRADOS - Usar useDespachoDetail para páginas de detalle
 // ════════════════════════════════════════════════════════════════════════════
-import useDespachos from '../../hooks/useDespachos';
+
+import { useDespachoDetail } from '../../hooks/useDespachos';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
 
@@ -63,49 +63,43 @@ import { useAuth } from '../../context/AuthContext';
 /**
  * Item del timeline
  */
-var TimelineItem = function(props) {
-  var item = props.item;
-  var isLast = props.isLast;
-  
-  var iconConfig = {
-    creacion: { icon: FileText, bg: 'bg-slate-100', color: 'text-slate-600' },
-    asignacion: { icon: Truck, bg: 'bg-blue-100', color: 'text-blue-600' },
-    preparacion: { icon: Package, bg: 'bg-amber-100', color: 'text-amber-600' },
-    verificacion: { icon: CheckCircle, bg: 'bg-emerald-100', color: 'text-emerald-600' },
-    salida: { icon: Navigation, bg: 'bg-violet-100', color: 'text-violet-600' },
-    transito: { icon: MapPin, bg: 'bg-blue-100', color: 'text-blue-600' },
-    entrega: { icon: CheckCircle, bg: 'bg-emerald-100', color: 'text-emerald-600' },
-    incidente: { icon: AlertCircle, bg: 'bg-red-100', color: 'text-red-600' },
-    cancelacion: { icon: XCircle, bg: 'bg-red-100', color: 'text-red-600' },
-    estado: { icon: Clock, bg: 'bg-orange-100', color: 'text-orange-600' },
+const TimelineItem = ({ item, isLast }) => {
+  const iconConfig = {
+    crear: { icon: FileText, bg: 'bg-slate-100', color: 'text-slate-600' },
+    actualizar: { icon: Pencil, bg: 'bg-blue-100', color: 'text-blue-600' },
+    cerrar: { icon: CheckCircle, bg: 'bg-emerald-100', color: 'text-emerald-600' },
+    anular: { icon: XCircle, bg: 'bg-red-100', color: 'text-red-600' },
+    averia: { icon: AlertCircle, bg: 'bg-amber-100', color: 'text-amber-600' },
+    documento: { icon: FileText, bg: 'bg-violet-100', color: 'text-violet-600' },
+    transporte: { icon: Truck, bg: 'bg-blue-100', color: 'text-blue-600' },
   };
-
-  var config = iconConfig[item.tipo] || iconConfig.creacion;
-  var Icon = config.icon;
-
+  
+  const tipo = item.accion || item.tipo || 'crear';
+  const config = iconConfig[tipo] || iconConfig.crear;
+  const Icon = config.icon;
+  
   return (
     <div className="flex gap-4">
       <div className="flex flex-col items-center">
-        <div className={'w-10 h-10 rounded-full flex items-center justify-center z-10 ' + config.bg}>
-          <Icon className={'w-5 h-5 ' + config.color} />
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 ${config.bg}`}>
+          <Icon className={`w-5 h-5 ${config.color}`} />
         </div>
         {!isLast && <div className="w-0.5 flex-1 bg-slate-200 my-2" />}
       </div>
-
-      <div className={'flex-1 ' + (!isLast ? 'pb-6' : '')}>
+      <div className={`flex-1 ${!isLast ? 'pb-6' : ''}`}>
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-medium text-slate-800">{item.titulo || item.accion}</p>
-            <p className="text-sm text-slate-500 mt-0.5">{item.descripcion || item.detalle}</p>
+            <p className="font-medium text-slate-800">{item.descripcion || item.accion}</p>
+            <p className="text-sm text-slate-500 mt-0.5">{item.detalle || ''}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            {new Date(item.fecha || item.created_at).toLocaleString('es-CO')}
+            {new Date(item.created_at || item.fecha).toLocaleString('es-CO')}
           </span>
           <span>•</span>
-          <span>{item.usuario || item.usuario_nombre || 'Sistema'}</span>
+          <span>{item.usuario_nombre || item.usuario || 'Sistema'}</span>
         </div>
       </div>
     </div>
@@ -113,25 +107,32 @@ var TimelineItem = function(props) {
 };
 
 /**
- * Fila de producto
+ * Fila de producto (detalle de operación)
  */
-var ProductoRow = function(props) {
-  var producto = props.producto;
+const ProductoRow = ({ producto }) => {
+  const tieneAveria = parseFloat(producto.cantidad_averia) > 0;
   
   return (
     <div className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
-      <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-        <Package className="w-5 h-5 text-slate-500" />
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+        tieneAveria ? 'bg-red-100' : 'bg-slate-100'
+      }`}>
+        <Package className={`w-5 h-5 ${tieneAveria ? 'text-red-500' : 'text-slate-500'}`} />
       </div>
       <div className="flex-1">
-        <p className="font-medium text-slate-800">{producto.nombre || producto.producto_nombre}</p>
+        <p className="font-medium text-slate-800">{producto.producto}</p>
         <p className="text-xs text-slate-500">
-          {producto.codigo || producto.sku} • Lote: {producto.lote || 'N/A'}
+          {producto.sku} {producto.lote ? `• Lote: ${producto.lote}` : ''}
         </p>
       </div>
       <div className="text-right">
-        <p className="font-semibold text-slate-800">{(producto.cantidad || 0).toLocaleString()}</p>
-        <p className="text-xs text-slate-500">{producto.unidad || producto.unidad_medida || 'unidades'}</p>
+        <p className="font-semibold text-slate-800">{parseFloat(producto.cantidad || 0).toLocaleString()}</p>
+        <p className="text-xs text-slate-500">{producto.unidad_medida || 'UND'}</p>
+        {tieneAveria && (
+          <p className="text-xs text-red-500">
+            Avería: {parseFloat(producto.cantidad_averia).toLocaleString()}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -140,12 +141,7 @@ var ProductoRow = function(props) {
 /**
  * Tarjeta de información
  */
-var InfoCard = function(props) {
-  var title = props.title;
-  var Icon = props.icon;
-  var children = props.children;
-  var action = props.action;
-  
+const InfoCard = ({ title, icon: Icon, children, action }) => {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -161,96 +157,71 @@ var InfoCard = function(props) {
 };
 
 /**
- * Modal de cambio de estado
+ * Modal de cierre de operación
  */
-var EstadoChangeModal = function(props) {
-  var isOpen = props.isOpen;
-  var onClose = props.onClose;
-  var onSubmit = props.onSubmit;
-  var currentEstado = props.currentEstado;
-  var loading = props.loading;
+const CierreModal = ({ isOpen, onClose, onSubmit, loading }) => {
+  const [observaciones, setObservaciones] = useState('');
+  const [enviarCorreo, setEnviarCorreo] = useState(true);
   
-  var _a = useState(''), nuevoEstado = _a[0], setNuevoEstado = _a[1];
-  var _b = useState(''), observacion = _b[0], setObservacion = _b[1];
-
-  var estados = [
-    { value: 'programado', label: 'Programado', disabled: ['en_transito', 'completado'].includes(currentEstado) },
-    { value: 'en_preparacion', label: 'En Preparación', disabled: ['en_transito', 'completado'].includes(currentEstado) },
-    { value: 'en_transito', label: 'En Tránsito', disabled: ['completado'].includes(currentEstado) },
-    { value: 'completado', label: 'Completado', disabled: false },
-  ];
-
-  var handleSubmit = function() {
-    if (!nuevoEstado) return;
-    onSubmit({ estado: nuevoEstado, observacion: observacion });
+  const handleSubmit = () => {
+    onSubmit({ 
+      observaciones_cierre: observaciones,
+      enviar_correo: enviarCorreo
+    });
   };
-
-  useEffect(function() {
+  
+  useEffect(() => {
     if (isOpen) {
-      setNuevoEstado('');
-      setObservacion('');
+      setObservaciones('');
+      setEnviarCorreo(true);
     }
   }, [isOpen]);
-
+  
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Cambiar Estado"
+      title="Cerrar Operación"
       size="sm"
       footer={
         <>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSubmit} loading={loading} disabled={!nuevoEstado}>
-            Actualizar Estado
+          <Button variant="primary" onClick={handleSubmit} loading={loading}>
+            Cerrar Operación
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Nuevo Estado
-          </label>
-          <div className="space-y-2">
-            {estados.map(function(e) {
-              return (
-                <label
-                  key={e.value}
-                  className={
-                    'flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ' +
-                    (e.disabled ? 'opacity-50 cursor-not-allowed bg-slate-50 ' : 'hover:bg-slate-50 ') +
-                    (nuevoEstado === e.value ? 'border-orange-500 bg-orange-50' : 'border-slate-200')
-                  }
-                >
-                  <input
-                    type="radio"
-                    name="estado"
-                    value={e.value}
-                    checked={nuevoEstado === e.value}
-                    onChange={function() { if (!e.disabled) setNuevoEstado(e.value); }}
-                    disabled={e.disabled}
-                    className="w-4 h-4 text-orange-500 focus:ring-orange-500"
-                  />
-                  <span className="text-sm text-slate-700">{e.label}</span>
-                </label>
-              );
-            })}
-          </div>
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <p className="text-sm text-amber-700">
+            <strong>⚠️ Importante:</strong> Al cerrar la operación se actualizará el inventario 
+            y se enviará notificación al cliente.
+          </p>
         </div>
-
+        
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            Observación (opcional)
+            Observaciones de cierre (opcional)
           </label>
           <textarea
-            value={observacion}
-            onChange={function(e) { setObservacion(e.target.value); }}
-            placeholder="Agregar nota sobre el cambio de estado..."
-            rows={2}
+            value={observaciones}
+            onChange={(e) => setObservaciones(e.target.value)}
+            placeholder="Agregar notas sobre el cierre..."
+            rows={3}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
+        
+        <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50">
+          <input
+            type="checkbox"
+            checked={enviarCorreo}
+            onChange={(e) => setEnviarCorreo(e.target.checked)}
+            className="w-4 h-4 text-orange-500 focus:ring-orange-500 rounded"
+          />
+          <span className="text-sm text-slate-700">Enviar correo de notificación al cliente</span>
+        </label>
       </div>
     </Modal>
   );
@@ -259,115 +230,101 @@ var EstadoChangeModal = function(props) {
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
-var DespachoDetail = function() {
-  var params = useParams();
-  var id = params.id;
-  var navigate = useNavigate();
-  var authHook = useAuth();
-  var hasPermission = authHook.hasPermission;
-  var notif = useNotification();
-  var success = notif.success;
-  var apiError = notif.apiError;
-  var despachoCerrado = notif.despachoCerrado;
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // HOOK DE DESPACHOS
-  // ──────────────────────────────────────────────────────────────────────────
-  var despachosHook = useDespachos({ autoFetch: false });
+const DespachoDetail = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const { success, apiError } = useNotification();
   
-  var currentDespacho = despachosHook.currentDespacho;
-  var loading = despachosHook.loading;
-  var error = despachosHook.error;
-  var productos = despachosHook.despachoProductos;
-  var timeline = despachosHook.despachoTimeline;
-  var loadingProductos = despachosHook.loadingProductos;
-  var loadingTimeline = despachosHook.loadingTimeline;
-  var fetchById = despachosHook.fetchById;
-  var fetchDespachoProductos = despachosHook.fetchDespachoProductos;
-  var fetchDespachoTimeline = despachosHook.fetchDespachoTimeline;
-  var updateDespacho = despachosHook.updateDespacho;
-  var cancelarDespacho = despachosHook.cancelarDespacho;
-  var cambiarEstado = despachosHook.cambiarEstado;
-
+  // ──────────────────────────────────────────────────────────────────────────
+  // HOOK DE DESPACHO INDIVIDUAL - Optimizado para páginas de detalle
+  // ──────────────────────────────────────────────────────────────────────────
+  
+  const {
+    despacho,
+    loading,
+    error,
+    puedeCerrar,
+    operationLoading,
+    refresh,
+    actualizarTransporte,
+    registrarAveria,
+    subirDocumento,
+    cerrar,
+    anular,
+  } = useDespachoDetail(id, true);  // true = autoFetch
+  
   // ──────────────────────────────────────────────────────────────────────────
   // ESTADOS LOCALES
   // ──────────────────────────────────────────────────────────────────────────
-  var _a = useState('info'), activeTab = _a[0], setActiveTab = _a[1];
-
+  
+  const [activeTab, setActiveTab] = useState('info');
+  
   // Modals
-  var _b = useState(false), editModal = _b[0], setEditModal = _b[1];
-  var _c = useState(false), estadoModal = _c[0], setEstadoModal = _c[1];
-  var _d = useState(false), cancelModal = _d[0], setCancelModal = _d[1];
-  var _e = useState(false), formLoading = _e[0], setFormLoading = _e[1];
-
+  const [editModal, setEditModal] = useState(false);
+  const [cierreModal, setCierreModal] = useState(false);
+  const [anularModal, setAnularModal] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  
   // Permisos
-  var canEdit = hasPermission('despachos', 'editar');
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // CARGAR DATOS
-  // ──────────────────────────────────────────────────────────────────────────
-  useEffect(function() {
-    if (id) {
-      fetchById(id);
-      fetchDespachoProductos(id);
-      fetchDespachoTimeline(id);
-    }
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  const canEdit = hasPermission('despachos', 'editar');
+  
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
   
-  var handleEditDespacho = async function(data) {
+  const handleEditTransporte = async (data) => {
     setFormLoading(true);
     try {
-      await updateDespacho(id, data);
-      success('Despacho actualizado correctamente');
+      // Solo actualizar datos de transporte
+      await actualizarTransporte({
+        origen: data.origen,
+        destino: data.destino,
+        vehiculo_placa: data.vehiculo_placa,
+        vehiculo_tipo: data.vehiculo_tipo,
+        conductor_nombre: data.conductor_nombre,
+        conductor_cedula: data.conductor_cedula,
+        conductor_telefono: data.conductor_telefono,
+      });
+      success('Información de transporte actualizada');
       setEditModal(false);
+      refresh();
     } catch (err) {
       apiError(err);
     } finally {
       setFormLoading(false);
     }
   };
-
-  var handleEstadoChange = async function(data) {
+  
+  const handleCerrar = async (cierreData) => {
     setFormLoading(true);
     try {
-      await cambiarEstado(id, data.estado, data.observacion);
-      
-      if (data.estado === 'completado') {
-        despachoCerrado(currentDespacho.numero || id);
-      } else {
-        success('Estado actualizado a ' + data.estado.replace('_', ' '));
-      }
-      
-      // Refrescar timeline
-      fetchDespachoTimeline(id);
-      setEstadoModal(false);
+      await cerrar(cierreData);
+      success('Operación cerrada exitosamente');
+      setCierreModal(false);
+      refresh();
     } catch (err) {
       apiError(err);
     } finally {
       setFormLoading(false);
     }
   };
-
-  var handleCancelDespacho = async function() {
+  
+  const handleAnular = async () => {
     setFormLoading(true);
     try {
-      await cancelarDespacho(id, { motivo: 'Cancelado por usuario' });
-      success('Despacho cancelado correctamente');
-      setCancelModal(false);
-      // Refrescar datos
-      fetchById(id);
-      fetchDespachoTimeline(id);
+      await anular('Anulado por usuario');
+      success('Operación anulada correctamente');
+      setAnularModal(false);
+      refresh();
     } catch (err) {
       apiError(err);
     } finally {
       setFormLoading(false);
     }
   };
-
+  
   // ──────────────────────────────────────────────────────────────────────────
   // LOADING STATE
   // ──────────────────────────────────────────────────────────────────────────
@@ -380,21 +337,21 @@ var DespachoDetail = function() {
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-48" />
             <div className="grid grid-cols-3 gap-4">
-              {[0, 1, 2].map(function(i) {
-                return <div key={i} className="h-48 bg-gray-200 rounded-2xl" />;
-              })}
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-48 bg-gray-200 rounded-2xl" />
+              ))}
             </div>
           </div>
         </main>
       </div>
     );
   }
-
+  
   // ──────────────────────────────────────────────────────────────────────────
   // ERROR STATE
   // ──────────────────────────────────────────────────────────────────────────
   
-  if (error || !currentDespacho) {
+  if (error || !despacho) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <FloatingHeader />
@@ -403,9 +360,9 @@ var DespachoDetail = function() {
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Truck className="w-8 h-8 text-red-500" />
             </div>
-            <h2 className="text-xl font-bold text-slate-800 mb-2">Despacho no encontrado</h2>
-            <p className="text-slate-500 mb-4">{error || 'El despacho solicitado no existe'}</p>
-            <Button variant="primary" onClick={function() { navigate('/despachos'); }}>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Operación no encontrada</h2>
+            <p className="text-slate-500 mb-4">{error || 'La operación solicitada no existe'}</p>
+            <Button variant="primary" onClick={() => navigate('/despachos')}>
               Volver a Despachos
             </Button>
           </div>
@@ -413,22 +370,33 @@ var DespachoDetail = function() {
       </div>
     );
   }
-
+  
   // ──────────────────────────────────────────────────────────────────────────
   // VARIABLES CALCULADAS
   // ──────────────────────────────────────────────────────────────────────────
   
-  var despacho = currentDespacho;
-  var totalProductos = productos.length;
-  var totalUnidades = productos.reduce(function(sum, p) { return sum + (p.cantidad || 0); }, 0);
-  var isEditable = !['completado', 'cancelado'].includes(despacho.estado);
-
-  var tabs = [
+  // Productos vienen del detalle de la operación
+  const productos = despacho.detalles || [];
+  const totalProductos = productos.length;
+  const totalUnidades = productos.reduce((sum, p) => sum + (parseFloat(p.cantidad) || 0), 0);
+  const totalAverias = productos.reduce((sum, p) => sum + (parseFloat(p.cantidad_averia) || 0), 0);
+  
+  // Documentos adjuntos
+  const documentos = despacho.documentos || [];
+  
+  // Averías registradas
+  const averias = despacho.averias || [];
+  
+  // Estado editable
+  const isEditable = ['pendiente', 'en_proceso'].includes(despacho.estado);
+  
+  // Tabs disponibles
+  const tabs = [
     { id: 'info', label: 'Información' },
-    { id: 'productos', label: 'Productos (' + totalProductos + ')' },
-    { id: 'timeline', label: 'Timeline' },
+    { id: 'productos', label: `Productos (${totalProductos})` },
+    { id: 'documentos', label: `Documentos (${documentos.length})` },
   ];
-
+  
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
@@ -436,72 +404,111 @@ var DespachoDetail = function() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <FloatingHeader />
-
+      
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* HEADER */}
         {/* ════════════════════════════════════════════════════════════════ */}
+        
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={function() { navigate('/despachos'); }}
+              onClick={() => navigate('/despachos')}
               className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
+            
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
-                <Truck className="w-7 h-7 text-slate-600" />
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                despacho.tipo === 'ingreso' ? 'bg-green-100' : 'bg-blue-100'
+              }`}>
+                <Truck className={`w-7 h-7 ${
+                  despacho.tipo === 'ingreso' ? 'text-green-600' : 'text-blue-600'
+                }`} />
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-slate-800">{despacho.numero || despacho.id}</h1>
+                  <h1 className="text-2xl font-bold text-slate-800">
+                    {despacho.numero_operacion}
+                  </h1>
                   <StatusChip status={despacho.estado} />
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                    despacho.tipo === 'ingreso' 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {despacho.tipo === 'ingreso' ? 'INGRESO' : 'SALIDA'}
+                  </span>
                   {despacho.prioridad === 'urgente' && (
                     <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
                       URGENTE
                     </span>
                   )}
                 </div>
-                <p className="text-slate-500">{despacho.cliente_nombre || despacho.cliente}</p>
+                <p className="text-slate-500">
+                  {despacho.cliente?.razon_social || 'Sin cliente'}
+                </p>
               </div>
             </div>
           </div>
-
+          
           <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              icon={RefreshCw} 
+              onClick={refresh}
+              title="Actualizar"
+            />
+            
             {isEditable && canEdit && (
               <>
-                <Button variant="outline" onClick={function() { setEstadoModal(true); }}>
-                  Cambiar Estado
+                <Button 
+                  variant="outline" 
+                  icon={Pencil} 
+                  onClick={() => setEditModal(true)}
+                >
+                  Editar Transporte
                 </Button>
-                <Button variant="outline" icon={Pencil} onClick={function() { setEditModal(true); }}>
-                  Editar
+                
+                <Button 
+                  variant="primary" 
+                  icon={CheckCircle} 
+                  onClick={() => setCierreModal(true)}
+                  disabled={!puedeCerrar && documentos.length === 0}
+                >
+                  Cerrar Operación
+                </Button>
+                
+                <Button 
+                  variant="danger" 
+                  icon={XCircle} 
+                  onClick={() => setAnularModal(true)}
+                >
+                  Anular
                 </Button>
               </>
             )}
+            
             <Button variant="outline" icon={Printer}>
               Imprimir
             </Button>
-            {isEditable && canEdit && (
-              <Button variant="danger" icon={XCircle} onClick={function() { setCancelModal(true); }}>
-                Cancelar
-              </Button>
-            )}
           </div>
         </div>
-
+        
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* MAIN GRID */}
         {/* ════════════════════════════════════════════════════════════════ */}
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Info */}
           <div className="lg:col-span-2 space-y-6">
             {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
                 <Package className="w-8 h-8 text-blue-500 mx-auto mb-2" />
                 <p className="text-2xl font-bold text-slate-800">{totalProductos}</p>
-                <p className="text-sm text-slate-500">Productos</p>
+                <p className="text-sm text-slate-500">Referencias</p>
               </div>
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
                 <Package className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
@@ -509,257 +516,313 @@ var DespachoDetail = function() {
                 <p className="text-sm text-slate-500">Unidades</p>
               </div>
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
-                <Clock className="w-8 h-8 text-violet-500 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-slate-800">{despacho.hora_estimada || despacho.horaEstimada || '--:--'}</p>
-                <p className="text-sm text-slate-500">ETA</p>
+                <AlertCircle className={`w-8 h-8 mx-auto mb-2 ${
+                  totalAverias > 0 ? 'text-red-500' : 'text-slate-300'
+                }`} />
+                <p className={`text-2xl font-bold ${
+                  totalAverias > 0 ? 'text-red-600' : 'text-slate-800'
+                }`}>{totalAverias.toLocaleString()}</p>
+                <p className="text-sm text-slate-500">Averías</p>
+              </div>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
+                <FileText className="w-8 h-8 text-violet-500 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-slate-800">{documentos.length}</p>
+                <p className="text-sm text-slate-500">Documentos</p>
               </div>
             </div>
-
+            
             {/* Tabs Content */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
               <div className="border-b border-gray-100">
                 <nav className="flex px-6">
-                  {tabs.map(function(tab) {
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={function() { setActiveTab(tab.id); }}
-                        className={
-                          'py-4 px-4 text-sm font-medium transition-colors relative ' +
-                          (activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700')
-                        }
-                      >
-                        {tab.label}
-                        {activeTab === tab.id && (
-                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
-                        )}
-                      </button>
-                    );
-                  })}
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${
+                        activeTab === tab.id 
+                          ? 'text-orange-600' 
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {tab.label}
+                      {activeTab === tab.id && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+                      )}
+                    </button>
+                  ))}
                 </nav>
               </div>
-
+              
               <div className="p-6">
                 {/* Tab: Info */}
                 {activeTab === 'info' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      <h4 className="font-semibold text-slate-800">Destino</h4>
+                      <h4 className="font-semibold text-slate-800">
+                        {despacho.tipo === 'salida' ? 'Destino' : 'Origen'}
+                      </h4>
                       <div className="space-y-3">
                         <div className="flex items-start gap-3 text-sm">
                           <Building2 className="w-5 h-5 text-slate-400 mt-0.5" />
                           <div>
-                            <p className="text-slate-800 font-medium">{despacho.cliente_nombre || despacho.cliente}</p>
-                            <p className="text-slate-500">NIT: {despacho.cliente_nit || despacho.clienteNit || '-'}</p>
+                            <p className="text-slate-800 font-medium">
+                              {despacho.cliente?.razon_social || '-'}
+                            </p>
+                            <p className="text-slate-500">
+                              NIT: {despacho.cliente?.nit || '-'}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-start gap-3 text-sm">
                           <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
                           <div>
-                            <p className="text-slate-800">{despacho.direccion_destino || despacho.direccion || '-'}</p>
-                            <p className="text-slate-500">{despacho.ciudad_destino || despacho.destino || '-'}</p>
+                            <p className="text-slate-800">
+                              {despacho.tipo === 'salida' 
+                                ? (despacho.destino || '-') 
+                                : (despacho.origen || '-')
+                              }
+                            </p>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3 text-sm">
-                          <User className="w-5 h-5 text-slate-400" />
-                          <span className="text-slate-800">{despacho.contacto_nombre || despacho.contacto || '-'}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-sm">
-                          <Phone className="w-5 h-5 text-slate-400" />
-                          <span className="text-slate-800">{despacho.contacto_telefono || despacho.contactoTelefono || '-'}</span>
                         </div>
                       </div>
                     </div>
-
+                    
                     <div className="space-y-4">
                       <h4 className="font-semibold text-slate-800">Transporte</h4>
                       <div className="space-y-3">
                         <div className="flex items-center gap-3 text-sm">
                           <Truck className="w-5 h-5 text-slate-400" />
                           <div>
-                            <p className="text-slate-800 font-medium">{despacho.vehiculo || 'Sin asignar'}</p>
-                            <p className="text-slate-500">{despacho.vehiculo_tipo || despacho.vehiculoTipo || '-'}</p>
+                            <p className="text-slate-800 font-medium">
+                              {despacho.vehiculo_placa || 'Sin asignar'}
+                            </p>
+                            <p className="text-slate-500">
+                              {despacho.vehiculo_tipo || '-'}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <User className="w-5 h-5 text-slate-400" />
-                          <span className="text-slate-800">{despacho.conductor || 'Sin asignar'}</span>
+                          <span className="text-slate-800">
+                            {despacho.conductor_nombre || 'Sin asignar'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <Phone className="w-5 h-5 text-slate-400" />
-                          <span className="text-slate-800">{despacho.conductor_telefono || despacho.conductorTelefono || '-'}</span>
+                          <span className="text-slate-800">
+                            {despacho.conductor_telefono || '-'}
+                          </span>
                         </div>
                       </div>
                     </div>
-
-                    {despacho.instrucciones && (
+                    
+                    {despacho.observaciones && (
                       <div className="md:col-span-2 space-y-2">
-                        <h4 className="font-semibold text-slate-800">Instrucciones de Entrega</h4>
-                        <p className="text-sm text-slate-600 bg-amber-50 p-4 rounded-xl border border-amber-100">
-                          {despacho.instrucciones}
+                        <h4 className="font-semibold text-slate-800">Observaciones</h4>
+                        <p className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                          {despacho.observaciones}
                         </p>
                       </div>
                     )}
                   </div>
                 )}
-
+                
                 {/* Tab: Productos */}
                 {activeTab === 'productos' && (
                   <div>
-                    {loadingProductos ? (
-                      <div className="space-y-3">
-                        {[0, 1, 2].map(function(i) {
-                          return <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />;
-                        })}
-                      </div>
-                    ) : productos.length === 0 ? (
+                    {productos.length === 0 ? (
                       <div className="py-12 text-center">
                         <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-slate-500">No hay productos en este despacho</p>
+                        <p className="text-slate-500">No hay productos en esta operación</p>
                       </div>
                     ) : (
                       <>
-                        {productos.map(function(producto) {
-                          return <ProductoRow key={producto.id} producto={producto} />;
-                        })}
+                        {productos.map((producto) => (
+                          <ProductoRow key={producto.id} producto={producto} />
+                        ))}
                         <div className="flex justify-between items-center pt-4 mt-4 border-t border-gray-100">
                           <span className="text-sm text-slate-500">Total</span>
-                          <span className="font-bold text-slate-800">{totalUnidades.toLocaleString()} unidades</span>
+                          <div className="text-right">
+                            <span className="font-bold text-slate-800">
+                              {totalUnidades.toLocaleString()} unidades
+                            </span>
+                            {totalAverias > 0 && (
+                              <span className="text-sm text-red-500 ml-2">
+                                ({totalAverias.toLocaleString()} averías)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
                   </div>
                 )}
-
-                {/* Tab: Timeline */}
-                {activeTab === 'timeline' && (
+                
+                {/* Tab: Documentos */}
+                {activeTab === 'documentos' && (
                   <div>
-                    {loadingTimeline ? (
-                      <div className="space-y-4">
-                        {[0, 1, 2].map(function(i) {
-                          return <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />;
-                        })}
-                      </div>
-                    ) : timeline.length === 0 ? (
+                    {documentos.length === 0 ? (
                       <div className="py-12 text-center">
-                        <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-slate-500">No hay eventos en el timeline</p>
+                        <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-500">No hay documentos adjuntos</p>
+                        {isEditable && (
+                          <Button variant="outline" className="mt-4" icon={Camera}>
+                            Subir Documento
+                          </Button>
+                        )}
                       </div>
                     ) : (
-                      timeline.map(function(item, idx) {
-                        return (
-                          <TimelineItem 
-                            key={item.id} 
-                            item={item} 
-                            isLast={idx === timeline.length - 1}
-                          />
-                        );
-                      })
+                      <div className="space-y-3">
+                        {documentos.map((doc) => (
+                          <div 
+                            key={doc.id}
+                            className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
+                          >
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-8 h-8 text-violet-500" />
+                              <div>
+                                <p className="font-medium text-slate-800">{doc.nombre}</p>
+                                <p className="text-xs text-slate-500">
+                                  {doc.tipo_documento} • {new Date(doc.created_at).toLocaleDateString('es-CO')}
+                                </p>
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="sm">
+                              Descargar
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
               </div>
             </div>
           </div>
-
+          
           {/* Right Column - Side Info */}
           <div className="space-y-6">
             {/* Fechas */}
-            <InfoCard title="Programación" icon={Calendar}>
+            <InfoCard title="Información" icon={Calendar}>
               <div className="space-y-4">
                 <div>
-                  <p className="text-xs text-slate-400 mb-1">Fecha Programada</p>
-                  <p className="font-medium text-slate-800">{despacho.fecha_programada || despacho.fechaProgramada || '-'}</p>
+                  <p className="text-xs text-slate-400 mb-1">Fecha Operación</p>
+                  <p className="font-medium text-slate-800">
+                    {despacho.fecha_operacion || '-'}
+                  </p>
                 </div>
+                {despacho.documento_wms && (
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Documento WMS</p>
+                    <p className="font-medium text-slate-800">{despacho.documento_wms}</p>
+                  </div>
+                )}
+                {despacho.fecha_cierre && (
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Fecha de Cierre</p>
+                    <p className="font-medium text-emerald-600">
+                      {new Date(despacho.fecha_cierre).toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                )}
                 <div>
-                  <p className="text-xs text-slate-400 mb-1">Hora Estimada</p>
-                  <p className="font-medium text-slate-800">{despacho.hora_estimada || despacho.horaEstimada || '-'}</p>
+                  <p className="text-xs text-slate-400 mb-1">Prioridad</p>
+                  <p className={`font-medium capitalize ${
+                    despacho.prioridad === 'urgente' ? 'text-red-600' :
+                    despacho.prioridad === 'alta' ? 'text-orange-600' :
+                    'text-slate-800'
+                  }`}>
+                    {despacho.prioridad || 'normal'}
+                  </p>
                 </div>
-                {(despacho.fecha_salida || despacho.fechaSalida) && (
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Fecha de Salida</p>
-                    <p className="font-medium text-emerald-600">{despacho.fecha_salida || despacho.fechaSalida}</p>
-                  </div>
-                )}
-                {(despacho.fecha_entrega || despacho.fechaEntrega) && (
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Fecha de Entrega</p>
-                    <p className="font-medium text-emerald-600">{despacho.fecha_entrega || despacho.fechaEntrega}</p>
-                  </div>
-                )}
               </div>
             </InfoCard>
-
-            {/* Acciones Rápidas */}
-            {despacho.estado === 'en_transito' && (
-              <InfoCard title="Acciones Rápidas" icon={Navigation}>
-                <div className="space-y-2">
-                  <Button variant="outline" icon={MapPin} fullWidth>
-                    Ver en Mapa
-                  </Button>
-                  <Button variant="outline" icon={Phone} fullWidth>
-                    Llamar Conductor
-                  </Button>
-                  <Button variant="outline" icon={MessageSquare} fullWidth>
-                    Enviar Mensaje
-                  </Button>
-                  <Button variant="outline" icon={Camera} fullWidth>
-                    Solicitar Evidencia
-                  </Button>
-                </div>
-              </InfoCard>
-            )}
-
-            {/* Info de Creación */}
-            <InfoCard title="Información" icon={FileText}>
+            
+            {/* Creación */}
+            <InfoCard title="Registro" icon={FileText}>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Creado por</span>
-                  <span className="text-slate-800">{despacho.creado_por || despacho.createdBy || '-'}</span>
+                  <span className="text-slate-800">
+                    {despacho.creador?.nombre_completo || '-'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Fecha creación</span>
                   <span className="text-slate-800">
-                    {despacho.created_at ? new Date(despacho.created_at).toLocaleString('es-CO') : despacho.createdAt || '-'}
+                    {despacho.created_at 
+                      ? new Date(despacho.created_at).toLocaleDateString('es-CO') 
+                      : '-'
+                    }
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Prioridad</span>
-                  <span className="text-slate-800 capitalize">{despacho.prioridad || 'normal'}</span>
-                </div>
+                {despacho.cerrador && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Cerrado por</span>
+                    <span className="text-slate-800">
+                      {despacho.cerrador?.nombre_completo || '-'}
+                    </span>
+                  </div>
+                )}
               </div>
             </InfoCard>
+            
+            {/* Averías */}
+            {averias.length > 0 && (
+              <InfoCard title="Averías Registradas" icon={AlertCircle}>
+                <div className="space-y-3">
+                  {averias.map((averia) => (
+                    <div 
+                      key={averia.id}
+                      className="p-3 bg-red-50 rounded-xl border border-red-100"
+                    >
+                      <p className="text-sm font-medium text-red-700">
+                        {averia.sku} - {averia.cantidad} unidades
+                      </p>
+                      <p className="text-xs text-red-600 mt-1">
+                        {averia.tipo_averia}: {averia.descripcion}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </InfoCard>
+            )}
           </div>
         </div>
       </main>
-
+      
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       
       <DespachoForm
         isOpen={editModal}
-        onClose={function() { setEditModal(false); }}
-        onSubmit={handleEditDespacho}
+        onClose={() => setEditModal(false)}
+        onSubmit={handleEditTransporte}
         despacho={despacho}
         loading={formLoading}
+        modeEdit={true}
       />
-
-      <EstadoChangeModal
-        isOpen={estadoModal}
-        onClose={function() { setEstadoModal(false); }}
-        onSubmit={handleEstadoChange}
-        currentEstado={despacho.estado}
+      
+      <CierreModal
+        isOpen={cierreModal}
+        onClose={() => setCierreModal(false)}
+        onSubmit={handleCerrar}
         loading={formLoading}
       />
-
+      
       <ConfirmDialog
-        isOpen={cancelModal}
-        onClose={function() { setCancelModal(false); }}
-        onConfirm={handleCancelDespacho}
-        title="Cancelar Despacho"
-        message="¿Estás seguro de cancelar este despacho? Esta acción notificará al cliente y liberará los productos reservados."
-        confirmText="Cancelar Despacho"
+        isOpen={anularModal}
+        onClose={() => setAnularModal(false)}
+        onConfirm={handleAnular}
+        title="Anular Operación"
+        message={`¿Estás seguro de anular la operación "${despacho.numero_operacion}"? ${
+          despacho.tipo === 'salida' 
+            ? 'Se liberará el stock reservado.' 
+            : 'Esta acción no se puede deshacer.'
+        }`}
+        confirmText="Anular Operación"
         type="danger"
         loading={formLoading}
       />

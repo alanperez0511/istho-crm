@@ -1,17 +1,17 @@
 /**
  * ============================================================================
- * ISTHO CRM - ProductoDetail (Versión Corregida v2.3.0)
+ * ISTHO CRM - ProductoDetail (Versión Corregida v2.4.0)
  * ============================================================================
  * Vista de detalle del producto conectada al backend real.
  * 
- * CORRECCIONES v2.3.0:
- * - Transformación de estadísticas para BarChart
+ * CORRECCIONES v2.4.0:
+ * - Template literals corregidos (faltaba $ en className y valores)
+ * - Formato de números corregido para evitar confusión de locale
  * - Todos los hooks ANTES de returns condicionales
- * - Template literals corregidos
  * - snake_case para campos del backend
  * 
  * @author Coordinación TI ISTHO
- * @version 2.3.0
+ * @version 2.4.0
  * @date Enero 2026
  */
 
@@ -91,6 +91,25 @@ const checkPermission = (userRole, action) => {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// HELPER DE FORMATO DE NÚMEROS
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Formatea un número para mostrar en la UI
+ * Usa formato colombiano (punto para miles, coma para decimales)
+ * @param {number} value - Valor a formatear
+ * @param {number} decimals - Decimales a mostrar (default 0)
+ * @returns {string}
+ */
+const formatNumber = (value, decimals = 0) => {
+  if (value === null || value === undefined || isNaN(value)) return '0';
+  return new Intl.NumberFormat('es-CO', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // COMPONENTES INTERNOS
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -98,19 +117,24 @@ const checkPermission = (userRole, action) => {
  * Gauge de stock visual
  */
 const StockGauge = ({ actual, minimo, maximo }) => {
-  const porcentaje = maximo > 0 ? (actual / maximo) * 100 : 0;
-  const minimoPos = maximo > 0 ? (minimo / maximo) * 100 : 0;
+  // Asegurar que los valores sean números
+  const actualNum = parseFloat(actual) || 0;
+  const minimoNum = parseFloat(minimo) || 0;
+  const maximoNum = parseFloat(maximo) || 1000;
+  
+  const porcentaje = maximoNum > 0 ? (actualNum / maximoNum) * 100 : 0;
+  const minimoPos = maximoNum > 0 ? (minimoNum / maximoNum) * 100 : 0;
   
   let statusColor = 'bg-emerald-500';
   let statusText = 'Óptimo';
   
-  if (actual === 0) {
+  if (actualNum === 0) {
     statusColor = 'bg-red-500';
     statusText = 'Agotado';
-  } else if (actual <= minimo) {
+  } else if (actualNum <= minimoNum) {
     statusColor = 'bg-amber-500';
     statusText = 'Bajo';
-  } else if (actual >= maximo * 0.9) {
+  } else if (actualNum >= maximoNum * 0.9) {
     statusColor = 'bg-blue-500';
     statusText = 'Máximo';
   }
@@ -142,21 +166,21 @@ const StockGauge = ({ actual, minimo, maximo }) => {
           <span className="font-medium text-slate-700">{statusText}</span>
         </div>
         <span className="text-slate-500">
-          {actual.toLocaleString()} / {maximo.toLocaleString()}
+          {formatNumber(actualNum)} / {formatNumber(maximoNum)}
         </span>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-gray-100">
         <div className="text-center">
-          <p className="text-2xl font-bold text-slate-800">{actual.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-slate-800">{formatNumber(actualNum)}</p>
           <p className="text-xs text-slate-500">Stock Actual</p>
         </div>
         <div className="text-center">
-          <p className="text-2xl font-bold text-amber-600">{minimo.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-amber-600">{formatNumber(minimoNum)}</p>
           <p className="text-xs text-slate-500">Mínimo</p>
         </div>
         <div className="text-center">
-          <p className="text-2xl font-bold text-blue-600">{maximo.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-blue-600">{formatNumber(maximoNum)}</p>
           <p className="text-xs text-slate-500">Máximo</p>
         </div>
       </div>
@@ -214,7 +238,7 @@ const MovimientoItem = ({ movimiento }) => {
           <div>
             <div className="flex items-center gap-2">
               <span className={`text-sm font-semibold ${isEntrada ? 'text-emerald-600' : isAjuste ? 'text-amber-600' : 'text-red-600'}`}>
-                {cantidad > 0 ? '+' : ''}{cantidad.toLocaleString()}
+                {cantidad > 0 ? '+' : ''}{formatNumber(cantidad)}
               </span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                 {iconConfig.label}
@@ -224,7 +248,7 @@ const MovimientoItem = ({ movimiento }) => {
           </div>
           <div className="text-right">
             <p className="text-sm font-medium text-slate-800">
-              Stock: {stockResultante.toLocaleString()}
+              Stock: {formatNumber(stockResultante)}
             </p>
           </div>
         </div>
@@ -258,6 +282,7 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HOOK DE INVENTARIO
   // ──────────────────────────────────────────────────────────────────────────
+  
   const {
     currentProducto,
     loadingDetail,
@@ -277,6 +302,7 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // ESTADOS LOCALES (TODOS los hooks ANTES de cualquier return)
   // ──────────────────────────────────────────────────────────────────────────
+  
   const [activeTab, setActiveTab] = useState('info');
   const [editModal, setEditModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
@@ -290,13 +316,15 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // VARIABLES DERIVADAS
   // ──────────────────────────────────────────────────────────────────────────
+  
   const producto = currentProducto || {};
   
-  const stockActual = producto.stock_actual || producto.cantidad || 0;
-  const stockMinimo = producto.stock_minimo || 0;
-  const stockMaximo = producto.stock_maximo || stockMinimo * 20 || 1000;
-  const costoUnitario = producto.costo_unitario || 0;
-  const precioVenta = producto.precio_venta || 0;
+  // ✅ Asegurar que los valores sean números
+  const stockActual = parseFloat(producto.stock_actual || producto.cantidad) || 0;
+  const stockMinimo = parseFloat(producto.stock_minimo) || 0;
+  const stockMaximo = parseFloat(producto.stock_maximo) || (stockMinimo > 0 ? stockMinimo * 10 : 1000);
+  const costoUnitario = parseFloat(producto.costo_unitario) || 0;
+  const precioVenta = parseFloat(producto.precio_venta) || 0;
   const clienteNombre = producto.cliente_nombre || producto.cliente?.razon_social || '-';
   const bodegaNombre = producto.bodega_nombre || producto.zona || producto.bodega || '-';
   const unidadMedida = producto.unidad_medida || 'UND';
@@ -311,8 +339,8 @@ const ProductoDetail = () => {
     const entradas = (movimientos || []).filter(m => m.tipo === 'entrada');
     const salidas = (movimientos || []).filter(m => m.tipo === 'salida');
     
-    const entradasMes = entradas.reduce((sum, m) => sum + Math.abs(m.cantidad || 0), 0);
-    const salidasMes = salidas.reduce((sum, m) => sum + Math.abs(m.cantidad || 0), 0);
+    const entradasMes = entradas.reduce((sum, m) => sum + Math.abs(parseFloat(m.cantidad) || 0), 0);
+    const salidasMes = salidas.reduce((sum, m) => sum + Math.abs(parseFloat(m.cantidad) || 0), 0);
     
     return {
       valorStock: stockActual * costoUnitario,
@@ -325,6 +353,7 @@ const ProductoDetail = () => {
   // ═══════════════════════════════════════════════════════════════════════════
   // TRANSFORMACIÓN DE DATOS PARA BARCHART
   // ═══════════════════════════════════════════════════════════════════════════
+  
   const chartData = useMemo(() => {
     if (!estadisticas || estadisticas.length === 0) {
       return [];
@@ -341,7 +370,6 @@ const ProductoDetail = () => {
       }
       
       // Transformar formato antiguo del backend
-      // Puede venir como "January" (MONTHNAME) o como número
       let mesLabel = item.periodo || '';
       
       if (item.mes) {
@@ -373,6 +401,7 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // EFFECTS
   // ──────────────────────────────────────────────────────────────────────────
+  
   useEffect(() => {
     if (id) {
       fetchById(id);
@@ -567,14 +596,14 @@ const ProductoDetail = () => {
           />
           <KpiCard
             title="Entradas del Mes"
-            value={`+${kpis.entradasMes.toLocaleString()}`}
+            value={`+${formatNumber(kpis.entradasMes)}`}
             icon={TrendingUp}
             iconBg="bg-blue-100"
             iconColor="text-blue-600"
           />
           <KpiCard
             title="Salidas del Mes"
-            value={`-${kpis.salidasMes.toLocaleString()}`}
+            value={`-${formatNumber(kpis.salidasMes)}`}
             icon={TrendingDown}
             iconBg="bg-red-100"
             iconColor="text-red-600"

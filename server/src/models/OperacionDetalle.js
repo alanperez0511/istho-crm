@@ -1,10 +1,14 @@
 /**
  * ISTHO CRM - Modelo OperacionDetalle
  * 
- * Detalle de productos de cada operación (del WMS).
+ * Detalle de productos de cada operación.
+ * 
+ * MODIFICACIÓN v1.1.0:
+ * - Agregado campo inventario_id para vincular con stock
+ * - Permite rastrear reservas y movimientos de inventario
  * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const { DataTypes } = require('sequelize');
@@ -24,6 +28,17 @@ module.exports = (sequelize) => {
         model: 'operaciones',
         key: 'id'
       }
+    },
+    
+    // ✅ AGREGADO: Referencia al inventario
+    inventario_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'inventario',
+        key: 'id'
+      },
+      comment: 'Referencia al registro de inventario (para gestión de stock)'
     },
     
     sku: {
@@ -89,7 +104,8 @@ module.exports = (sequelize) => {
     
     indexes: [
       { fields: ['operacion_id'] },
-      { fields: ['sku'] }
+      { fields: ['sku'] },
+      { fields: ['inventario_id'] }  // ✅ Índice para búsquedas
     ]
   });
 

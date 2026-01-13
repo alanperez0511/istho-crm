@@ -2,10 +2,15 @@
  * ISTHO CRM - Modelo Operación
  * 
  * Gestiona las operaciones de ingreso y salida de mercancía.
- * Vinculado a documentos del WMS.
+ * Vinculado a documentos del WMS (opcional para modo manual).
+ * 
+ * MODIFICACIÓN v1.1.0:
+ * - documento_wms ahora es opcional (allowNull: true)
+ * - Agregado campo vehiculo_tipo
+ * - Agregado campo prioridad
  * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const { DataTypes } = require('sequelize');
@@ -32,11 +37,11 @@ module.exports = (sequelize) => {
       allowNull: false
     },
     
-    // Referencia al documento del WMS
+    // ✅ MODIFICADO: Referencia al documento del WMS (ahora opcional)
     documento_wms: {
       type: DataTypes.STRING(50),
-      allowNull: false,
-      comment: 'Número de documento en el WMS'
+      allowNull: true,  // ← CAMBIADO de false a true
+      comment: 'Número de documento en el WMS (opcional para modo manual)'
     },
     
     // Cliente
@@ -85,6 +90,13 @@ module.exports = (sequelize) => {
       allowNull: true
     },
     
+    // ✅ AGREGADO: Tipo de vehículo
+    vehiculo_tipo: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: 'Tipo de vehículo (Furgón, Turbo, Tractomula, etc.)'
+    },
+    
     conductor_nombre: {
       type: DataTypes.STRING(150),
       allowNull: true
@@ -117,6 +129,13 @@ module.exports = (sequelize) => {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       comment: 'Total de unidades con avería'
+    },
+    
+    // ✅ AGREGADO: Prioridad de la operación
+    prioridad: {
+      type: DataTypes.ENUM('baja', 'normal', 'alta', 'urgente'),
+      defaultValue: 'normal',
+      comment: 'Prioridad de la operación'
     },
     
     // Estado
@@ -183,28 +202,29 @@ module.exports = (sequelize) => {
       { fields: ['cliente_id'] },
       { fields: ['tipo'] },
       { fields: ['estado'] },
-      { fields: ['fecha_operacion'] }
+      { fields: ['fecha_operacion'] },
+      { fields: ['prioridad'] }
     ]
   });
 
   // ============================================
   // MÉTODOS DE INSTANCIA
   // ============================================
-
+  
   /**
    * Verificar si se puede editar
    */
   Operacion.prototype.esEditable = function() {
     return ['pendiente', 'en_proceso'].includes(this.estado);
   };
-
+  
   /**
    * Verificar si se puede cerrar
    */
   Operacion.prototype.puedeCerrarse = function() {
     return this.estado === 'en_proceso';
   };
-
+  
   /**
    * Obtener resumen para correo
    */
@@ -212,7 +232,7 @@ module.exports = (sequelize) => {
     return {
       numero_operacion: this.numero_operacion,
       tipo: this.tipo === 'ingreso' ? 'INGRESO DE MERCANCÍA' : 'SALIDA DE MERCANCÍA',
-      documento_wms: this.documento_wms,
+      documento_wms: this.documento_wms || 'N/A (Manual)',
       fecha: this.fecha_operacion,
       total_referencias: this.total_referencias,
       total_unidades: this.total_unidades,
@@ -220,8 +240,16 @@ module.exports = (sequelize) => {
       origen: this.origen,
       destino: this.destino,
       placa: this.vehiculo_placa,
-      conductor: this.conductor_nombre
+      conductor: this.conductor_nombre,
+      prioridad: this.prioridad
     };
+  };
+  
+  /**
+   * Verificar si es operación manual (sin WMS)
+   */
+  Operacion.prototype.esManual = function() {
+    return !this.documento_wms;
   };
 
   return Operacion;

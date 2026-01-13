@@ -1,8 +1,12 @@
 /**
  * ISTHO CRM - Validadores de Operación
  * 
+ * MODIFICACIÓN v1.1.0:
+ * - documento_wms ahora es opcional (permite modo manual)
+ * - Agregada validación de detalles para modo manual
+ * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const { body, param, query, validationResult } = require('express-validator');
@@ -29,14 +33,20 @@ const crearOperacionValidator = [
     .notEmpty().withMessage('El tipo es requerido')
     .isIn(['ingreso', 'salida']).withMessage('Tipo debe ser "ingreso" o "salida"'),
   
+  // ✅ MODIFICADO: documento_wms ahora es OPCIONAL (permite modo manual)
   body('documento_wms')
+    .optional({ nullable: true, checkFalsy: true })
     .trim()
-    .notEmpty().withMessage('El documento WMS es requerido')
     .isLength({ max: 50 }).withMessage('El documento WMS no puede exceder 50 caracteres'),
   
   body('cliente_id')
     .notEmpty().withMessage('El cliente es requerido')
     .isInt({ min: 1 }).withMessage('ID de cliente inválido'),
+  
+  // ✅ AGREGADO: Validación de fecha_operacion
+  body('fecha_operacion')
+    .optional()
+    .isISO8601().withMessage('Fecha de operación inválida'),
   
   body('origen')
     .optional()
@@ -53,6 +63,11 @@ const crearOperacionValidator = [
     .trim()
     .isLength({ max: 10 }).withMessage('La placa no puede exceder 10 caracteres'),
   
+  body('vehiculo_tipo')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('El tipo de vehículo no puede exceder 50 caracteres'),
+  
   body('conductor_nombre')
     .optional()
     .trim()
@@ -68,10 +83,42 @@ const crearOperacionValidator = [
     .trim()
     .isLength({ max: 50 }).withMessage('El teléfono no puede exceder 50 caracteres'),
   
+  body('prioridad')
+    .optional()
+    .isIn(['baja', 'normal', 'alta', 'urgente']).withMessage('Prioridad no válida'),
+  
   body('observaciones')
     .optional()
     .trim()
     .isLength({ max: 2000 }).withMessage('Las observaciones no pueden exceder 2000 caracteres'),
+  
+  // ✅ AGREGADO: Validación de detalles para modo manual
+  body('detalles')
+    .optional()
+    .isArray().withMessage('Los detalles deben ser un array'),
+  
+  body('detalles.*.producto_id')
+    .optional()
+    .isInt({ min: 1 }).withMessage('ID de producto inválido'),
+  
+  body('detalles.*.sku')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('El SKU no puede exceder 50 caracteres'),
+  
+  body('detalles.*.producto')
+    .optional()
+    .trim()
+    .isLength({ max: 200 }).withMessage('El nombre del producto no puede exceder 200 caracteres'),
+  
+  body('detalles.*.cantidad')
+    .optional()
+    .isFloat({ min: 0.001 }).withMessage('La cantidad debe ser mayor a 0'),
+  
+  body('detalles.*.unidad_medida')
+    .optional()
+    .trim()
+    .isLength({ max: 20 }).withMessage('La unidad de medida no puede exceder 20 caracteres'),
   
   validar
 ];
