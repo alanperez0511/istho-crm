@@ -292,7 +292,7 @@ const LoginPage = () => {
                                 <span className="text-sm text-gray-600">Recordarme</span>
                             </label>
                             <Link
-                                to="/recuperar-password"
+                                to="/forgot-password"
                                 className="text-sm text-[#E65100] hover:text-[#BF360C] font-medium transition-colors"
                             >
                                 ¿Olvidaste tu contraseña?

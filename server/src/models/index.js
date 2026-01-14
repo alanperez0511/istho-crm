@@ -205,6 +205,23 @@ MovimientoInventario.belongsTo(Operacion, {
 Notificacion.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
 Usuario.hasMany(Notificacion, { foreignKey: 'usuario_id', as: 'notificaciones' });
 
+// Usuario <-> Usuario (invitaciones)
+Usuario.belongsTo(Usuario, {
+  foreignKey: 'invitado_por',
+  as: 'usuarioInvitador'
+});
+
+Usuario.hasMany(Usuario, {
+  foreignKey: 'invitado_por',
+  as: 'usuariosInvitados'
+});
+
+// Usuario <-> Cliente (para usuarios tipo cliente)
+Usuario.belongsTo(Cliente, {
+  foreignKey: 'cliente_id',
+  as: 'cliente'
+});
+
 // ============================================
 // EXPORTAR MODELOS
 // ============================================
@@ -212,7 +229,7 @@ Usuario.hasMany(Notificacion, { foreignKey: 'usuario_id', as: 'notificaciones' }
 const db = {
   sequelize,
   Sequelize: require('sequelize'),
-  
+
   // Modelos
   Usuario,
   Cliente,
@@ -237,7 +254,7 @@ db.syncModels = async (options = {}) => {
       alter: process.env.NODE_ENV === 'development',
       force: false
     };
-    
+
     await sequelize.sync({ ...defaultOptions, ...options });
     logger.info('✅ Modelos sincronizados con la base de datos');
     return true;

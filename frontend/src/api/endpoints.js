@@ -144,6 +144,7 @@ export const USUARIOS_ENDPOINTS = {
   BY_ID: (id) => `/usuarios/${id}`,
   PERFIL: '/usuarios/perfil',
   CAMBIAR_PASSWORD: '/usuarios/cambiar-password',
+  RESTABLECER_PASSWORD: '/usuarios/restablecer-password',
 };
 
 // ════════════════════════════════════════════════════════════════════════════

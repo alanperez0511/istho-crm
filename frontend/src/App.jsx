@@ -21,10 +21,10 @@ import { SnackbarProvider } from 'notistack';
 // PROVIDERS Y COMPONENTES DE AUTH
 // ════════════════════════════════════════════════════════════════════════════
 import { AuthProvider } from './context/AuthContext';
-import PrivateRoute, { 
-  AdminRoute, 
+import PrivateRoute, {
+  AdminRoute,
   SupervisorRoute,
-  OperadorRoute 
+  OperadorRoute
 } from './components/auth/PrivateRoute';
 
 // Layout
@@ -53,6 +53,8 @@ const PageLoader = () => (
 
 // Auth (públicas)
 const Login = lazy(() => import('./pages/Auth/Login'));
+const ForgotPassword = lazy(() => import('./pages/Auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/Auth/ResetPassword'));
 
 // Dashboard
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -141,6 +143,8 @@ function App() {
               {/* RUTAS PÚBLICAS */}
               {/* ══════════════════════════════════════════════════════════ */}
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
               {/* ══════════════════════════════════════════════════════════ */}
               {/* RUTAS PROTEGIDAS - Requieren autenticación */}
@@ -204,7 +208,7 @@ function App() {
               {/* ══════════════════════════════════════════════════════════ */}
               {/* REDIRECCIONES */}
               {/* ══════════════════════════════════════════════════════════ */}
-              
+
               {/* Raíz redirige a login */}
               <Route path="/" element={<Navigate to="/login" replace />} />
 

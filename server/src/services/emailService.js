@@ -1,10 +1,12 @@
 /**
+ * ============================================================================
  * ISTHO CRM - Servicio de Email
+ * ============================================================================
  * 
  * Servicio principal para envío de correos electrónicos.
  * 
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const fs = require('fs');
@@ -24,25 +26,25 @@ const loadTemplate = (templateName) => {
   if (templateCache[templateName]) {
     return templateCache[templateName];
   }
-  
+
   const templatePath = path.join(__dirname, '../templates/email', `${templateName}.html`);
   const basePath = path.join(__dirname, '../templates/email/base.html');
-  
+
+  // ✅ CORREGIDO: Error de sintaxis en template literal
   if (!fs.existsSync(templatePath)) {
     throw new Error(`Plantilla no encontrada: ${templateName}`);
   }
-  
+
   const templateContent = fs.readFileSync(templatePath, 'utf8');
   const baseContent = fs.readFileSync(basePath, 'utf8');
-  
+
   // Compilar plantilla de contenido
   const contentTemplate = Handlebars.compile(templateContent);
   
   // Compilar plantilla base
   const baseTemplate = Handlebars.compile(baseContent);
-  
+
   templateCache[templateName] = { contentTemplate, baseTemplate };
-  
   return templateCache[templateName];
 };
 
@@ -60,7 +62,7 @@ const renderEmail = (templateName, data) => {
     asunto: data.asunto || 'Notificación ISTHO CRM',
     contenido
   });
-  
+
   return html;
 };
 
@@ -78,10 +80,10 @@ const enviarCorreo = async ({
 }) => {
   try {
     const transporter = await getTransporter();
-    
+
     // Renderizar HTML
     const html = renderEmail(templateName, { ...datos, asunto });
-    
+
     // Preparar opciones
     const mailOptions = {
       from: `"${defaultFrom.name}" <${defaultFrom.address}>`,
@@ -91,15 +93,15 @@ const enviarCorreo = async ({
       // Versión texto plano (básica)
       text: `${asunto}\n\nEste correo contiene contenido HTML. Por favor, visualícelo en un cliente compatible.`
     };
-    
+
     if (cc) {
       mailOptions.cc = Array.isArray(cc) ? cc.join(', ') : cc;
     }
-    
+
     if (cco) {
       mailOptions.bcc = Array.isArray(cco) ? cco.join(', ') : cco;
     }
-    
+
     // Adjuntos
     if (adjuntos.length > 0) {
       mailOptions.attachments = adjuntos.map(adj => ({
@@ -108,16 +110,16 @@ const enviarCorreo = async ({
         contentType: adj.tipo
       }));
     }
-    
+
     // Enviar
     const info = await transporter.sendMail(mailOptions);
-    
+
     logger.info('📧 Correo enviado:', {
       messageId: info.messageId,
       to: mailOptions.to,
       subject: asunto
     });
-    
+
     // Si es Ethereal, mostrar URL de previsualización
     if (info.messageId && process.env.NODE_ENV === 'development') {
       const previewUrl = nodemailer.getTestMessageUrl(info);
@@ -125,20 +127,20 @@ const enviarCorreo = async ({
         logger.info('📧 Preview URL:', previewUrl);
       }
     }
-    
+
     return {
       success: true,
       messageId: info.messageId,
       previewUrl: nodemailer.getTestMessageUrl(info)
     };
-    
+
   } catch (error) {
-    logger.error('❌ Error al enviar correo:', { 
+    logger.error('❌ Error al enviar correo:', {
       message: error.message,
       to: para,
       subject: asunto
     });
-    
+
     return {
       success: false,
       error: error.message
@@ -146,9 +148,9 @@ const enviarCorreo = async ({
   }
 };
 
-// =============================================
+// ════════════════════════════════════════════════════════════════════════════
 // FUNCIONES ESPECÍFICAS DE NOTIFICACIÓN
-// =============================================
+// ════════════════════════════════════════════════════════════════════════════
 
 /**
  * Enviar notificación de cierre de operación
@@ -178,7 +180,7 @@ const enviarCierreOperacion = async (operacion, correosDestino) => {
       conductorTelefono: operacion.conductor_telefono || 'No especificado',
       observaciones: operacion.observaciones_cierre || operacion.observaciones
     };
-    
+
     // Preparar adjuntos (documentos de cumplido)
     const adjuntos = [];
     if (operacion.documentos && operacion.documentos.length > 0) {
@@ -193,15 +195,15 @@ const enviarCierreOperacion = async (operacion, correosDestino) => {
         }
       }
     }
-    
+
     // Parsear correos
     const correos = correosDestino.split(',').map(c => c.trim()).filter(c => c);
-    
+
     if (correos.length === 0) {
       logger.warn('No hay correos destino para enviar notificación de cierre');
       return { success: false, error: 'Sin destinatarios' };
     }
-    
+
     return await enviarCorreo({
       para: correos,
       asunto: `[ISTHO] ${datos.tipoOperacion} - ${operacion.numero_operacion}`,
@@ -209,7 +211,7 @@ const enviarCierreOperacion = async (operacion, correosDestino) => {
       datos,
       adjuntos
     });
-    
+
   } catch (error) {
     logger.error('Error al enviar cierre de operación:', { message: error.message });
     return { success: false, error: error.message };
@@ -221,35 +223,35 @@ const enviarCierreOperacion = async (operacion, correosDestino) => {
  */
 const enviarAlertaInventario = async (alertas, correosDestino) => {
   try {
-    const correos = Array.isArray(correosDestino) 
-      ? correosDestino 
+    const correos = Array.isArray(correosDestino)
+      ? correosDestino
       : correosDestino.split(',').map(c => c.trim());
-    
+
     const datos = {
       stockBajo: alertas.stockBajo || [],
       proximosVencer: alertas.proximosVencer || [],
       vencidos: alertas.vencidos || [],
       urlInventario: `${process.env.APP_URL}/inventario`
     };
-    
+
     // Formatear fechas
     datos.proximosVencer = datos.proximosVencer.map(item => ({
       ...item,
       fecha_vencimiento: new Date(item.fecha_vencimiento).toLocaleDateString('es-CO')
     }));
-    
+
     datos.vencidos = datos.vencidos.map(item => ({
       ...item,
       fecha_vencimiento: new Date(item.fecha_vencimiento).toLocaleDateString('es-CO')
     }));
-    
+
     return await enviarCorreo({
       para: correos,
       asunto: '[ISTHO] ⚠️ Alerta de Inventario',
       templateName: 'alerta-inventario',
       datos
     });
-    
+
   } catch (error) {
     logger.error('Error al enviar alerta de inventario:', { message: error.message });
     return { success: false, error: error.message };
@@ -269,24 +271,120 @@ const enviarBienvenida = async (usuario, passwordTemporal = null) => {
       passwordTemporal,
       urlLogin: `${process.env.APP_URL}/login`
     };
-    
+
     return await enviarCorreo({
       para: usuario.email,
       asunto: '[ISTHO] Bienvenido al CRM',
       templateName: 'bienvenida',
       datos
     });
-    
+
   } catch (error) {
     logger.error('Error al enviar bienvenida:', { message: error.message });
     return { success: false, error: error.message };
   }
 };
 
+/**
+ * Enviar bienvenida a usuario de cliente
+ */
+const enviarBienvenidaUsuarioCliente = async ({
+  email,
+  nombre,
+  username,
+  password,
+  cliente,
+  invitadoPor,
+  esReenvio
+}) => {
+  try {
+    const datos = {
+      nombre,
+      username,
+      email,
+      rol: 'Cliente',
+      passwordTemporal: password,
+      cliente,
+      invitadoPor,
+      urlLogin: `${process.env.APP_URL}/login`,
+      esReenvio
+    };
+
+    return await enviarCorreo({
+      para: email,
+      asunto: esReenvio
+        ? '[ISTHO] Credenciales de Acceso - Portal Cliente'
+        : `[ISTHO] Bienvenido al Portal de ${cliente || 'Clientes'}`,
+      templateName: 'bienvenida',
+      datos
+    });
+
+  } catch (error) {
+    logger.error('Error al enviar bienvenida usuario cliente:', { message: error.message });
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Enviar reseteo de contraseña
+ * @param {Object} params
+ * @param {string} params.email - Email del usuario
+ * @param {string} params.nombre - Nombre del usuario
+ * @param {string} params.username - Username (opcional, se deriva del email si no se proporciona)
+ * @param {string} params.password - Contraseña temporal (alias de passwordTemporal)
+ * @param {string} params.passwordTemporal - Contraseña temporal
+ * @param {string} params.cliente - Nombre del cliente (opcional)
+ * @param {string} params.reseteadoPor - Nombre de quien resetea (opcional)
+ */
+const enviarReseteoPassword = async ({
+  email,
+  nombre,
+  username,
+  password,
+  passwordTemporal,
+  cliente,
+  reseteadoPor
+}) => {
+  try {
+    // Compatibilidad: aceptar 'password' o 'passwordTemporal'
+    const passTemp = passwordTemporal || password;
+    
+    // Si no viene username, derivarlo del email
+    const user = username || email?.split('@')[0];
+    
+    const datos = {
+      nombre,
+      username: user,
+      email,
+      passwordTemporal: passTemp,
+      cliente,
+      reseteadoPor,
+      urlLogin: `${process.env.APP_URL}/login`
+    };
+
+    return await enviarCorreo({
+      para: email,
+      asunto: '[ISTHO] Reseteo de Contraseña',
+      templateName: 'reseteo-password',
+      datos
+    });
+
+  } catch (error) {
+    logger.error('Error al enviar reseteo password:', { message: error.message });
+    return { success: false, error: error.message };
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// EXPORTS
+// ════════════════════════════════════════════════════════════════════════════
+
 module.exports = {
   enviarCorreo,
   renderEmail,
   enviarCierreOperacion,
   enviarAlertaInventario,
-  enviarBienvenida
+  enviarBienvenida,
+  enviarBienvenidaUsuarioCliente,
+  enviarReseteoPassword
 };

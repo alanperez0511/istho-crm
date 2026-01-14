@@ -4,13 +4,13 @@
  * ============================================================================
  * Vista de detalle del cliente conectada al backend real.
  * 
- * CORRECCIONES v2.5.0:
- * - Template literals corregidos
- * - Carga de productos del cliente desde el backend
- * - KPI "Productos en Bodega" conectado a datos reales
+ * ACTUALIZACIÓN v2.6.0:
+ * - Nuevo tab "Usuarios Portal" para gestionar usuarios de cliente
+ * - Integración con componente UsuariosCliente
+ * - Corrección de template literals
  * 
  * @author Coordinación TI ISTHO
- * @version 2.5.0
+ * @version 2.6.0
  * @date Enero 2026
  */
 
@@ -29,6 +29,7 @@ import {
   Trash2,
   Plus,
   User,
+  Users,
   Truck,
   Clock,
   MessageSquare,
@@ -46,6 +47,7 @@ import { Button, StatusChip, KpiCard, ConfirmDialog, Modal } from '../../compone
 
 // Local Components
 import ClienteForm from './components/ClienteForm';
+import UsuariosCliente from './components/UsuariosCliente'; // ← NUEVO
 
 // Hooks
 import useClientes from '../../hooks/useClientes';
@@ -101,8 +103,8 @@ const formatCurrency = (value) => {
  */
 const checkPermission = (userRole, action) => {
   const permissions = {
-    admin: ['ver', 'crear', 'editar', 'eliminar', 'exportar', 'importar'],
-    supervisor: ['ver', 'crear', 'editar', 'exportar'],
+    admin: ['ver', 'crear', 'editar', 'eliminar', 'exportar', 'importar', 'usuarios'],
+    supervisor: ['ver', 'crear', 'editar', 'exportar', 'usuarios'],
     operador: ['ver'],
     cliente: ['ver'],
   };
@@ -163,7 +165,6 @@ const ContactCard = ({ contacto, onEdit, onDelete, canEdit }) => (
         </div>
       )}
     </div>
-
     <div className="mt-3 space-y-1.5 text-sm">
       {contacto.telefono && (
         <div className="flex items-center gap-2 text-slate-600">
@@ -412,7 +413,7 @@ const ClienteDetail = () => {
   const [historial, setHistorial] = useState([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   
-  // ✅ Estado para productos del cliente
+  // Estado para productos del cliente
   const [productosCliente, setProductosCliente] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
   
@@ -429,6 +430,7 @@ const ClienteDetail = () => {
   
   const canEdit = checkPermission(userRole, 'editar');
   const canDelete = checkPermission(userRole, 'eliminar');
+  const canManageUsers = checkPermission(userRole, 'usuarios'); // ← NUEVO
 
   // ──────────────────────────────────────────────────────────────────────────
   // CARGAR DATOS
@@ -449,7 +451,7 @@ const ClienteDetail = () => {
     }
   }, [fetchContactos]);
 
-  // ✅ NUEVO: Cargar productos del cliente
+  // Cargar productos del cliente
   const loadProductosCliente = useCallback(async (clienteId) => {
     setLoadingProductos(true);
     try {
@@ -591,13 +593,16 @@ const ClienteDetail = () => {
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
   
+  // ✅ TABS ACTUALIZADOS - Incluye Usuarios Portal
   const tabs = [
-    { id: 'info', label: 'Información' },
-    { id: 'contactos', label: `Contactos (${contactos.length})` },
-    { id: 'historial', label: 'Historial' },
+    { id: 'info', label: 'Información', icon: Building2 },
+    { id: 'contactos', label: `Contactos (${contactos.length})`, icon: User },
+    // ← NUEVO TAB (solo visible si tiene permisos)
+    ...(canManageUsers ? [{ id: 'usuarios', label: 'Usuarios Portal', icon: Users }] : []),
+    { id: 'historial', label: 'Historial', icon: Clock },
   ];
 
-  // ✅ Calcular productos en bodega desde los datos cargados
+  // Calcular productos en bodega desde los datos cargados
   const productosEnBodega = productosCliente.length;
 
   return (
@@ -682,29 +687,35 @@ const ClienteDetail = () => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6">
           <div className="border-b border-gray-100">
             <nav className="flex px-6">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    py-4 px-4 text-sm font-medium transition-colors relative
-                    ${activeTab === tab.id 
-                      ? 'text-orange-600' 
-                      : 'text-slate-500 hover:text-slate-700'
-                    }
-                  `}
-                >
-                  {tab.label}
-                  {activeTab === tab.id && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
-                  )}
-                </button>
-              ))}
+              {tabs.map((tab) => {
+                const TabIcon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`
+                      py-4 px-4 text-sm font-medium transition-colors relative flex items-center gap-2
+                      ${activeTab === tab.id 
+                        ? 'text-orange-600' 
+                        : 'text-slate-500 hover:text-slate-700'
+                      }
+                    `}
+                  >
+                    <TabIcon className="w-4 h-4" />
+                    {tab.label}
+                    {activeTab === tab.id && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+                    )}
+                  </button>
+                );
+              })}
             </nav>
           </div>
 
           <div className="p-6">
+            {/* ══════════════════════════════════════════════════════════════ */}
             {/* Tab: Información */}
+            {/* ══════════════════════════════════════════════════════════════ */}
             {activeTab === 'info' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Información General */}
@@ -806,7 +817,9 @@ const ClienteDetail = () => {
               </div>
             )}
 
+            {/* ══════════════════════════════════════════════════════════════ */}
             {/* Tab: Contactos */}
+            {/* ══════════════════════════════════════════════════════════════ */}
             {activeTab === 'contactos' && (
               <div>
                 {canEdit && (
@@ -859,7 +872,19 @@ const ClienteDetail = () => {
               </div>
             )}
 
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* Tab: Usuarios Portal (NUEVO) */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {activeTab === 'usuarios' && canManageUsers && (
+              <UsuariosCliente 
+                clienteId={cliente.id} 
+                clienteNombre={cliente.razon_social}
+              />
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
             {/* Tab: Historial */}
+            {/* ══════════════════════════════════════════════════════════════ */}
             {activeTab === 'historial' && (
               <div>
                 {loadingHistorial ? (
@@ -895,7 +920,10 @@ const ClienteDetail = () => {
         </footer>
       </main>
 
+      {/* ════════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      
       <ClienteForm
         isOpen={editModal}
         onClose={() => setEditModal(false)}

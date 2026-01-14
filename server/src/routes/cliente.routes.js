@@ -12,6 +12,7 @@ const router = express.Router();
 
 // Controlador
 const clienteController = require('../controllers/clienteController');
+const usuarioClienteRoutes = require('./usuarioClienteRoutes');
 
 // Middleware
 const { verificarToken } = require('../middleware/auth');
@@ -44,7 +45,10 @@ router.use(verificarToken);
  * @query   page, limit, search, estado, tipo_cliente, ciudad, sort, order
  */
 router.get('/', listarClientesValidator, clienteController.listar);
-
+// =============================================
+// RUTAS DE USUARIOS CLIENTE
+// =============================================
+router.use('/:clienteId/usuarios', usuarioClienteRoutes);
 /**
  * @route   GET /clientes/stats
  * @desc    Obtener estadísticas de clientes

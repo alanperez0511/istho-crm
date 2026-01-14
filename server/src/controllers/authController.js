@@ -27,6 +27,7 @@ const {
   serverError
 } = require('../utils/responses');
 const logger = require('../utils/logger');
+const emailService = require('../services/emailService');
 
 // ============================================================================
 // CONSTANTES
@@ -378,8 +379,13 @@ const forgotPassword = async (req, res) => {
     usuario.reset_token_expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
     await usuario.save();
 
-    // TODO: Enviar email con token
-    // await emailService.enviarRecuperacionPassword(usuario.email, resetToken);
+    // Enviar email con token
+    await emailService.enviarReseteoPassword({
+      email: usuario.email,
+      nombre: usuario.nombre_completo || usuario.username,
+      username: usuario.username,
+      passwordTemporal: resetToken // Usamos este campo para pasar el token en la plantilla actual
+    });
 
     logger.info('Token de recuperación generado:', { email });
 

@@ -37,6 +37,12 @@ const startServer = async () => {
 
     // Crear usuario admin por defecto si no existe
     await crearAdminPorDefecto();
+    
+    // Crear usuario supervisor por defecto si no existe
+    await crearSupervisorPorDefecto();
+
+    // Crear usuario operador por defecto si no existe
+    await crearOperadorPorDefecto();
 
     // Iniciar servidor
     app.listen(PORT, () => {
@@ -81,6 +87,66 @@ const crearAdminPorDefecto = async () => {
     }
   } catch (error) {
     logger.error('Error al crear admin por defecto:', { message: error.message });
+  }
+};
+
+/**
+ * Crear usuario supervisor por defecto
+ * 
+ * @returns {Promise<void>}
+ */
+const crearSupervisorPorDefecto = async () => {
+  try {
+    const { Usuario } = db;
+    
+    // Verificar si ya existe un supervisor
+    const supervisorExiste = await Usuario.findOne({ where: { rol: 'supervisor' } });
+    
+    if (!supervisorExiste) {
+      await Usuario.crearConPassword({
+        username: 'supervisor',
+        email: 'supervisor@istho.com.co',
+        password: 'Supervisor2026*',  // CAMBIAR EN PRODUCCIÓN
+        nombre_completo: 'Supervisor ISTHO',
+        rol: 'supervisor'
+      });
+      
+      logger.info('✅ Usuario supervisor creado por defecto');
+      logger.warn('⚠️  IMPORTANTE: Cambiar contraseña del supervisor en producción!');
+      console.log('\n   📧 Email: supervisor@istho.com.co');
+      console.log('   🔑 Password: Supervisor2026*\n');
+    }
+  } catch (error) {
+    logger.error('Error al crear supervisor por defecto:', { message: error.message });
+  }
+};
+
+/**
+ * Crear usuario operador por defecto
+ */
+const crearOperadorPorDefecto = async () => {
+  try {
+    const { Usuario } = db;
+    
+    // Verificar si ya existe un operador
+    const operadorExiste = await Usuario.findOne({ where: { rol: 'operador' } });
+    
+    if (!operadorExiste) {
+      await Usuario.crearConPassword({
+        username: 'operador',
+        email: 'operador@istho.com.co',
+        password: 'Operador2026*',  // CAMBIAR EN PRODUCCIÓN
+        nombre_completo: 'Operador ISTHO',
+        rol: 'operador'
+      });
+      
+      logger.info('✅ Usuario operador creado por defecto');
+      logger.warn('⚠️  IMPORTANTE: Cambiar contraseña del operador en producción!');
+      console.log('\n   📧 Email: operador@istho.com.co');
+      console.log('   🔑 Password: Operador2026*\n');
+    }
+  } catch (error) {
+    logger.error('Error al crear operador por defecto:', { message: error.message });
   }
 };
 
