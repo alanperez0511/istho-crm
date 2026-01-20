@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import {
@@ -110,9 +110,9 @@ const RowActions = ({ cliente, onView, onEdit, onDelete, onChangeStatus }) => {
 
       {isOpen && (
         <>
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setIsOpen(false)} 
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setIsOpen(false)}
           />
           <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20">
             <button
@@ -122,7 +122,7 @@ const RowActions = ({ cliente, onView, onEdit, onDelete, onChangeStatus }) => {
               <Eye className="w-4 h-4" />
               Ver detalle
             </button>
-            
+
             <ProtectedAction module="clientes" action="editar">
               <button
                 onClick={() => { onEdit(cliente); setIsOpen(false); }}
@@ -142,7 +142,7 @@ const RowActions = ({ cliente, onView, onEdit, onDelete, onChangeStatus }) => {
                 Cambiar Estado
               </button>
             </ProtectedAction>
-            
+
             <ProtectedAction module="clientes" action="eliminar">
               <button
                 onClick={() => { onDelete(cliente); setIsOpen(false); }}
@@ -167,12 +167,12 @@ const ClientesList = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // HOOKS
   // ──────────────────────────────────────────────────────────────────────────
   const { success, apiError, saved, deleted } = useNotification();
-  
+
   const {
     clientes,
     pagination,
@@ -188,7 +188,7 @@ const ClientesList = () => {
     clearFilters,
     search,
     refresh,
-  } = useClientes({ 
+  } = useClientes({
     autoFetch: true,
     initialFilters: {
       estado: searchParams.get('estado') || undefined,
@@ -206,7 +206,7 @@ const ClientesList = () => {
     estado: searchParams.get('estado') || '',
   });
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   // Modales
   const [formModal, setFormModal] = useState({ isOpen: false, cliente: null });
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, cliente: null });
@@ -216,7 +216,7 @@ const ClientesList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS DE BÚSQUEDA Y FILTROS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const handleSearch = (value) => {
     setSearchTerm(value);
     search(value);
@@ -226,7 +226,7 @@ const ClientesList = () => {
     const newFilters = { ...filters, [key]: value || undefined };
     setFilters(newFilters);
     applyFilters(newFilters);
-    
+
     const params = new URLSearchParams();
     Object.entries(newFilters).forEach(([k, v]) => {
       if (v) params.set(k, v);
@@ -244,7 +244,7 @@ const ClientesList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS CRUD
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const handleCreate = () => {
     setFormModal({ isOpen: true, cliente: null });
   };
@@ -312,10 +312,10 @@ const ClientesList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* PAGE HEADER */}
@@ -353,7 +353,7 @@ const ClientesList = () => {
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
             <p className="font-medium">Error al cargar clientes</p>
             <p className="text-sm">{error}</p>
-            <button 
+            <button
               onClick={refresh}
               className="mt-2 text-sm underline hover:no-underline"
             >
@@ -422,7 +422,7 @@ const ClientesList = () => {
                   placeholder="Todos los estados"
                 />
               </div>
-              
+
               {Object.values(filters).filter(Boolean).length > 0 && (
                 <div className="mt-4 flex justify-end">
                   <Button variant="ghost" size="sm" onClick={handleClearFilters}>
@@ -514,7 +514,7 @@ const ClientesList = () => {
                             <Building2 className="w-5 h-5 text-orange-600" />
                           </div>
                           <div>
-                            <p 
+                            <p
                               className="text-sm font-medium text-slate-800 hover:text-orange-600 cursor-pointer"
                               onClick={() => handleView(cliente)}
                             >
@@ -608,8 +608,8 @@ const ClientesList = () => {
                   disabled={statusModal.cliente?.estado === opt.value}
                   className={`
                     w-full p-3 text-left rounded-xl border transition-colors
-                    ${statusModal.cliente?.estado === opt.value 
-                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' 
+                    ${statusModal.cliente?.estado === opt.value
+                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
                       : 'bg-white border-slate-200 hover:border-orange-500 hover:bg-orange-50'
                     }
                   `}

@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, StatusChip, KpiCard, ConfirmDialog } from '../../components/common';
@@ -63,7 +63,7 @@ import { useAuth } from '../../context/AuthContext';
 // Mapeo de nombres de meses inglés → español
 const MESES_ES = {
   'January': 'Enero',
-  'February': 'Febrero', 
+  'February': 'Febrero',
   'March': 'Marzo',
   'April': 'Abril',
   'May': 'Mayo',
@@ -121,13 +121,13 @@ const StockGauge = ({ actual, minimo, maximo }) => {
   const actualNum = parseFloat(actual) || 0;
   const minimoNum = parseFloat(minimo) || 0;
   const maximoNum = parseFloat(maximo) || 1000;
-  
+
   const porcentaje = maximoNum > 0 ? (actualNum / maximoNum) * 100 : 0;
   const minimoPos = maximoNum > 0 ? (minimoNum / maximoNum) * 100 : 0;
-  
+
   let statusColor = 'bg-emerald-500';
   let statusText = 'Óptimo';
-  
+
   if (actualNum === 0) {
     statusColor = 'bg-red-500';
     statusText = 'Agotado';
@@ -142,19 +142,19 @@ const StockGauge = ({ actual, minimo, maximo }) => {
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
       <h3 className="text-lg font-semibold text-slate-800 mb-4">Nivel de Stock</h3>
-      
+
       <div className="relative h-8 bg-slate-100 rounded-full overflow-hidden mb-4">
-        <div 
+        <div
           className="absolute top-0 bottom-0 left-0 bg-red-100 opacity-50"
           style={{ width: `${minimoPos}%` }}
         />
-        
-        <div 
+
+        <div
           className={`absolute top-0 bottom-0 left-0 transition-all duration-500 rounded-full ${statusColor}`}
           style={{ width: `${Math.min(porcentaje, 100)}%` }}
         />
-        
-        <div 
+
+        <div
           className="absolute top-0 bottom-0 w-0.5 bg-red-500"
           style={{ left: `${minimoPos}%` }}
         />
@@ -194,14 +194,14 @@ const StockGauge = ({ actual, minimo, maximo }) => {
 const MovimientoItem = ({ movimiento }) => {
   const isEntrada = movimiento.tipo === 'entrada';
   const isAjuste = movimiento.tipo === 'ajuste';
-  
+
   let iconConfig = {
     icon: PackageMinus,
     bg: 'bg-red-100',
     color: 'text-red-600',
     label: 'Salida',
   };
-  
+
   if (isEntrada) {
     iconConfig = {
       icon: PackagePlus,
@@ -219,7 +219,7 @@ const MovimientoItem = ({ movimiento }) => {
   }
 
   const Icon = iconConfig.icon;
-  
+
   // Usar snake_case para campos del backend
   const cantidad = movimiento.cantidad || 0;
   const stockResultante = movimiento.stock_resultante || movimiento.stockResultante || 0;
@@ -232,7 +232,7 @@ const MovimientoItem = ({ movimiento }) => {
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconConfig.bg}`}>
         <Icon className={`w-5 h-5 ${iconConfig.color}`} />
       </div>
-      
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
           <div>
@@ -252,7 +252,7 @@ const MovimientoItem = ({ movimiento }) => {
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
@@ -282,7 +282,7 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HOOK DE INVENTARIO
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const {
     currentProducto,
     loadingDetail,
@@ -302,7 +302,7 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // ESTADOS LOCALES (TODOS los hooks ANTES de cualquier return)
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const [activeTab, setActiveTab] = useState('info');
   const [editModal, setEditModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
@@ -316,9 +316,9 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // VARIABLES DERIVADAS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const producto = currentProducto || {};
-  
+
   // ✅ Asegurar que los valores sean números
   const stockActual = parseFloat(producto.stock_actual || producto.cantidad) || 0;
   const stockMinimo = parseFloat(producto.stock_minimo) || 0;
@@ -333,15 +333,15 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // MEMOS (SIEMPRE se ejecutan)
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   // KPIs calculados desde movimientos
   const kpis = useMemo(() => {
     const entradas = (movimientos || []).filter(m => m.tipo === 'entrada');
     const salidas = (movimientos || []).filter(m => m.tipo === 'salida');
-    
+
     const entradasMes = entradas.reduce((sum, m) => sum + Math.abs(parseFloat(m.cantidad) || 0), 0);
     const salidasMes = salidas.reduce((sum, m) => sum + Math.abs(parseFloat(m.cantidad) || 0), 0);
-    
+
     return {
       valorStock: stockActual * costoUnitario,
       entradasMes,
@@ -353,12 +353,12 @@ const ProductoDetail = () => {
   // ═══════════════════════════════════════════════════════════════════════════
   // TRANSFORMACIÓN DE DATOS PARA BARCHART
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
   const chartData = useMemo(() => {
     if (!estadisticas || estadisticas.length === 0) {
       return [];
     }
-    
+
     return estadisticas.map(item => {
       // Si ya viene con label y value1/value2 (backend actualizado)
       if (item.label !== undefined && item.value1 !== undefined) {
@@ -368,21 +368,21 @@ const ProductoDetail = () => {
           value2: parseFloat(item.value2) || 0,
         };
       }
-      
+
       // Transformar formato antiguo del backend
       let mesLabel = item.periodo || '';
-      
+
       if (item.mes) {
         // Si es nombre en inglés, traducir
         mesLabel = MESES_ES[item.mes]?.substring(0, 3) || item.mes.substring(0, 3);
       } else if (item.periodo) {
         // Extraer mes del periodo "2026-01" → "Ene"
         const mesNum = parseInt(item.periodo.split('-')[1]);
-        const mesesCortos = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
-                            'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const mesesCortos = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         mesLabel = mesesCortos[mesNum] || item.periodo;
       }
-      
+
       return {
         label: mesLabel,
         value1: parseFloat(item.entradas) || 0,
@@ -401,7 +401,7 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // EFFECTS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   useEffect(() => {
     if (id) {
       fetchById(id);
@@ -413,7 +413,7 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const handleEditProducto = async (data) => {
     setFormLoading(true);
     try {
@@ -465,7 +465,7 @@ const ProductoDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // FORMATTERS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const formatCurrency = (value) => {
     if (!value) return '$0';
     return new Intl.NumberFormat('es-CO', {
@@ -478,11 +478,11 @@ const ProductoDetail = () => {
   // ══════════════════════════════════════════════════════════════════════════
   // RENDERS CONDICIONALES (DESPUÉS de todos los hooks)
   // ══════════════════════════════════════════════════════════════════════════
-  
+
   if (loadingDetail) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-48" />
@@ -501,7 +501,7 @@ const ProductoDetail = () => {
   if (errorDetail || !currentProducto) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -521,10 +521,10 @@ const ProductoDetail = () => {
   // ══════════════════════════════════════════════════════════════════════════
   // RENDER PRINCIPAL
   // ══════════════════════════════════════════════════════════════════════════
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* HEADER */}
@@ -557,15 +557,15 @@ const ProductoDetail = () => {
           <div className="flex items-center gap-2">
             {canEdit && (
               <>
-                <Button 
-                  variant="success" 
+                <Button
+                  variant="success"
                   icon={PackagePlus}
                   onClick={() => setMovimientoModal({ isOpen: true, tipo: 'entrada' })}
                 >
                   Entrada
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   icon={PackageMinus}
                   onClick={() => setMovimientoModal({ isOpen: true, tipo: 'salida' })}
                   disabled={stockActual === 0}
@@ -621,7 +621,7 @@ const ProductoDetail = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Stock Gauge */}
           <div className="lg:col-span-1">
-            <StockGauge 
+            <StockGauge
               actual={stockActual}
               minimo={stockMinimo}
               maximo={stockMaximo}
@@ -665,9 +665,8 @@ const ProductoDetail = () => {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${
-                        activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'
-                      }`}
+                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'
+                        }`}
                     >
                       {tab.label}
                       {activeTab === tab.id && (
@@ -704,7 +703,7 @@ const ProductoDetail = () => {
                           <Calendar className="w-5 h-5 text-slate-400" />
                           <span className="text-slate-500 w-28">Vencimiento:</span>
                           <span className="text-slate-800">
-                            {fechaVencimiento 
+                            {fechaVencimiento
                               ? new Date(fechaVencimiento).toLocaleDateString('es-CO')
                               : 'N/A'
                             }

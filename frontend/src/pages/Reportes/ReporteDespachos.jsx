@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, StatusChip, FilterDropdown } from '../../components/common';
@@ -117,7 +117,7 @@ const StatCard = ({ title, value, subtitle, icon: Icon, iconBg, iconColor, trend
 // ============================================
 const ProgressBar = ({ value, max = 100, color = 'bg-blue-500' }) => (
   <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-    <div 
+    <div
       className={`h-full ${color} transition-all duration-500`}
       style={{ width: `${(value / max) * 100}%` }}
     />
@@ -151,7 +151,7 @@ const ReporteDespachos = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-10 bg-gray-200 rounded w-64" />
@@ -172,7 +172,7 @@ const ReporteDespachos = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* Header */}
@@ -315,13 +315,12 @@ const ReporteDespachos = () => {
                         <span className="font-semibold text-slate-800">{item.despachos}</span>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          item.cumplimiento >= 95 
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.cumplimiento >= 95
                             ? 'bg-emerald-100 text-emerald-700'
                             : item.cumplimiento >= 90
                               ? 'bg-amber-100 text-amber-700'
                               : 'bg-red-100 text-red-700'
-                        }`}>
+                          }`}>
                           {item.cumplimiento}%
                         </span>
                       </td>
@@ -350,8 +349,8 @@ const ReporteDespachos = () => {
                       <span className="text-slate-400 ml-1">({item.porcentaje}%)</span>
                     </div>
                   </div>
-                  <ProgressBar 
-                    value={item.porcentaje} 
+                  <ProgressBar
+                    value={item.porcentaje}
                     color={idx === 0 ? 'bg-blue-500' : idx === 1 ? 'bg-emerald-500' : 'bg-slate-300'}
                   />
                 </div>

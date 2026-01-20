@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, StatusChip } from '../../components/common';
@@ -116,19 +116,18 @@ const StatCard = ({ title, value, subtitle, icon: Icon, iconBg, iconColor, trend
 const RatingStars = ({ rating }) => {
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating % 1 >= 0.5;
-  
+
   return (
     <div className="flex items-center gap-0.5">
       {[...Array(5)].map((_, i) => (
-        <Star 
-          key={i} 
-          className={`w-4 h-4 ${
-            i < fullStars 
-              ? 'text-amber-400 fill-current' 
+        <Star
+          key={i}
+          className={`w-4 h-4 ${i < fullStars
+              ? 'text-amber-400 fill-current'
               : i === fullStars && hasHalfStar
                 ? 'text-amber-400'
                 : 'text-slate-200'
-          }`} 
+            }`}
         />
       ))}
       <span className="ml-1 text-sm font-medium text-slate-600">{rating}</span>
@@ -201,7 +200,7 @@ const ReporteClientes = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-10 bg-gray-200 rounded w-64" />
@@ -218,7 +217,7 @@ const ReporteClientes = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* Header */}

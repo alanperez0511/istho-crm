@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button } from '../../components/common';
@@ -109,29 +109,29 @@ const Configuracion = () => {
     darkMode: false,
     compactMode: false,
     animations: true,
-    
+
     // Notificaciones
     emailNotifications: true,
     pushNotifications: true,
     smsNotifications: false,
     soundEnabled: true,
-    
+
     // Notificaciones específicas
     notifyDespachos: true,
     notifyInventario: true,
     notifyClientes: true,
     notifyReportes: false,
-    
+
     // Regional
     language: 'es',
     timezone: 'America/Bogota',
     dateFormat: 'DD/MM/YYYY',
     currency: 'COP',
-    
+
     // Seguridad
     twoFactorAuth: false,
     sessionTimeout: '30',
-    
+
     // Datos
     autoBackup: true,
     backupFrequency: 'daily',
@@ -147,7 +147,7 @@ const Configuracion = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-4xl mx-auto">
         {/* Header */}

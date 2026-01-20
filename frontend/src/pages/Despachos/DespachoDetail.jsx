@@ -33,14 +33,11 @@ import {
   AlertCircle,
   Pencil,
   Printer,
-  Navigation,
-  Camera,
-  MessageSquare,
   RefreshCw,
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, StatusChip, ConfirmDialog, Modal } from '../../components/common';
@@ -73,11 +70,11 @@ const TimelineItem = ({ item, isLast }) => {
     documento: { icon: FileText, bg: 'bg-violet-100', color: 'text-violet-600' },
     transporte: { icon: Truck, bg: 'bg-blue-100', color: 'text-blue-600' },
   };
-  
+
   const tipo = item.accion || item.tipo || 'crear';
   const config = iconConfig[tipo] || iconConfig.crear;
   const Icon = config.icon;
-  
+
   return (
     <div className="flex gap-4">
       <div className="flex flex-col items-center">
@@ -111,12 +108,11 @@ const TimelineItem = ({ item, isLast }) => {
  */
 const ProductoRow = ({ producto }) => {
   const tieneAveria = parseFloat(producto.cantidad_averia) > 0;
-  
+
   return (
     <div className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-        tieneAveria ? 'bg-red-100' : 'bg-slate-100'
-      }`}>
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${tieneAveria ? 'bg-red-100' : 'bg-slate-100'
+        }`}>
         <Package className={`w-5 h-5 ${tieneAveria ? 'text-red-500' : 'text-slate-500'}`} />
       </div>
       <div className="flex-1">
@@ -162,21 +158,21 @@ const InfoCard = ({ title, icon: Icon, children, action }) => {
 const CierreModal = ({ isOpen, onClose, onSubmit, loading }) => {
   const [observaciones, setObservaciones] = useState('');
   const [enviarCorreo, setEnviarCorreo] = useState(true);
-  
+
   const handleSubmit = () => {
-    onSubmit({ 
+    onSubmit({
       observaciones_cierre: observaciones,
       enviar_correo: enviarCorreo
     });
   };
-  
+
   useEffect(() => {
     if (isOpen) {
       setObservaciones('');
       setEnviarCorreo(true);
     }
   }, [isOpen]);
-  
+
   return (
     <Modal
       isOpen={isOpen}
@@ -195,11 +191,11 @@ const CierreModal = ({ isOpen, onClose, onSubmit, loading }) => {
       <div className="space-y-4">
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
           <p className="text-sm text-amber-700">
-            <strong>⚠️ Importante:</strong> Al cerrar la operación se actualizará el inventario 
+            <strong>⚠️ Importante:</strong> Al cerrar la operación se actualizará el inventario
             y se enviará notificación al cliente.
           </p>
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
             Observaciones de cierre (opcional)
@@ -212,7 +208,7 @@ const CierreModal = ({ isOpen, onClose, onSubmit, loading }) => {
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
-        
+
         <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50">
           <input
             type="checkbox"
@@ -236,11 +232,11 @@ const DespachoDetail = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const { success, apiError } = useNotification();
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // HOOK DE DESPACHO INDIVIDUAL - Optimizado para páginas de detalle
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const {
     despacho,
     loading,
@@ -254,26 +250,26 @@ const DespachoDetail = () => {
     cerrar,
     anular,
   } = useDespachoDetail(id, true);  // true = autoFetch
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // ESTADOS LOCALES
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const [activeTab, setActiveTab] = useState('info');
-  
+
   // Modals
   const [editModal, setEditModal] = useState(false);
   const [cierreModal, setCierreModal] = useState(false);
   const [anularModal, setAnularModal] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
-  
+
   // Permisos
   const canEdit = hasPermission('despachos', 'editar');
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const handleEditTransporte = async (data) => {
     setFormLoading(true);
     try {
@@ -296,7 +292,7 @@ const DespachoDetail = () => {
       setFormLoading(false);
     }
   };
-  
+
   const handleCerrar = async (cierreData) => {
     setFormLoading(true);
     try {
@@ -310,7 +306,7 @@ const DespachoDetail = () => {
       setFormLoading(false);
     }
   };
-  
+
   const handleAnular = async () => {
     setFormLoading(true);
     try {
@@ -324,15 +320,15 @@ const DespachoDetail = () => {
       setFormLoading(false);
     }
   };
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // LOADING STATE
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-48" />
@@ -346,15 +342,15 @@ const DespachoDetail = () => {
       </div>
     );
   }
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // ERROR STATE
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   if (error || !despacho) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -370,46 +366,46 @@ const DespachoDetail = () => {
       </div>
     );
   }
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // VARIABLES CALCULADAS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   // Productos vienen del detalle de la operación
   const productos = despacho.detalles || [];
   const totalProductos = productos.length;
   const totalUnidades = productos.reduce((sum, p) => sum + (parseFloat(p.cantidad) || 0), 0);
   const totalAverias = productos.reduce((sum, p) => sum + (parseFloat(p.cantidad_averia) || 0), 0);
-  
+
   // Documentos adjuntos
   const documentos = despacho.documentos || [];
-  
+
   // Averías registradas
   const averias = despacho.averias || [];
-  
+
   // Estado editable
   const isEditable = ['pendiente', 'en_proceso'].includes(despacho.estado);
-  
+
   // Tabs disponibles
   const tabs = [
     { id: 'info', label: 'Información' },
     { id: 'productos', label: `Productos (${totalProductos})` },
     { id: 'documentos', label: `Documentos (${documentos.length})` },
   ];
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
-      
+
+
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* HEADER */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        
+
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
@@ -418,14 +414,12 @@ const DespachoDetail = () => {
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            
+
             <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                despacho.tipo === 'ingreso' ? 'bg-green-100' : 'bg-blue-100'
-              }`}>
-                <Truck className={`w-7 h-7 ${
-                  despacho.tipo === 'ingreso' ? 'text-green-600' : 'text-blue-600'
-                }`} />
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${despacho.tipo === 'ingreso' ? 'bg-green-100' : 'bg-blue-100'
+                }`}>
+                <Truck className={`w-7 h-7 ${despacho.tipo === 'ingreso' ? 'text-green-600' : 'text-blue-600'
+                  }`} />
               </div>
               <div>
                 <div className="flex items-center gap-3">
@@ -433,11 +427,10 @@ const DespachoDetail = () => {
                     {despacho.numero_operacion}
                   </h1>
                   <StatusChip status={despacho.estado} />
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                    despacho.tipo === 'ingreso' 
-                      ? 'bg-green-100 text-green-700' 
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${despacho.tipo === 'ingreso'
+                      ? 'bg-green-100 text-green-700'
                       : 'bg-blue-100 text-blue-700'
-                  }`}>
+                    }`}>
                     {despacho.tipo === 'ingreso' ? 'INGRESO' : 'SALIDA'}
                   </span>
                   {despacho.prioridad === 'urgente' && (
@@ -452,54 +445,54 @@ const DespachoDetail = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              icon={RefreshCw} 
+            <Button
+              variant="ghost"
+              icon={RefreshCw}
               onClick={refresh}
               title="Actualizar"
             />
-            
+
             {isEditable && canEdit && (
               <>
-                <Button 
-                  variant="outline" 
-                  icon={Pencil} 
+                <Button
+                  variant="outline"
+                  icon={Pencil}
                   onClick={() => setEditModal(true)}
                 >
                   Editar Transporte
                 </Button>
-                
-                <Button 
-                  variant="primary" 
-                  icon={CheckCircle} 
+
+                <Button
+                  variant="primary"
+                  icon={CheckCircle}
                   onClick={() => setCierreModal(true)}
                   disabled={!puedeCerrar && documentos.length === 0}
                 >
                   Cerrar Operación
                 </Button>
-                
-                <Button 
-                  variant="danger" 
-                  icon={XCircle} 
+
+                <Button
+                  variant="danger"
+                  icon={XCircle}
                   onClick={() => setAnularModal(true)}
                 >
                   Anular
                 </Button>
               </>
             )}
-            
+
             <Button variant="outline" icon={Printer}>
               Imprimir
             </Button>
           </div>
         </div>
-        
+
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* MAIN GRID */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Info */}
           <div className="lg:col-span-2 space-y-6">
@@ -516,12 +509,10 @@ const DespachoDetail = () => {
                 <p className="text-sm text-slate-500">Unidades</p>
               </div>
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
-                <AlertCircle className={`w-8 h-8 mx-auto mb-2 ${
-                  totalAverias > 0 ? 'text-red-500' : 'text-slate-300'
-                }`} />
-                <p className={`text-2xl font-bold ${
-                  totalAverias > 0 ? 'text-red-600' : 'text-slate-800'
-                }`}>{totalAverias.toLocaleString()}</p>
+                <AlertCircle className={`w-8 h-8 mx-auto mb-2 ${totalAverias > 0 ? 'text-red-500' : 'text-slate-300'
+                  }`} />
+                <p className={`text-2xl font-bold ${totalAverias > 0 ? 'text-red-600' : 'text-slate-800'
+                  }`}>{totalAverias.toLocaleString()}</p>
                 <p className="text-sm text-slate-500">Averías</p>
               </div>
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
@@ -530,7 +521,7 @@ const DespachoDetail = () => {
                 <p className="text-sm text-slate-500">Documentos</p>
               </div>
             </div>
-            
+
             {/* Tabs Content */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
               <div className="border-b border-gray-100">
@@ -539,11 +530,10 @@ const DespachoDetail = () => {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${
-                        activeTab === tab.id 
-                          ? 'text-orange-600' 
+                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${activeTab === tab.id
+                          ? 'text-orange-600'
                           : 'text-slate-500 hover:text-slate-700'
-                      }`}
+                        }`}
                     >
                       {tab.label}
                       {activeTab === tab.id && (
@@ -553,7 +543,7 @@ const DespachoDetail = () => {
                   ))}
                 </nav>
               </div>
-              
+
               <div className="p-6">
                 {/* Tab: Info */}
                 {activeTab === 'info' && (
@@ -578,8 +568,8 @@ const DespachoDetail = () => {
                           <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
                           <div>
                             <p className="text-slate-800">
-                              {despacho.tipo === 'salida' 
-                                ? (despacho.destino || '-') 
+                              {despacho.tipo === 'salida'
+                                ? (despacho.destino || '-')
                                 : (despacho.origen || '-')
                               }
                             </p>
@@ -587,7 +577,7 @@ const DespachoDetail = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-4">
                       <h4 className="font-semibold text-slate-800">Transporte</h4>
                       <div className="space-y-3">
@@ -616,7 +606,7 @@ const DespachoDetail = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     {despacho.observaciones && (
                       <div className="md:col-span-2 space-y-2">
                         <h4 className="font-semibold text-slate-800">Observaciones</h4>
@@ -627,7 +617,7 @@ const DespachoDetail = () => {
                     )}
                   </div>
                 )}
-                
+
                 {/* Tab: Productos */}
                 {activeTab === 'productos' && (
                   <div>
@@ -658,7 +648,7 @@ const DespachoDetail = () => {
                     )}
                   </div>
                 )}
-                
+
                 {/* Tab: Documentos */}
                 {activeTab === 'documentos' && (
                   <div>
@@ -667,7 +657,7 @@ const DespachoDetail = () => {
                         <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                         <p className="text-slate-500">No hay documentos adjuntos</p>
                         {isEditable && (
-                          <Button variant="outline" className="mt-4" icon={Camera}>
+                          <Button variant="outline" className="mt-4">
                             Subir Documento
                           </Button>
                         )}
@@ -675,7 +665,7 @@ const DespachoDetail = () => {
                     ) : (
                       <div className="space-y-3">
                         {documentos.map((doc) => (
-                          <div 
+                          <div
                             key={doc.id}
                             className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
                           >
@@ -700,7 +690,7 @@ const DespachoDetail = () => {
               </div>
             </div>
           </div>
-          
+
           {/* Right Column - Side Info */}
           <div className="space-y-6">
             {/* Fechas */}
@@ -728,17 +718,16 @@ const DespachoDetail = () => {
                 )}
                 <div>
                   <p className="text-xs text-slate-400 mb-1">Prioridad</p>
-                  <p className={`font-medium capitalize ${
-                    despacho.prioridad === 'urgente' ? 'text-red-600' :
-                    despacho.prioridad === 'alta' ? 'text-orange-600' :
-                    'text-slate-800'
-                  }`}>
+                  <p className={`font-medium capitalize ${despacho.prioridad === 'urgente' ? 'text-red-600' :
+                      despacho.prioridad === 'alta' ? 'text-orange-600' :
+                        'text-slate-800'
+                    }`}>
                     {despacho.prioridad || 'normal'}
                   </p>
                 </div>
               </div>
             </InfoCard>
-            
+
             {/* Creación */}
             <InfoCard title="Registro" icon={FileText}>
               <div className="space-y-3 text-sm">
@@ -751,8 +740,8 @@ const DespachoDetail = () => {
                 <div className="flex justify-between">
                   <span className="text-slate-500">Fecha creación</span>
                   <span className="text-slate-800">
-                    {despacho.created_at 
-                      ? new Date(despacho.created_at).toLocaleDateString('es-CO') 
+                    {despacho.created_at
+                      ? new Date(despacho.created_at).toLocaleDateString('es-CO')
                       : '-'
                     }
                   </span>
@@ -767,13 +756,13 @@ const DespachoDetail = () => {
                 )}
               </div>
             </InfoCard>
-            
+
             {/* Averías */}
             {averias.length > 0 && (
               <InfoCard title="Averías Registradas" icon={AlertCircle}>
                 <div className="space-y-3">
                   {averias.map((averia) => (
-                    <div 
+                    <div
                       key={averia.id}
                       className="p-3 bg-red-50 rounded-xl border border-red-100"
                     >
@@ -791,11 +780,11 @@ const DespachoDetail = () => {
           </div>
         </div>
       </main>
-      
+
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
       {/* ══════════════════════════════════════════════════════════════════ */}
-      
+
       <DespachoForm
         isOpen={editModal}
         onClose={() => setEditModal(false)}
@@ -804,24 +793,23 @@ const DespachoDetail = () => {
         loading={formLoading}
         modeEdit={true}
       />
-      
+
       <CierreModal
         isOpen={cierreModal}
         onClose={() => setCierreModal(false)}
         onSubmit={handleCerrar}
         loading={formLoading}
       />
-      
+
       <ConfirmDialog
         isOpen={anularModal}
         onClose={() => setAnularModal(false)}
         onConfirm={handleAnular}
         title="Anular Operación"
-        message={`¿Estás seguro de anular la operación "${despacho.numero_operacion}"? ${
-          despacho.tipo === 'salida' 
-            ? 'Se liberará el stock reservado.' 
+        message={`¿Estás seguro de anular la operación "${despacho.numero_operacion}"? ${despacho.tipo === 'salida'
+            ? 'Se liberará el stock reservado.'
             : 'Esta acción no se puede deshacer.'
-        }`}
+          }`}
         confirmText="Anular Operación"
         type="danger"
         loading={formLoading}

@@ -1,7 +1,11 @@
 /**
  * ISTHO CRM - DataTable Component
  * Tabla de datos con tabs reutilizable
- * 
+ *
+ * Dark Mode:
+ * - Compatible con Tailwind dark:class
+ * - Skeleton, hover y tabs adaptados
+ *
  * @author Coordinación TI ISTHO
  * @date Enero 2026
  */
@@ -10,19 +14,22 @@ import { useState } from 'react';
 import PropTypes from 'prop-types';
 import StatusChip from '../StatusChip/StatusChip';
 
-// ============================================
-// TABLA SIN TABS (Componente interno)
-// ============================================
+// ======================================================
+// TABLA SIMPLE (SIN TABS)
+// ======================================================
 const SimpleTable = ({ columns, data, onRowClick, loading, emptyMessage }) => {
-  // Loading skeleton
+  // Skeleton loading
   if (loading) {
     return (
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
+            <tr className="border-b border-gray-100 dark:border-slate-700">
               {columns.map((col, idx) => (
-                <th key={idx} className="py-3 px-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <th
+                  key={idx}
+                  className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                >
                   {col.label}
                 </th>
               ))}
@@ -30,10 +37,13 @@ const SimpleTable = ({ columns, data, onRowClick, loading, emptyMessage }) => {
           </thead>
           <tbody>
             {[...Array(5)].map((_, rowIdx) => (
-              <tr key={rowIdx} className="border-b border-gray-50">
+              <tr
+                key={rowIdx}
+                className="border-b border-gray-50 dark:border-slate-700"
+              >
                 {columns.map((_, colIdx) => (
                   <td key={colIdx} className="py-4 px-4">
-                    <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" />
                   </td>
                 ))}
               </tr>
@@ -47,7 +57,7 @@ const SimpleTable = ({ columns, data, onRowClick, loading, emptyMessage }) => {
   // Empty state
   if (!data || data.length === 0) {
     return (
-      <div className="py-12 text-center text-slate-500">
+      <div className="py-12 text-center text-slate-500 dark:text-slate-400">
         <p>{emptyMessage || 'No hay datos para mostrar'}</p>
       </div>
     );
@@ -57,12 +67,13 @@ const SimpleTable = ({ columns, data, onRowClick, loading, emptyMessage }) => {
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
-          <tr className="border-b border-gray-100">
+          <tr className="border-b border-gray-100 dark:border-slate-700">
             {columns.map((col, idx) => (
               <th
                 key={idx}
                 className={`
-                  py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider
+                  py-3 px-4 text-xs font-semibold uppercase tracking-wider
+                  text-slate-500 dark:text-slate-400
                   ${col.align === 'center' ? 'text-center' : ''}
                   ${col.align === 'right' ? 'text-right' : 'text-left'}
                 `}
@@ -72,13 +83,16 @@ const SimpleTable = ({ columns, data, onRowClick, loading, emptyMessage }) => {
             ))}
           </tr>
         </thead>
+
         <tbody>
           {data.map((row, rowIdx) => (
             <tr
               key={row.id || rowIdx}
               onClick={() => onRowClick?.(row)}
               className={`
-                border-b border-gray-50 hover:bg-slate-50 transition-colors
+                border-b border-gray-50 dark:border-slate-700
+                hover:bg-slate-50 dark:hover:bg-slate-700
+                transition-colors
                 ${onRowClick ? 'cursor-pointer' : ''}
               `}
             >
@@ -87,6 +101,7 @@ const SimpleTable = ({ columns, data, onRowClick, loading, emptyMessage }) => {
                   key={colIdx}
                   className={`
                     py-4 px-4 text-sm
+                    text-slate-600 dark:text-slate-300
                     ${col.align === 'center' ? 'text-center' : ''}
                     ${col.align === 'right' ? 'text-right' : ''}
                   `}
@@ -102,35 +117,44 @@ const SimpleTable = ({ columns, data, onRowClick, loading, emptyMessage }) => {
   );
 };
 
-// Función para renderizar celdas
+// ======================================================
+// RENDER DE CELDAS
+// ======================================================
 const renderCell = (row, col) => {
   const value = row[col.key];
 
-  // Renderizado personalizado
-  if (col.render) {
-    return col.render(value, row);
-  }
+  if (col.render) return col.render(value, row);
 
-  // Tipos especiales
   if (col.type === 'status') {
     return <StatusChip status={value} />;
   }
 
   if (col.type === 'id') {
-    return <span className="font-medium text-orange-600">{value}</span>;
+    return (
+      <span className="font-medium text-orange-600 dark:text-orange-400">
+        {value}
+      </span>
+    );
   }
 
   if (col.type === 'currency') {
-    return <span className="text-slate-600 font-medium">{value}</span>;
+    return (
+      <span className="font-medium text-slate-600 dark:text-slate-300">
+        {value}
+      </span>
+    );
   }
 
-  // Default
-  return <span className="text-slate-600">{value}</span>;
+  return (
+    <span className="text-slate-600 dark:text-slate-300">
+      {value}
+    </span>
+  );
 };
 
-// ============================================
-// TABLA CON TABS (Componente principal)
-// ============================================
+// ======================================================
+// DATATABLE CON TABS
+// ======================================================
 const DataTable = ({
   tabs,
   columns,
@@ -141,12 +165,17 @@ const DataTable = ({
   loading = false,
   emptyMessage,
 }) => {
-  const [activeTab, setActiveTab] = useState(defaultTab || (tabs?.[0]?.id));
+  const [activeTab, setActiveTab] = useState(defaultTab || tabs?.[0]?.id);
 
-  // Si no hay tabs, renderizar tabla simple
+  // Sin tabs → tabla simple
   if (!tabs || tabs.length === 0) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="
+        bg-white dark:bg-slate-800
+        rounded-2xl shadow-sm
+        border border-gray-100 dark:border-slate-700
+        overflow-hidden
+      ">
         <SimpleTable
           columns={columns}
           data={data}
@@ -163,14 +192,18 @@ const DataTable = ({
     onTabChange?.(tabId);
   };
 
-  // Obtener columnas y datos del tab activo
   const currentColumns = columns[activeTab] || columns;
   const currentData = data[activeTab] || data;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="
+      bg-white dark:bg-slate-800
+      rounded-2xl shadow-sm
+      border border-gray-100 dark:border-slate-700
+      overflow-hidden
+    ">
       {/* Tabs */}
-      <div className="border-b border-gray-100">
+      <div className="border-b border-gray-100 dark:border-slate-700">
         <nav className="flex">
           {tabs.map((tab) => (
             <button
@@ -179,14 +212,14 @@ const DataTable = ({
               className={`
                 px-6 py-4 text-sm font-medium transition-colors relative
                 ${activeTab === tab.id
-                  ? 'text-slate-900'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'text-slate-900 dark:text-slate-100'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                 }
               `}
             >
               {tab.label}
               {tab.count !== undefined && (
-                <span className="ml-2 text-xs bg-slate-100 px-2 py-0.5 rounded-full">
+                <span className="ml-2 text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">
                   {tab.count}
                 </span>
               )}
@@ -198,7 +231,7 @@ const DataTable = ({
         </nav>
       </div>
 
-      {/* Table */}
+      {/* Tabla */}
       <SimpleTable
         columns={currentColumns}
         data={currentData}
@@ -210,8 +243,10 @@ const DataTable = ({
   );
 };
 
+// ======================================================
+// PROPTYPES
+// ======================================================
 DataTable.propTypes = {
-  /** Array de tabs { id, label, count? } */
   tabs: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.string.isRequired,
@@ -219,30 +254,15 @@ DataTable.propTypes = {
       count: PropTypes.number,
     })
   ),
-  /** Columnas de la tabla (objeto por tab o array simple) */
   columns: PropTypes.oneOfType([
-    PropTypes.arrayOf(
-      PropTypes.shape({
-        key: PropTypes.string.isRequired,
-        label: PropTypes.string.isRequired,
-        align: PropTypes.oneOf(['left', 'center', 'right']),
-        type: PropTypes.oneOf(['status', 'id', 'currency', 'default']),
-        render: PropTypes.func,
-      })
-    ),
+    PropTypes.array,
     PropTypes.object,
   ]).isRequired,
-  /** Datos de la tabla (objeto por tab o array simple) */
   data: PropTypes.oneOfType([PropTypes.array, PropTypes.object]).isRequired,
-  /** Tab activo por defecto */
   defaultTab: PropTypes.string,
-  /** Callback cuando cambia el tab */
   onTabChange: PropTypes.func,
-  /** Callback al hacer click en una fila */
   onRowClick: PropTypes.func,
-  /** Estado de carga */
   loading: PropTypes.bool,
-  /** Mensaje cuando no hay datos */
   emptyMessage: PropTypes.string,
 };
 

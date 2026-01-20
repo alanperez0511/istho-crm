@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, SearchBar } from '../../components/common';
@@ -143,11 +143,10 @@ const ReporteCard = ({ reporte, onGenerar, onVer, onToggleFavorito }) => {
         </div>
         <button
           onClick={() => onToggleFavorito(reporte.id)}
-          className={`p-2 rounded-lg transition-colors ${
-            reporte.favorito 
-              ? 'text-amber-500 bg-amber-50' 
+          className={`p-2 rounded-lg transition-colors ${reporte.favorito
+              ? 'text-amber-500 bg-amber-50'
               : 'text-slate-300 hover:text-amber-500 hover:bg-amber-50'
-          }`}
+            }`}
         >
           <Star className={`w-5 h-5 ${reporte.favorito ? 'fill-current' : ''}`} />
         </button>
@@ -215,9 +214,8 @@ const ReporteRecienteRow = ({ reporte }) => {
         <p className="text-sm font-medium text-slate-800 truncate">{reporte.titulo}</p>
         <p className="text-xs text-slate-400">{reporte.fecha}</p>
       </div>
-      <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-        reporte.formato === 'PDF' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
-      }`}>
+      <span className={`px-2 py-0.5 text-xs font-medium rounded ${reporte.formato === 'PDF' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+        }`}>
         {reporte.formato}
       </span>
       <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
@@ -270,7 +268,7 @@ const ReportesList = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* Header */}
@@ -369,11 +367,10 @@ const ReportesList = () => {
                   </select>
                   <button
                     onClick={() => setShowFavoritosOnly(!showFavoritosOnly)}
-                    className={`p-2.5 rounded-xl transition-colors ${
-                      showFavoritosOnly 
-                        ? 'bg-amber-100 text-amber-600' 
+                    className={`p-2.5 rounded-xl transition-colors ${showFavoritosOnly
+                        ? 'bg-amber-100 text-amber-600'
                         : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                    }`}
+                      }`}
                   >
                     <Star className={`w-5 h-5 ${showFavoritosOnly ? 'fill-current' : ''}`} />
                   </button>
@@ -453,8 +450,8 @@ const ReportesList = () => {
               <p className="text-sm text-orange-100 mb-4">
                 Genera un reporte personalizado con los datos que necesitas
               </p>
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 icon={Plus}
                 onClick={() => navigate('/reportes/crear')}
                 fullWidth

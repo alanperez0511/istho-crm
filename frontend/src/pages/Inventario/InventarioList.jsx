@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import {
@@ -93,7 +93,7 @@ const FILTER_OPTIONS = {
  */
 const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, canEdit, canDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
-  
+
   // Usar snake_case para campos del backend
   const stockActual = producto.stock_actual || producto.cantidad || 0;
 
@@ -140,9 +140,8 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
                 </button>
                 <button
                   onClick={() => { onSalida(producto); setIsOpen(false); }}
-                  className={`flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-blue-50 ${
-                    stockActual === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600'
-                  }`}
+                  className={`flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-blue-50 ${stockActual === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-blue-600'
+                    }`}
                   disabled={stockActual === 0}
                 >
                   <PackageMinus className="w-4 h-4" />
@@ -176,7 +175,7 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
 const StockIndicator = ({ actual, minimo }) => {
   const porcentaje = minimo > 0 ? (actual / minimo) * 100 : 100;
   let colorClass = 'bg-emerald-500';
-  
+
   if (actual === 0) {
     colorClass = 'bg-red-500';
   } else if (porcentaje <= 100) {
@@ -186,7 +185,7 @@ const StockIndicator = ({ actual, minimo }) => {
   return (
     <div className="flex items-center gap-2">
       <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
-        <div 
+        <div
           className={`h-full transition-all duration-300 ${colorClass}`}
           style={{ width: `${Math.min(porcentaje, 100)}%` }}
         />
@@ -245,7 +244,7 @@ const InventarioList = () => {
     registrarMovimiento,
     // Stats
     fetchStats,
-  } = useInventario({ 
+  } = useInventario({
     autoFetch: true,
     autoFetchStats: true,
     initialFilters: user?.rol === 'cliente' ? { cliente_id: user.cliente_id } : {},
@@ -257,7 +256,7 @@ const InventarioList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({});
   const [showFilters, setShowFilters] = useState(false);
-  
+
   // Modals
   const [formModal, setFormModal] = useState({ isOpen: false, producto: null });
   const [movimientoModal, setMovimientoModal] = useState({ isOpen: false, tipo: 'entrada', producto: null });
@@ -297,7 +296,7 @@ const InventarioList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const handleSearch = (value) => {
     setSearchTerm(value);
     hookSearch(value);
@@ -398,7 +397,7 @@ const InventarioList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // FORMATTERS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const formatCurrency = (value) => {
     if (!value) return '$0';
     return new Intl.NumberFormat('es-CO', {
@@ -411,7 +410,7 @@ const InventarioList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // KPIs PARA DISPLAY
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const displayKpis = kpis || {
     total: productos.length,
     disponibles: productos.filter(p => p.estado === 'disponible').length,
@@ -425,10 +424,10 @@ const InventarioList = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader notificationCount={displayKpis.bajoStock + displayKpis.agotados} />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* ════════════════════════════════════════════════════════════════ */}
@@ -443,26 +442,26 @@ const InventarioList = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              icon={RefreshCw} 
+            <Button
+              variant="ghost"
+              icon={RefreshCw}
               onClick={refresh}
               loading={isRefreshing}
               title="Actualizar datos"
             />
-            
+
             {canExport && (
               <Button variant="outline" icon={Download} size="md">
                 Exportar
               </Button>
             )}
-            
+
             {canImport && (
               <Button variant="outline" icon={Upload} size="md">
                 Importar
               </Button>
             )}
-            
+
             {canCreate && (
               <Button variant="primary" icon={Plus} onClick={handleCreate}>
                 Nuevo Producto
@@ -564,7 +563,7 @@ const InventarioList = () => {
                   placeholder="Todos los estados"
                 />
               </div>
-              
+
               {Object.keys(filters).length > 0 && (
                 <div className="mt-4 flex justify-end">
                   <Button variant="ghost" size="sm" onClick={handleClearFilters}>
@@ -656,7 +655,7 @@ const InventarioList = () => {
                     const stockMinimo = producto.stock_minimo || 0;
                     const costoUnitario = producto.costo_unitario || 0;
                     const bodegaLabel = FILTER_OPTIONS.bodega.find(b => b.value === producto.bodega || b.value === producto.zona);
-                    
+
                     return (
                       <tr
                         key={producto.id}
@@ -668,7 +667,7 @@ const InventarioList = () => {
                               <Package className="w-5 h-5 text-slate-500" />
                             </div>
                             <div>
-                              <p 
+                              <p
                                 className="text-sm font-medium text-slate-800 hover:text-orange-600 cursor-pointer"
                                 onClick={() => handleView(producto)}
                               >
@@ -690,9 +689,9 @@ const InventarioList = () => {
                           </div>
                         </td>
                         <td className="py-4 px-4">
-                          <StockIndicator 
-                            actual={stockActual} 
-                            minimo={stockMinimo} 
+                          <StockIndicator
+                            actual={stockActual}
+                            minimo={stockMinimo}
                           />
                         </td>
                         <td className="py-4 px-4 text-center">
@@ -742,7 +741,7 @@ const InventarioList = () => {
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
       {/* ══════════════════════════════════════════════════════════════════ */}
-      
+
       <ProductoForm
         isOpen={formModal.isOpen}
         onClose={() => setFormModal({ isOpen: false, producto: null })}

@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import {
@@ -39,9 +39,9 @@ import {
 // DATOS MOCK
 // ============================================
 const MOCK_DESPACHOS_ACTIVOS = [
-  { 
-    id: 'DSP-001', 
-    cliente: 'Lácteos Betania S.A.S', 
+  {
+    id: 'DSP-001',
+    cliente: 'Lácteos Betania S.A.S',
     destino: 'Medellín, Antioquia',
     direccion: 'Cra 45 #78-90, Zona Industrial',
     vehiculo: 'ABC-123',
@@ -58,9 +58,9 @@ const MOCK_DESPACHOS_ACTIVOS = [
     eventos: 12,
     alertas: 0,
   },
-  { 
-    id: 'DSP-004', 
-    cliente: 'Prodenvases S.A.S', 
+  {
+    id: 'DSP-004',
+    cliente: 'Prodenvases S.A.S',
     destino: 'Barranquilla, Atlántico',
     direccion: 'Vía 40 #85-55, Zona Industrial',
     vehiculo: 'DEF-456',
@@ -77,9 +77,9 @@ const MOCK_DESPACHOS_ACTIVOS = [
     eventos: 8,
     alertas: 1,
   },
-  { 
-    id: 'DSP-007', 
-    cliente: 'Almacenes Éxito S.A', 
+  {
+    id: 'DSP-007',
+    cliente: 'Almacenes Éxito S.A',
     destino: 'Bucaramanga, Santander',
     direccion: 'Av Quebrada Seca #35-20',
     vehiculo: 'ABC-123',
@@ -96,9 +96,9 @@ const MOCK_DESPACHOS_ACTIVOS = [
     eventos: 3,
     alertas: 0,
   },
-  { 
-    id: 'DSP-009', 
-    cliente: 'Klar Colombia S.A.S', 
+  {
+    id: 'DSP-009',
+    cliente: 'Klar Colombia S.A.S',
     destino: 'Cali, Valle del Cauca',
     direccion: 'Zona Franca del Pacífico, Bod 22',
     vehiculo: 'GHI-789',
@@ -115,9 +115,9 @@ const MOCK_DESPACHOS_ACTIVOS = [
     eventos: 18,
     alertas: 0,
   },
-  { 
-    id: 'DSP-010', 
-    cliente: 'Eternit Colombia S.A', 
+  {
+    id: 'DSP-010',
+    cliente: 'Eternit Colombia S.A',
     destino: 'Pereira, Risaralda',
     direccion: 'Zona Industrial La Popa, Bod 8',
     vehiculo: 'JKL-012',
@@ -156,7 +156,7 @@ const ProgressBar = ({ progress, showLabel = true }) => {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-        <div 
+        <div
           className={`h-full ${colorClass} transition-all duration-500`}
           style={{ width: `${progress}%` }}
         />
@@ -175,14 +175,14 @@ const ProgressBar = ({ progress, showLabel = true }) => {
 // ============================================
 const DespachoCard = ({ despacho, onView, onCall, onMessage, isSelected, onSelect }) => {
   const navigate = useNavigate();
-  
+
   return (
-    <div 
+    <div
       onClick={() => onSelect(despacho.id)}
       className={`
         bg-white rounded-2xl p-5 shadow-sm border transition-all cursor-pointer
-        ${isSelected 
-          ? 'border-orange-500 ring-2 ring-orange-500/20' 
+        ${isSelected
+          ? 'border-orange-500 ring-2 ring-orange-500/20'
           : 'border-gray-100 hover:border-orange-200 hover:shadow-md'
         }
       `}
@@ -259,7 +259,7 @@ const DespachoCard = ({ despacho, onView, onCall, onMessage, isSelected, onSelec
             <p className="text-xs text-slate-400">{despacho.conductorTel}</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-1">
           <button
             onClick={(e) => { e.stopPropagation(); onCall(despacho); }}
@@ -300,7 +300,7 @@ const MapaSimulado = ({ despachos, selectedId, onSelectDespacho }) => {
         <svg className="w-full h-full opacity-20">
           <defs>
             <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="0.5"/>
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="0.5" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
@@ -342,20 +342,20 @@ const MapaSimulado = ({ despachos, selectedId, onSelectDespacho }) => {
                   ${isSelected ? 'bg-orange-400/30' : 'bg-blue-400/20'}
                 `} />
               )}
-              
+
               {/* Marcador */}
               <div className={`
                 relative w-10 h-10 rounded-full flex items-center justify-center shadow-lg
-                ${isSelected 
-                  ? 'bg-orange-500 text-white' 
-                  : d.estado === 'en_transito' 
-                    ? 'bg-blue-500 text-white' 
+                ${isSelected
+                  ? 'bg-orange-500 text-white'
+                  : d.estado === 'en_transito'
+                    ? 'bg-blue-500 text-white'
                     : 'bg-amber-500 text-white'
                 }
               `}>
                 <Truck className="w-5 h-5" />
               </div>
-              
+
               {/* Label */}
               <div className={`
                 absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap
@@ -370,7 +370,7 @@ const MapaSimulado = ({ despachos, selectedId, onSelectDespacho }) => {
       })}
 
       {/* Origen (ISTHO) */}
-      <div 
+      <div
         className="absolute z-5"
         style={{ top: '45%', left: '28%' }}
       >
@@ -465,7 +465,7 @@ const TrazabilidadList = () => {
     const enTransito = despachos.filter(d => d.estado === 'en_transito').length;
     const enPreparacion = despachos.filter(d => d.estado === 'en_preparacion').length;
     const conAlertas = despachos.filter(d => d.alertas > 0).length;
-    const progresoPromedio = despachos.length > 0 
+    const progresoPromedio = despachos.length > 0
       ? Math.round(despachos.reduce((sum, d) => sum + d.progreso, 0) / despachos.length)
       : 0;
 
@@ -477,9 +477,9 @@ const TrazabilidadList = () => {
     return despachos.filter((d) => {
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        if (!d.id.toLowerCase().includes(search) && 
-            !d.cliente.toLowerCase().includes(search) &&
-            !d.conductor.toLowerCase().includes(search)) {
+        if (!d.id.toLowerCase().includes(search) &&
+          !d.cliente.toLowerCase().includes(search) &&
+          !d.conductor.toLowerCase().includes(search)) {
           return false;
         }
       }
@@ -507,7 +507,7 @@ const TrazabilidadList = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader notificationCount={kpis.conAlertas} />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* Header */}
@@ -523,9 +523,9 @@ const TrazabilidadList = () => {
             <span className="text-xs text-slate-400">
               Última actualización: {lastUpdate.toLocaleTimeString('es-CO')}
             </span>
-            <Button 
-              variant="outline" 
-              icon={RefreshCw} 
+            <Button
+              variant="outline"
+              icon={RefreshCw}
               onClick={handleRefresh}
               loading={loading}
             >
@@ -571,7 +571,7 @@ const TrazabilidadList = () => {
           {/* Mapa */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-[500px]">
-              <MapaSimulado 
+              <MapaSimulado
                 despachos={filteredDespachos}
                 selectedId={selectedDespacho}
                 onSelectDespacho={setSelectedDespacho}

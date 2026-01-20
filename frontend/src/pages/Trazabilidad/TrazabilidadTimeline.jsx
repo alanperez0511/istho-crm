@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, StatusChip } from '../../components/common';
@@ -61,10 +61,10 @@ const MOCK_DESPACHO = {
 };
 
 const MOCK_EVENTOS = [
-  { 
-    id: 1, 
-    tipo: 'creacion', 
-    titulo: 'Despacho creado', 
+  {
+    id: 1,
+    tipo: 'creacion',
+    titulo: 'Despacho creado',
     descripcion: 'Orden de despacho generada en el sistema',
     ubicacion: 'Centro Logístico ISTHO',
     fecha: '2026-01-07 15:30',
@@ -72,10 +72,10 @@ const MOCK_EVENTOS = [
     icon: FileText,
     color: 'slate',
   },
-  { 
-    id: 2, 
-    tipo: 'asignacion', 
-    titulo: 'Vehículo asignado', 
+  {
+    id: 2,
+    tipo: 'asignacion',
+    titulo: 'Vehículo asignado',
     descripcion: 'Asignado camión ABC-123 (Furgón Refrigerado) con conductor Juan Pérez',
     ubicacion: 'Centro Logístico ISTHO',
     fecha: '2026-01-07 16:00',
@@ -83,10 +83,10 @@ const MOCK_EVENTOS = [
     icon: Truck,
     color: 'blue',
   },
-  { 
-    id: 3, 
-    tipo: 'preparacion', 
-    titulo: 'Inicio de preparación', 
+  {
+    id: 3,
+    tipo: 'preparacion',
+    titulo: 'Inicio de preparación',
     descripcion: 'Inicio de alistamiento de productos en bodega refrigerada',
     ubicacion: 'Bodega 01 - Refrigerados',
     fecha: '2026-01-08 06:00',
@@ -94,10 +94,10 @@ const MOCK_EVENTOS = [
     icon: Package,
     color: 'amber',
   },
-  { 
-    id: 4, 
-    tipo: 'verificacion', 
-    titulo: 'Verificación de temperatura', 
+  {
+    id: 4,
+    tipo: 'verificacion',
+    titulo: 'Verificación de temperatura',
     descripcion: 'Temperatura del furgón verificada: 4°C ✓',
     ubicacion: 'Bodega 01 - Refrigerados',
     fecha: '2026-01-08 07:15',
@@ -106,10 +106,10 @@ const MOCK_EVENTOS = [
     color: 'cyan',
     datos: { temperatura: 4 },
   },
-  { 
-    id: 5, 
-    tipo: 'carga', 
-    titulo: 'Carga completada', 
+  {
+    id: 5,
+    tipo: 'carga',
+    titulo: 'Carga completada',
     descripcion: 'Productos verificados y cargados. 450 unidades totales en 3 productos.',
     ubicacion: 'Muelle de Carga 02',
     fecha: '2026-01-08 07:45',
@@ -118,10 +118,10 @@ const MOCK_EVENTOS = [
     color: 'emerald',
     datos: { unidades: 450, productos: 3 },
   },
-  { 
-    id: 6, 
-    tipo: 'evidencia', 
-    titulo: 'Evidencia fotográfica', 
+  {
+    id: 6,
+    tipo: 'evidencia',
+    titulo: 'Evidencia fotográfica',
     descripcion: 'Foto de carga tomada antes de sellar el furgón',
     ubicacion: 'Muelle de Carga 02',
     fecha: '2026-01-08 07:50',
@@ -130,10 +130,10 @@ const MOCK_EVENTOS = [
     color: 'violet',
     imagen: true,
   },
-  { 
-    id: 7, 
-    tipo: 'salida', 
-    titulo: 'Salida de bodega', 
+  {
+    id: 7,
+    tipo: 'salida',
+    titulo: 'Salida de bodega',
     descripcion: 'Vehículo sale de instalaciones hacia destino final',
     ubicacion: 'Centro Logístico ISTHO - Girardota',
     fecha: '2026-01-08 08:30',
@@ -142,10 +142,10 @@ const MOCK_EVENTOS = [
     color: 'emerald',
     coordenadas: { lat: 6.3816, lng: -75.4536 },
   },
-  { 
-    id: 8, 
-    tipo: 'checkpoint', 
-    titulo: 'Checkpoint - Peaje Copacabana', 
+  {
+    id: 8,
+    tipo: 'checkpoint',
+    titulo: 'Checkpoint - Peaje Copacabana',
     descripcion: 'Paso por peaje registrado. Temperatura: 4.1°C',
     ubicacion: 'Peaje Copacabana, Antioquia',
     fecha: '2026-01-08 08:55',
@@ -155,10 +155,10 @@ const MOCK_EVENTOS = [
     coordenadas: { lat: 6.3456, lng: -75.5012 },
     datos: { temperatura: 4.1 },
   },
-  { 
-    id: 9, 
-    tipo: 'combustible', 
-    titulo: 'Carga de combustible', 
+  {
+    id: 9,
+    tipo: 'combustible',
+    titulo: 'Carga de combustible',
     descripcion: 'Parada para tanqueo. 45 galones cargados.',
     ubicacion: 'Estación Terpel - Bello',
     fecha: '2026-01-08 09:15',
@@ -167,10 +167,10 @@ const MOCK_EVENTOS = [
     color: 'amber',
     datos: { galones: 45 },
   },
-  { 
-    id: 10, 
-    tipo: 'checkpoint', 
-    titulo: 'Checkpoint - Túnel de Occidente', 
+  {
+    id: 10,
+    tipo: 'checkpoint',
+    titulo: 'Checkpoint - Túnel de Occidente',
     descripcion: 'Ingreso al Túnel de Occidente. Todo en orden.',
     ubicacion: 'Túnel de Occidente, Antioquia',
     fecha: '2026-01-08 09:45',
@@ -179,10 +179,10 @@ const MOCK_EVENTOS = [
     color: 'blue',
     coordenadas: { lat: 6.2850, lng: -75.6230 },
   },
-  { 
-    id: 11, 
-    tipo: 'alerta', 
-    titulo: 'Alerta de tráfico', 
+  {
+    id: 11,
+    tipo: 'alerta',
+    titulo: 'Alerta de tráfico',
     descripcion: 'Congestión vehicular detectada. Tiempo estimado aumentado en 15 min.',
     ubicacion: 'Autopista Medellín - San Cristóbal',
     fecha: '2026-01-08 10:10',
@@ -190,10 +190,10 @@ const MOCK_EVENTOS = [
     icon: AlertTriangle,
     color: 'red',
   },
-  { 
-    id: 12, 
-    tipo: 'transito', 
-    titulo: 'En tránsito', 
+  {
+    id: 12,
+    tipo: 'transito',
+    titulo: 'En tránsito',
     descripcion: 'Circulando normalmente por autopista. Temperatura estable: 4.2°C',
     ubicacion: 'Autopista Medellín - Bogotá, Km 25',
     fecha: '2026-01-08 10:45',
@@ -211,7 +211,7 @@ const MOCK_EVENTOS = [
 // ============================================
 const TimelineEvent = ({ evento, isLast, isFirst }) => {
   const Icon = evento.icon;
-  
+
   const colorConfig = {
     slate: { bg: 'bg-slate-100', icon: 'text-slate-600', border: 'border-slate-200' },
     blue: { bg: 'bg-blue-100', icon: 'text-blue-600', border: 'border-blue-200' },
@@ -321,13 +321,13 @@ const TimelineEvent = ({ evento, isLast, isFirst }) => {
 // ============================================
 const InfoPanel = ({ despacho }) => {
   const distanciaRestante = despacho.distanciaTotal - despacho.distanciaRecorrida;
-  
+
   return (
     <div className="space-y-4">
       {/* Estado actual */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
         <h3 className="font-semibold text-slate-800 mb-4">Estado Actual</h3>
-        
+
         <div className="space-y-4">
           {/* Progreso */}
           <div>
@@ -336,7 +336,7 @@ const InfoPanel = ({ despacho }) => {
               <span className="font-medium text-slate-800">{despacho.progreso}%</span>
             </div>
             <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-blue-500 transition-all duration-500"
                 style={{ width: `${despacho.progreso}%` }}
               />
@@ -379,7 +379,7 @@ const InfoPanel = ({ despacho }) => {
               <span className="font-medium text-slate-800">{despacho.combustible}%</span>
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div 
+              <div
                 className={`h-full ${despacho.combustible > 30 ? 'bg-emerald-500' : 'bg-amber-500'}`}
                 style={{ width: `${despacho.combustible}%` }}
               />
@@ -391,7 +391,7 @@ const InfoPanel = ({ despacho }) => {
       {/* Conductor */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
         <h3 className="font-semibold text-slate-800 mb-4">Conductor</h3>
-        
+
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
             <User className="w-6 h-6 text-slate-500" />
@@ -403,17 +403,17 @@ const InfoPanel = ({ despacho }) => {
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <Button 
-            variant="outline" 
-            icon={Phone} 
+          <Button
+            variant="outline"
+            icon={Phone}
             size="sm"
             onClick={() => window.open(`tel:${despacho.conductorTel}`, '_self')}
           >
             Llamar
           </Button>
-          <Button 
-            variant="outline" 
-            icon={MessageSquare} 
+          <Button
+            variant="outline"
+            icon={MessageSquare}
             size="sm"
             onClick={() => window.open(`https://wa.me/${despacho.conductorTel.replace(/\D/g, '')}`, '_blank')}
           >
@@ -425,7 +425,7 @@ const InfoPanel = ({ despacho }) => {
       {/* Vehículo */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
         <h3 className="font-semibold text-slate-800 mb-4">Vehículo</h3>
-        
+
         <div className="space-y-3">
           <div className="flex items-center gap-3">
             <Truck className="w-5 h-5 text-slate-400" />
@@ -440,7 +440,7 @@ const InfoPanel = ({ despacho }) => {
       {/* Destino */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
         <h3 className="font-semibold text-slate-800 mb-4">Destino</h3>
-        
+
         <div className="space-y-3">
           <div className="flex items-start gap-3">
             <Building2 className="w-5 h-5 text-slate-400 mt-0.5" />
@@ -450,7 +450,7 @@ const InfoPanel = ({ despacho }) => {
               <p className="text-sm text-slate-500">{despacho.destino}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
             <Clock className="w-5 h-5 text-slate-400" />
             <div>
@@ -488,8 +488,8 @@ const TrazabilidadTimeline = () => {
   }, [id]);
 
   // Filtrar eventos
-  const filteredEventos = filterTipo === 'todos' 
-    ? eventos 
+  const filteredEventos = filterTipo === 'todos'
+    ? eventos
     : eventos.filter(e => e.tipo === filterTipo);
 
   // Tipos únicos para filtro
@@ -498,7 +498,7 @@ const TrazabilidadTimeline = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-48" />
@@ -514,7 +514,7 @@ const TrazabilidadTimeline = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* Header */}
@@ -560,7 +560,7 @@ const TrazabilidadTimeline = () => {
                 <h2 className="text-lg font-semibold text-slate-800">
                   Timeline de Eventos ({eventos.length})
                 </h2>
-                
+
                 {/* Filtro */}
                 <select
                   value={filterTipo}

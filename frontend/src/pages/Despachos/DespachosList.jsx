@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import {
@@ -99,9 +99,9 @@ const PriorityBadge = ({ prioridad }) => {
     normal: { color: 'bg-slate-100 text-slate-700', label: 'Normal' },
     baja: { color: 'bg-slate-100 text-slate-500', label: 'Baja' },
   };
-  
+
   const c = config[prioridad] || config.normal;
-  
+
   return (
     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${c.color}`}>
       {c.label}
@@ -114,7 +114,7 @@ const PriorityBadge = ({ prioridad }) => {
  */
 const RowActions = ({ despacho, onView, onEdit, onAnular, canEdit }) => {
   const [isOpen, setIsOpen] = useState(false);
-  
+
   return (
     <div className="relative">
       <button
@@ -123,7 +123,7 @@ const RowActions = ({ despacho, onView, onEdit, onAnular, canEdit }) => {
       >
         <MoreVertical className="w-4 h-4" />
       </button>
-      
+
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
@@ -135,7 +135,7 @@ const RowActions = ({ despacho, onView, onEdit, onAnular, canEdit }) => {
               <Eye className="w-4 h-4" />
               Ver detalle
             </button>
-            
+
             {despacho.estado !== 'cerrado' && despacho.estado !== 'anulado' && canEdit && (
               <>
                 <button
@@ -173,11 +173,11 @@ const DespachoCard = ({ despacho, onView, onEdit }) => {
     cerrado: CheckCircle,
     anulado: XCircle,
   };
-  
+
   const Icon = estadoIcon[despacho.estado] || Truck;
-  
+
   return (
-    <div 
+    <div
       onClick={() => onView(despacho)}
       className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer"
     >
@@ -197,7 +197,7 @@ const DespachoCard = ({ despacho, onView, onEdit }) => {
         </div>
         <PriorityBadge prioridad={despacho.prioridad} />
       </div>
-      
+
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <MapPin className="w-4 h-4 text-slate-400" />
@@ -212,7 +212,7 @@ const DespachoCard = ({ despacho, onView, onEdit }) => {
           {despacho.tipo === 'ingreso' ? 'Ingreso' : 'Salida'}
         </div>
       </div>
-      
+
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
         <StatusChip status={despacho.estado} />
         {despacho.vehiculo_placa && (
@@ -234,11 +234,11 @@ const DespachosList = () => {
   const [searchParams] = useSearchParams();
   const { user, hasPermission } = useAuth();
   const { success, apiError, saved } = useNotification();
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // HOOK DE DESPACHOS - MAPEO CORRECTO
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const {
     // Estado de lista
     despachos,
@@ -246,48 +246,48 @@ const DespachosList = () => {
     error,
     pagination,
     conteoEstados,
-    
+
     // CRUD - Nombres correctos del hook
     fetchDespachos,
     crearDespacho,
     anularDespacho,
-    
+
     // Filtros y paginación
     search,
     applyFilters,
     clearFilters,
     goToPage,
     refresh,
-  } = useDespachos({ 
+  } = useDespachos({
     autoFetch: true,
     // Si es cliente, filtrar por su cliente_id
     initialFilters: user?.rol === 'cliente' ? { cliente_id: user.cliente_id } : {},
   });
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // ESTADOS LOCALES
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({});
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('table');
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Modals
   const [formModal, setFormModal] = useState({ isOpen: false, despacho: null });
   const [anularModal, setAnularModal] = useState({ isOpen: false, despacho: null });
   const [formLoading, setFormLoading] = useState(false);
-  
+
   // Permisos
   const canCreate = hasPermission('despachos', 'crear');
   const canEdit = hasPermission('despachos', 'editar');
   const canExport = hasPermission('despachos', 'exportar');
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // APLICAR FILTRO DE URL
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   useEffect(() => {
     const filterParam = searchParams.get('filter');
     if (filterParam === 'pendientes') {
@@ -301,11 +301,11 @@ const DespachosList = () => {
       applyFilters({ estado: 'en_proceso' });
     }
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -314,12 +314,12 @@ const DespachosList = () => {
       setRefreshing(false);
     }
   };
-  
+
   const handleSearch = (value) => {
     setSearchTerm(value);
     search(value);
   };
-  
+
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters };
     if (value) {
@@ -330,29 +330,29 @@ const DespachosList = () => {
     setFilters(newFilters);
     applyFilters(newFilters);
   };
-  
+
   const handleClearFilters = () => {
     setFilters({});
     setSearchTerm('');
     clearFilters();
   };
-  
+
   const handleCreate = () => {
     setFormModal({ isOpen: true, despacho: null });
   };
-  
+
   const handleEdit = (despacho) => {
     setFormModal({ isOpen: true, despacho });
   };
-  
+
   const handleView = (despacho) => {
     navigate(`/despachos/${despacho.id}`);
   };
-  
+
   const handleAnular = (despacho) => {
     setAnularModal({ isOpen: true, despacho });
   };
-  
+
   // ✅ CORRECCIÓN: Usar crearDespacho del hook
   const handleFormSubmit = async (data) => {
     setFormLoading(true);
@@ -375,7 +375,7 @@ const DespachosList = () => {
       setFormLoading(false);
     }
   };
-  
+
   // ✅ CORRECCIÓN: Usar anularDespacho del hook
   const handleConfirmAnular = async () => {
     setFormLoading(true);
@@ -390,31 +390,31 @@ const DespachosList = () => {
       setFormLoading(false);
     }
   };
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // KPIs - Usar conteoEstados del hook
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const displayKpis = {
     enProceso: conteoEstados?.en_proceso || 0,
     pendientes: conteoEstados?.pendiente || 0,
     cerrados: conteoEstados?.cerrado || 0,
     anulados: conteoEstados?.anulado || 0,
   };
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader notificationCount={displayKpis.pendientes} />
-      
+
+
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* PAGE HEADER */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        
+
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">Despachos</h1>
@@ -422,22 +422,22 @@ const DespachosList = () => {
               Gestiona los despachos y entregas
             </p>
           </div>
-          
+
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              icon={RefreshCw} 
+            <Button
+              variant="ghost"
+              icon={RefreshCw}
               onClick={handleRefresh}
               loading={refreshing}
               title="Actualizar datos"
             />
-            
+
             <ProtectedAction module="despachos" action="exportar">
               <Button variant="outline" icon={Download} size="md">
                 Exportar
               </Button>
             </ProtectedAction>
-            
+
             <ProtectedAction module="despachos" action="crear">
               <Button variant="primary" icon={Plus} onClick={handleCreate}>
                 Nuevo Despacho
@@ -445,11 +445,11 @@ const DespachosList = () => {
             </ProtectedAction>
           </div>
         </div>
-        
+
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* KPIs */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <KpiCard
             title="En Proceso"
@@ -488,11 +488,11 @@ const DespachosList = () => {
             className="cursor-pointer hover:shadow-md transition-shadow"
           />
         </div>
-        
+
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* SEARCH & FILTERS */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        
+
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
@@ -503,28 +503,26 @@ const DespachosList = () => {
                 onClear={() => handleSearch('')}
               />
             </div>
-            
+
             <div className="flex items-center gap-2">
               {/* View Toggle */}
               <div className="flex bg-slate-100 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('table')}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    viewMode === 'table' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
-                  }`}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${viewMode === 'table' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
+                    }`}
                 >
                   Tabla
                 </button>
                 <button
                   onClick={() => setViewMode('cards')}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    viewMode === 'cards' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
-                  }`}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${viewMode === 'cards' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
+                    }`}
                 >
                   Tarjetas
                 </button>
               </div>
-              
+
               <Button
                 variant={showFilters ? 'secondary' : 'outline'}
                 icon={Filter}
@@ -539,7 +537,7 @@ const DespachosList = () => {
               </Button>
             </div>
           </div>
-          
+
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -565,7 +563,7 @@ const DespachosList = () => {
                   placeholder="Todos los tipos"
                 />
               </div>
-              
+
               {Object.keys(filters).length > 0 && (
                 <div className="mt-4 flex justify-end">
                   <Button variant="ghost" size="sm" onClick={handleClearFilters}>
@@ -576,27 +574,27 @@ const DespachosList = () => {
             </div>
           )}
         </div>
-        
+
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* RESULTS COUNT */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        
+
         <div className="mb-4">
           <p className="text-sm text-slate-500">
             {pagination?.total || despachos.length} despacho{(pagination?.total || despachos.length) !== 1 ? 's' : ''} encontrado{(pagination?.total || despachos.length) !== 1 ? 's' : ''}
           </p>
         </div>
-        
+
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* ERROR STATE */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        
+
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
             <p className="text-red-700 text-sm">{error}</p>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleRefresh}
               className="mt-2"
             >
@@ -604,11 +602,11 @@ const DespachosList = () => {
             </Button>
           </div>
         )}
-        
+
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* CONTENT */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        
+
         {loading ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
             {[0, 1, 2, 3, 4].map((i) => (
@@ -698,7 +696,7 @@ const DespachosList = () => {
                             <Truck className="w-5 h-5 text-slate-500" />
                           </div>
                           <div>
-                            <p 
+                            <p
                               className="text-sm font-semibold text-slate-800 hover:text-orange-600 cursor-pointer"
                               onClick={() => handleView(despacho)}
                             >
@@ -710,7 +708,7 @@ const DespachosList = () => {
                           </div>
                         </div>
                       </td>
-                      
+
                       <td className="py-4 px-4">
                         <p className="text-sm font-medium text-slate-800">
                           {despacho.cliente?.razon_social || despacho.cliente_nombre || '-'}
@@ -719,43 +717,42 @@ const DespachosList = () => {
                           {despacho.cliente?.codigo_cliente || ''}
                         </p>
                       </td>
-                      
+
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-1">
                           <MapPin className="w-3 h-3 text-slate-400" />
                           <span className="text-sm text-slate-600">
-                            {despacho.tipo === 'salida' 
+                            {despacho.tipo === 'salida'
                               ? (despacho.destino || '-')
                               : (despacho.origen || '-')
                             }
                           </span>
                         </div>
                       </td>
-                      
+
                       <td className="py-4 px-4 text-center">
                         <p className="text-sm text-slate-800">
                           {despacho.fecha_operacion || '-'}
                         </p>
                       </td>
-                      
+
                       <td className="py-4 px-4 text-center">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          despacho.tipo === 'ingreso' 
-                            ? 'bg-green-100 text-green-700' 
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${despacho.tipo === 'ingreso'
+                            ? 'bg-green-100 text-green-700'
                             : 'bg-blue-100 text-blue-700'
-                        }`}>
+                          }`}>
                           {despacho.tipo === 'ingreso' ? 'Ingreso' : 'Salida'}
                         </span>
                       </td>
-                      
+
                       <td className="py-4 px-4 text-center">
                         <PriorityBadge prioridad={despacho.prioridad} />
                       </td>
-                      
+
                       <td className="py-4 px-4 text-center">
                         <StatusChip status={despacho.estado} />
                       </td>
-                      
+
                       <td className="py-4 px-4 text-center">
                         <RowActions
                           despacho={despacho}
@@ -770,7 +767,7 @@ const DespachosList = () => {
                 </tbody>
               </table>
             </div>
-            
+
             {pagination && pagination.totalPages > 1 && (
               <Pagination
                 currentPage={pagination.page}
@@ -782,7 +779,7 @@ const DespachosList = () => {
             )}
           </div>
         )}
-        
+
         {/* Pagination for Cards */}
         {viewMode === 'cards' && pagination && pagination.totalPages > 1 && (
           <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100">
@@ -795,18 +792,18 @@ const DespachosList = () => {
             />
           </div>
         )}
-        
+
         {/* Footer */}
         <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
           © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
           Centro Logístico Industrial del Norte, Girardota, Antioquia
         </footer>
       </main>
-      
+
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
       {/* ══════════════════════════════════════════════════════════════════ */}
-      
+
       <DespachoForm
         isOpen={formModal.isOpen}
         onClose={() => setFormModal({ isOpen: false, despacho: null })}
@@ -814,7 +811,7 @@ const DespachosList = () => {
         despacho={formModal.despacho}
         loading={formLoading}
       />
-      
+
       <ConfirmDialog
         isOpen={anularModal.isOpen}
         onClose={() => setAnularModal({ isOpen: false, despacho: null })}

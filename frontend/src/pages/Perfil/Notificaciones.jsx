@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, SearchBar } from '../../components/common';
@@ -67,11 +67,11 @@ var FILTER_OPTIONS = [
 // ════════════════════════════════════════════════════════════════════════════
 // NOTIFICACIÓN CARD
 // ════════════════════════════════════════════════════════════════════════════
-var NotificacionCard = function(props) {
+var NotificacionCard = function (props) {
   var notificacion = props.notificacion;
   var onMarcarLeida = props.onMarcarLeida;
   var onEliminar = props.onEliminar;
-  
+
   var _a = useState(false), menuOpen = _a[0], setMenuOpen = _a[1];
   var navigate = useNavigate();
 
@@ -95,7 +95,7 @@ var NotificacionCard = function(props) {
   var prioridad = prioridadConfig[notificacion.prioridad] || prioridadConfig.normal;
   var Icon = config.icon;
 
-  var handleAccion = function() {
+  var handleAccion = function () {
     var url = notificacion.accion_url || notificacion.url;
     if (url) {
       navigate(url);
@@ -105,8 +105,8 @@ var NotificacionCard = function(props) {
   return (
     <div className={
       'relative p-4 rounded-2xl border transition-all ' +
-      (notificacion.leida 
-        ? 'bg-white border-gray-100' 
+      (notificacion.leida
+        ? 'bg-white border-gray-100'
         : 'bg-orange-50/50 border-orange-200')
     }>
       {/* Indicador no leída */}
@@ -137,7 +137,7 @@ var NotificacionCard = function(props) {
             {/* Menu */}
             <div className="relative">
               <button
-                onClick={function() { setMenuOpen(!menuOpen); }}
+                onClick={function () { setMenuOpen(!menuOpen); }}
                 className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 <MoreVertical className="w-4 h-4" />
@@ -145,11 +145,11 @@ var NotificacionCard = function(props) {
 
               {menuOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={function() { setMenuOpen(false); }} />
+                  <div className="fixed inset-0 z-10" onClick={function () { setMenuOpen(false); }} />
                   <div className="absolute right-0 mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20">
                     {!notificacion.leida && (
                       <button
-                        onClick={function() { onMarcarLeida(notificacion.id); setMenuOpen(false); }}
+                        onClick={function () { onMarcarLeida(notificacion.id); setMenuOpen(false); }}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                       >
                         <Check className="w-4 h-4" />
@@ -158,7 +158,7 @@ var NotificacionCard = function(props) {
                     )}
                     {(notificacion.accion_url || notificacion.url) && (
                       <button
-                        onClick={function() { handleAccion(); setMenuOpen(false); }}
+                        onClick={function () { handleAccion(); setMenuOpen(false); }}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                       >
                         <Eye className="w-4 h-4" />
@@ -166,7 +166,7 @@ var NotificacionCard = function(props) {
                       </button>
                     )}
                     <button
-                      onClick={function() { onEliminar(notificacion.id); setMenuOpen(false); }}
+                      onClick={function () { onEliminar(notificacion.id); setMenuOpen(false); }}
                       className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -206,7 +206,7 @@ var NotificacionCard = function(props) {
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
-var Notificaciones = function() {
+var Notificaciones = function () {
   var navigate = useNavigate();
   var authHook = useAuth();
   var user = authHook.user;
@@ -226,7 +226,7 @@ var Notificaciones = function() {
   // ──────────────────────────────────────────────────────────────────────────
   // CARGAR NOTIFICACIONES
   // ──────────────────────────────────────────────────────────────────────────
-  var fetchNotificaciones = async function() {
+  var fetchNotificaciones = async function () {
     try {
       if (notificacionesService && notificacionesService.getAll) {
         var data = await notificacionesService.getAll();
@@ -239,8 +239,8 @@ var Notificaciones = function() {
     }
   };
 
-  useEffect(function() {
-    var loadData = async function() {
+  useEffect(function () {
+    var loadData = async function () {
       setLoading(true);
       await fetchNotificaciones();
       setLoading(false);
@@ -251,17 +251,17 @@ var Notificaciones = function() {
   // ──────────────────────────────────────────────────────────────────────────
   // STATS
   // ──────────────────────────────────────────────────────────────────────────
-  var stats = useMemo(function() {
-    var noLeidas = notificaciones.filter(function(n) { return !n.leida; }).length;
-    var urgentes = notificaciones.filter(function(n) { return n.prioridad === 'urgente' && !n.leida; }).length;
+  var stats = useMemo(function () {
+    var noLeidas = notificaciones.filter(function (n) { return !n.leida; }).length;
+    var urgentes = notificaciones.filter(function (n) { return n.prioridad === 'urgente' && !n.leida; }).length;
     return { noLeidas: noLeidas, urgentes: urgentes };
   }, [notificaciones]);
 
   // ──────────────────────────────────────────────────────────────────────────
   // FILTRAR
   // ──────────────────────────────────────────────────────────────────────────
-  var filteredNotificaciones = useMemo(function() {
-    return notificaciones.filter(function(n) {
+  var filteredNotificaciones = useMemo(function () {
+    return notificaciones.filter(function (n) {
       if (filter === 'no_leidas' && n.leida) return false;
       if (filter !== 'todas' && filter !== 'no_leidas' && n.tipo !== filter) return false;
       if (searchTerm) {
@@ -279,21 +279,21 @@ var Notificaciones = function() {
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
-  
-  var handleRefresh = async function() {
+
+  var handleRefresh = async function () {
     setIsRefreshing(true);
     await fetchNotificaciones();
     setIsRefreshing(false);
   };
 
-  var handleMarcarLeida = async function(id) {
+  var handleMarcarLeida = async function (id) {
     try {
       if (notificacionesService && notificacionesService.marcarLeida) {
         await notificacionesService.marcarLeida(id);
       }
-      setNotificaciones(function(prev) {
-        return prev.map(function(n) { 
-          return n.id === id ? Object.assign({}, n, { leida: true }) : n; 
+      setNotificaciones(function (prev) {
+        return prev.map(function (n) {
+          return n.id === id ? Object.assign({}, n, { leida: true }) : n;
         });
       });
     } catch (err) {
@@ -301,14 +301,14 @@ var Notificaciones = function() {
     }
   };
 
-  var handleMarcarTodasLeidas = async function() {
+  var handleMarcarTodasLeidas = async function () {
     try {
       if (notificacionesService && notificacionesService.marcarTodasLeidas) {
         await notificacionesService.marcarTodasLeidas();
       }
-      setNotificaciones(function(prev) {
-        return prev.map(function(n) { 
-          return Object.assign({}, n, { leida: true }); 
+      setNotificaciones(function (prev) {
+        return prev.map(function (n) {
+          return Object.assign({}, n, { leida: true });
         });
       });
       success('Todas las notificaciones marcadas como leídas');
@@ -317,13 +317,13 @@ var Notificaciones = function() {
     }
   };
 
-  var handleEliminar = async function(id) {
+  var handleEliminar = async function (id) {
     try {
       if (notificacionesService && notificacionesService.eliminar) {
         await notificacionesService.eliminar(id);
       }
-      setNotificaciones(function(prev) { 
-        return prev.filter(function(n) { return n.id !== id; }); 
+      setNotificaciones(function (prev) {
+        return prev.filter(function (n) { return n.id !== id; });
       });
       success('Notificación eliminada');
     } catch (err) {
@@ -331,13 +331,13 @@ var Notificaciones = function() {
     }
   };
 
-  var handleEliminarLeidas = async function() {
+  var handleEliminarLeidas = async function () {
     try {
       if (notificacionesService && notificacionesService.eliminarLeidas) {
         await notificacionesService.eliminarLeidas();
       }
-      setNotificaciones(function(prev) { 
-        return prev.filter(function(n) { return !n.leida; }); 
+      setNotificaciones(function (prev) {
+        return prev.filter(function (n) { return !n.leida; });
       });
       success('Notificaciones leídas eliminadas');
     } catch (err) {
@@ -348,10 +348,10 @@ var Notificaciones = function() {
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader notificationCount={stats.noLeidas} />
+
 
       <main className="pt-28 px-4 pb-8 max-w-4xl mx-auto">
         {/* ════════════════════════════════════════════════════════════════ */}
@@ -361,7 +361,7 @@ var Notificaciones = function() {
           <div>
             <h1 className="text-3xl font-bold text-slate-800">Notificaciones</h1>
             <p className="text-slate-500 mt-1">
-              {stats.noLeidas > 0 
+              {stats.noLeidas > 0
                 ? 'Tienes ' + stats.noLeidas + ' notificación' + (stats.noLeidas > 1 ? 'es' : '') + ' sin leer'
                 : 'Todas las notificaciones leídas'
               }
@@ -369,9 +369,9 @@ var Notificaciones = function() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              icon={RefreshCw} 
+            <Button
+              variant="ghost"
+              icon={RefreshCw}
               onClick={handleRefresh}
               loading={isRefreshing}
               title="Actualizar"
@@ -381,7 +381,7 @@ var Notificaciones = function() {
                 Marcar todas leídas
               </Button>
             )}
-            <Button variant="outline" icon={Settings} onClick={function() { navigate('/configuracion'); }}>
+            <Button variant="outline" icon={Settings} onClick={function () { navigate('/configuracion'); }}>
               Configurar
             </Button>
           </div>
@@ -401,10 +401,10 @@ var Notificaciones = function() {
               </p>
               <p className="text-sm text-red-600">Requieren atención inmediata</p>
             </div>
-            <Button 
-              variant="danger" 
+            <Button
+              variant="danger"
               size="sm"
-              onClick={function() { setFilter('alerta'); }}
+              onClick={function () { setFilter('alerta'); }}
             >
               Ver Urgentes
             </Button>
@@ -421,27 +421,27 @@ var Notificaciones = function() {
                 placeholder="Buscar notificaciones..."
                 value={searchTerm}
                 onChange={setSearchTerm}
-                onClear={function() { setSearchTerm(''); }}
+                onClear={function () { setSearchTerm(''); }}
               />
             </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {FILTER_OPTIONS.map(function(opt) {
+              {FILTER_OPTIONS.map(function (opt) {
                 var Icon = opt.icon;
                 var isActive = filter === opt.value;
-                var count = opt.value === 'no_leidas' 
-                  ? stats.noLeidas 
+                var count = opt.value === 'no_leidas'
+                  ? stats.noLeidas
                   : opt.value === 'todas'
                     ? notificaciones.length
-                    : notificaciones.filter(function(n) { return n.tipo === opt.value; }).length;
+                    : notificaciones.filter(function (n) { return n.tipo === opt.value; }).length;
 
                 return (
                   <button
                     key={opt.value}
-                    onClick={function() { setFilter(opt.value); }}
+                    onClick={function () { setFilter(opt.value); }}
                     className={
                       'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ' +
-                      (isActive 
-                        ? 'bg-orange-500 text-white' 
+                      (isActive
+                        ? 'bg-orange-500 text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200')
                     }
                   >
@@ -467,7 +467,7 @@ var Notificaciones = function() {
         {/* ════════════════════════════════════════════════════════════════ */}
         {loading ? (
           <div className="space-y-4">
-            {[0, 1, 2, 3, 4].map(function(i) {
+            {[0, 1, 2, 3, 4].map(function (i) {
               return (
                 <div key={i} className="bg-white rounded-2xl p-4 animate-pulse">
                   <div className="flex gap-4">
@@ -489,8 +489,8 @@ var Notificaciones = function() {
             </div>
             <h3 className="text-lg font-medium text-slate-800 mb-1">Sin notificaciones</h3>
             <p className="text-slate-500">
-              {filter !== 'todas' 
-                ? 'No hay notificaciones con el filtro seleccionado' 
+              {filter !== 'todas'
+                ? 'No hay notificaciones con el filtro seleccionado'
                 : 'No tienes notificaciones pendientes'
               }
             </p>
@@ -498,7 +498,7 @@ var Notificaciones = function() {
         ) : (
           <>
             <div className="space-y-4">
-              {filteredNotificaciones.map(function(notificacion) {
+              {filteredNotificaciones.map(function (notificacion) {
                 return (
                   <NotificacionCard
                     key={notificacion.id}
@@ -511,11 +511,11 @@ var Notificaciones = function() {
             </div>
 
             {/* Acciones masivas */}
-            {notificaciones.some(function(n) { return n.leida; }) && (
+            {notificaciones.some(function (n) { return n.leida; }) && (
               <div className="mt-6 flex justify-center">
-                <Button 
-                  variant="ghost" 
-                  icon={Trash2} 
+                <Button
+                  variant="ghost"
+                  icon={Trash2}
                   onClick={handleEliminarLeidas}
                   className="text-slate-500"
                 >

@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, StatusChip, KpiCard, ConfirmDialog, Modal } from '../../components/common';
@@ -108,7 +108,7 @@ const checkPermission = (userRole, action) => {
     operador: ['ver'],
     cliente: ['ver'],
   };
-  
+
   const rolePermissions = permissions[userRole] || permissions.operador;
   return rolePermissions.includes(action);
 };
@@ -123,8 +123,8 @@ const checkPermission = (userRole, action) => {
 const ContactCard = ({ contacto, onEdit, onDelete, canEdit }) => (
   <div className={`
     p-4 rounded-xl border transition-colors
-    ${contacto.es_principal 
-      ? 'border-orange-200 bg-orange-50' 
+    ${contacto.es_principal
+      ? 'border-orange-200 bg-orange-50'
       : 'border-gray-100 bg-white hover:bg-slate-50'
     }
   `}>
@@ -295,9 +295,8 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
             type="text"
             value={formData.nombre || ''}
             onChange={(e) => handleChange('nombre', e.target.value)}
-            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
-              errors.nombre ? 'border-red-300' : 'border-slate-200'
-            }`}
+            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${errors.nombre ? 'border-red-300' : 'border-slate-200'
+              }`}
             placeholder="Nombre del contacto"
           />
           {errors.nombre && <p className="text-xs text-red-500 mt-1">{errors.nombre}</p>}
@@ -324,9 +323,8 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
             type="tel"
             value={formData.telefono || ''}
             onChange={(e) => handleChange('telefono', e.target.value)}
-            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
-              errors.telefono ? 'border-red-300' : 'border-slate-200'
-            }`}
+            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${errors.telefono ? 'border-red-300' : 'border-slate-200'
+              }`}
             placeholder="+57 300 123 4567"
           />
           {errors.telefono && <p className="text-xs text-red-500 mt-1">{errors.telefono}</p>}
@@ -340,9 +338,8 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
             type="email"
             value={formData.email || ''}
             onChange={(e) => handleChange('email', e.target.value)}
-            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
-              errors.email ? 'border-red-300' : 'border-slate-200'
-            }`}
+            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${errors.email ? 'border-red-300' : 'border-slate-200'
+              }`}
             placeholder="email@empresa.com"
           />
           {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
@@ -389,7 +386,7 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HOOK DE CLIENTES
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const {
     cliente,
     loadingDetail: loading,
@@ -406,17 +403,17 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // ESTADOS LOCALES
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const [activeTab, setActiveTab] = useState('info');
   const [contactos, setContactos] = useState([]);
   const [loadingContactos, setLoadingContactos] = useState(false);
   const [historial, setHistorial] = useState([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
-  
+
   // Estado para productos del cliente
   const [productosCliente, setProductosCliente] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
-  
+
   // Modals
   const [editModal, setEditModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
@@ -427,7 +424,7 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // PERMISOS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const canEdit = checkPermission(userRole, 'editar');
   const canDelete = checkPermission(userRole, 'eliminar');
   const canManageUsers = checkPermission(userRole, 'usuarios'); // ← NUEVO
@@ -435,7 +432,7 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // CARGAR DATOS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const loadContactos = useCallback(async (clienteId) => {
     setLoadingContactos(true);
     try {
@@ -481,7 +478,7 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const handleEditCliente = async (data) => {
     setFormLoading(true);
     try {
@@ -545,11 +542,11 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // LOADING STATE
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-48" />
@@ -568,11 +565,11 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // ERROR STATE
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   if (error || !cliente) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -592,7 +589,7 @@ const ClienteDetail = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   // ✅ TABS ACTUALIZADOS - Incluye Usuarios Portal
   const tabs = [
     { id: 'info', label: 'Información', icon: Building2 },
@@ -607,7 +604,7 @@ const ClienteDetail = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* HEADER */}
@@ -695,8 +692,8 @@ const ClienteDetail = () => {
                     onClick={() => setActiveTab(tab.id)}
                     className={`
                       py-4 px-4 text-sm font-medium transition-colors relative flex items-center gap-2
-                      ${activeTab === tab.id 
-                        ? 'text-orange-600' 
+                      ${activeTab === tab.id
+                        ? 'text-orange-600'
                         : 'text-slate-500 hover:text-slate-700'
                       }
                     `}
@@ -736,9 +733,9 @@ const ClienteDetail = () => {
                       <Calendar className="w-5 h-5 text-slate-400" />
                       <span className="text-slate-500 w-32">Cliente desde:</span>
                       <span className="text-slate-800">
-                        {cliente.fecha_inicio_relacion 
+                        {cliente.fecha_inicio_relacion
                           ? new Date(cliente.fecha_inicio_relacion).toLocaleDateString('es-CO')
-                          : cliente.created_at 
+                          : cliente.created_at
                             ? new Date(cliente.created_at).toLocaleDateString('es-CO')
                             : '-'
                         }
@@ -780,10 +777,10 @@ const ClienteDetail = () => {
                     {cliente.sitio_web && (
                       <div className="flex items-center gap-3 text-sm">
                         <Globe className="w-5 h-5 text-slate-400" />
-                        <a 
-                          href={cliente.sitio_web} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
+                        <a
+                          href={cliente.sitio_web}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="text-orange-600 hover:underline"
                         >
                           {cliente.sitio_web}
@@ -834,7 +831,7 @@ const ClienteDetail = () => {
                     </Button>
                   </div>
                 )}
-                
+
                 {loadingContactos ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[0, 1, 2].map((i) => (
@@ -876,8 +873,8 @@ const ClienteDetail = () => {
             {/* Tab: Usuarios Portal (NUEVO) */}
             {/* ══════════════════════════════════════════════════════════════ */}
             {activeTab === 'usuarios' && canManageUsers && (
-              <UsuariosCliente 
-                clienteId={cliente.id} 
+              <UsuariosCliente
+                clienteId={cliente.id}
                 clienteNombre={cliente.razon_social}
               />
             )}
@@ -923,7 +920,7 @@ const ClienteDetail = () => {
       {/* ════════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
       {/* ════════════════════════════════════════════════════════════════════ */}
-      
+
       <ClienteForm
         isOpen={editModal}
         onClose={() => setEditModal(false)}

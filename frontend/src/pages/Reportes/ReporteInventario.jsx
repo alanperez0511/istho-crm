@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, StatusChip } from '../../components/common';
@@ -120,7 +120,7 @@ const OcupacionBar = ({ value }) => {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-        <div 
+        <div
           className={`h-full ${colorClass} transition-all duration-500`}
           style={{ width: `${value}%` }}
         />
@@ -148,7 +148,7 @@ const AlertaItem = ({ alerta }) => {
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-medium ${text} truncate`}>{alerta.producto}</p>
         <p className="text-xs text-slate-500">
-          {alerta.tipo === 'vencimiento' 
+          {alerta.tipo === 'vencimiento'
             ? `Vence en ${alerta.diasRestantes} días`
             : `Stock: ${alerta.stock} / Mín: ${alerta.minimo}`
           }
@@ -195,7 +195,7 @@ const ReporteInventario = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-10 bg-gray-200 rounded w-64" />
@@ -212,7 +212,7 @@ const ReporteInventario = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* Header */}
@@ -420,13 +420,12 @@ const ReporteInventario = () => {
                       <span className="font-semibold text-slate-800">{producto.stock.toLocaleString()}</span>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        producto.rotacion >= 6 
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${producto.rotacion >= 6
                           ? 'bg-emerald-100 text-emerald-700'
                           : producto.rotacion >= 3
                             ? 'bg-amber-100 text-amber-700'
                             : 'bg-red-100 text-red-700'
-                      }`}>
+                        }`}>
                         {producto.rotacion}x
                       </span>
                     </td>

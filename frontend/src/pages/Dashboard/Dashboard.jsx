@@ -16,10 +16,10 @@
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Users, 
-  Truck, 
-  Package, 
+import {
+  Users,
+  Truck,
+  Package,
   TrendingUp,
   AlertTriangle,
   RefreshCw,
@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Common Components
 import { KpiCard, DataTable, AlertWidget } from '../../components/common';
@@ -90,19 +90,19 @@ const KPI_CONFIG = [
 // Columnas de tabla de despachos
 const DESPACHOS_COLUMNS = [
   { key: 'numero_operacion', label: 'ID', type: 'id' },
-  { 
-    key: 'cliente', 
+  {
+    key: 'cliente',
     label: 'Cliente',
     render: (value, row) => row.cliente?.razon_social || 'Sin cliente'
   },
-  { 
-    key: 'tipo', 
+  {
+    key: 'tipo',
     label: 'Tipo',
     render: (value) => value === 'ingreso' ? 'Ingreso' : 'Salida'
   },
   { key: 'estado', label: 'Estado', type: 'status' },
-  { 
-    key: 'created_at', 
+  {
+    key: 'created_at',
     label: 'Fecha',
     render: (value) => new Date(value).toLocaleDateString('es-CO')
   },
@@ -114,13 +114,13 @@ const DESPACHOS_COLUMNS = [
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // HOOKS
   // ──────────────────────────────────────────────────────────────────────────
   const { user } = useAuth();
   const { inventoryAlert, info } = useNotification();
-  
+
   // Hook principal del dashboard con auto-refresh cada 60 segundos
   const {
     loading,
@@ -134,7 +134,7 @@ const Dashboard = () => {
     chartData,
     refresh,
     lastUpdated,
-  } = useDashboard({ 
+  } = useDashboard({
     autoFetch: true,
     // Si el usuario es cliente, filtrar por su cliente_id
     clienteId: user?.rol === 'cliente' ? user?.cliente_id : null,
@@ -144,13 +144,13 @@ const Dashboard = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // EFECTOS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   // Mostrar notificación de alertas al cargar (solo una vez)
   useEffect(() => {
     if (!loading && totalAlertas > 0) {
       // Construir mensaje inteligente según tipos de alerta presentes
       const tiposPresentes = [];
-      
+
       if (alertasPorTipo.agotado?.length > 0) {
         tiposPresentes.push(`${alertasPorTipo.agotado.length} agotado(s)`);
       }
@@ -160,7 +160,7 @@ const Dashboard = () => {
       if (alertasPorTipo.vencimiento?.length > 0) {
         tiposPresentes.push(`${alertasPorTipo.vencimiento.length} por vencer`);
       }
-      
+
       // Usar la nueva función de alerta de inventario
       inventoryAlert(totalAlertas, alertasPorTipo);
     }
@@ -169,7 +169,7 @@ const Dashboard = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const handleDespachoClick = (row) => {
     navigate(`/despachos/${row.id}`);
   };
@@ -191,7 +191,7 @@ const Dashboard = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // PREPARAR DATOS PARA GRÁFICOS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   // Datos para gráfico de barras (despachos por estado)
   const barData = chartData.despachosPorEstado?.map(item => ({
     label: item.name,
@@ -204,18 +204,18 @@ const Dashboard = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // FORMATEAR ALERTAS PARA EL WIDGET
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const formattedAlertas = alertas.slice(0, 5).map(alerta => ({
     id: alerta.id,
-    type: alerta.tipo === 'stock_bajo' ? 'inventario' : 
-          alerta.tipo === 'agotado' ? 'inventario' : 
-          alerta.tipo === 'vencimiento' ? 'vencimiento' : 'documento',
+    type: alerta.tipo === 'stock_bajo' ? 'inventario' :
+      alerta.tipo === 'agotado' ? 'inventario' :
+        alerta.tipo === 'vencimiento' ? 'vencimiento' : 'documento',
     title: alerta.tipo === 'stock_bajo' ? `Stock bajo - ${alerta.nombre}` :
-           alerta.tipo === 'agotado' ? `Agotado - ${alerta.nombre}` :
-           `Por vencer - ${alerta.nombre}`,
+      alerta.tipo === 'agotado' ? `Agotado - ${alerta.nombre}` :
+        `Por vencer - ${alerta.nombre}`,
     description: alerta.mensaje || `${alerta.cantidad_actual || 0} unidades disponibles`,
-    date: alerta.fecha_vencimiento 
-      ? `Vence: ${new Date(alerta.fecha_vencimiento).toLocaleDateString('es-CO')}` 
+    date: alerta.fecha_vencimiento
+      ? `Vence: ${new Date(alerta.fecha_vencimiento).toLocaleDateString('es-CO')}`
       : 'Actualizado recientemente',
     originalData: alerta,
   }));
@@ -223,44 +223,51 @@ const Dashboard = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen 
+  bg-gradient-to-br 
+  from-slate-50 to-slate-100
+  dark:from-slate-900 dark:to-slate-950">
       {/* Header */}
-      <FloatingHeader />
+
 
       {/* Main Content */}
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
-        
+
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* PAGE HEADER */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">
+            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">
               Bienvenido, {user?.nombre_completo?.split(' ')[0] || 'Usuario'}
             </h1>
-            <p className="text-slate-500 mt-1">
-              Panel de control de Istho CRM
+            <p className="text-slate-500 mt-1 dark:text-slate-400">
+              Panel de control de CRM
               {lastUpdated && (
-                <span className="text-xs ml-2 text-slate-400">
+                <span className="text-xs ml-2 text-slate-400 dark:text-slate-600">
                   • Actualizado: {new Date(lastUpdated).toLocaleTimeString('es-CO')}
                 </span>
               )}
             </p>
           </div>
-          
+
           {/* Botón de refrescar */}
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
             className={`
-              flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 
-              rounded-xl hover:bg-gray-50 transition-colors shadow-sm
+             flex items-center gap-2 px-4 py-2 
+    bg-white dark:bg-slate-800 dark:bg-slate-800 dark:bg-slate-800
+    border border-gray-200 dark:border-slate-700
+    rounded-xl 
+    hover:bg-gray-50 dark:hover:bg-slate-700
+    transition-colors shadow-sm
               ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-slate-500 dark:text-slate-400 ${isRefreshing ? 'animate-spin' : ''}` } />
             <span className="hidden sm:inline">Actualizar</span>
           </button>
         </div>
@@ -285,7 +292,7 @@ const Dashboard = () => {
             if (kpiConfig.suffix && value !== '-') {
               value = `${value}${kpiConfig.suffix}`;
             }
-            
+
             // Obtener cambio si existe
             let change = null;
             if (kpiConfig.changeKey && kpis[kpiConfig.changeKey]) {
@@ -338,21 +345,21 @@ const Dashboard = () => {
         {/* BOTTOM ROW - TABLE & ALERTS */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* Despachos Recientes - 2 columnas */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-800">
+                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
                       Despachos Recientes
                     </h3>
-                    <p className="text-sm text-slate-500 mt-1">
+                    <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">
                       Últimas operaciones del sistema
                     </p>
                   </div>
-                  <button 
+                  <button
                     onClick={() => navigate('/despachos')}
                     className="text-sm text-orange-600 hover:text-orange-700 font-medium"
                   >
@@ -360,7 +367,7 @@ const Dashboard = () => {
                   </button>
                 </div>
               </div>
-              
+
               <DataTable
                 columns={DESPACHOS_COLUMNS}
                 data={despachosRecientes}
@@ -386,7 +393,7 @@ const Dashboard = () => {
 
             {/* Resumen de alertas por tipo */}
             {!loading && totalAlertas > 0 && (
-              <div className="mt-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <div className="mt-4 bg-white dark:bg-slate-800 dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 p-4">
                 <h4 className="text-sm font-medium text-slate-700 mb-3">Resumen de Alertas</h4>
                 <div className="space-y-2">
                   {alertasPorTipo.agotado?.length > 0 && (

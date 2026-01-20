@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 
 // Layout
-import FloatingHeader from '../../components/layout/FloatingHeader';
+
 
 // Components
 import { Button, Modal, StatusChip } from '../../components/common';
@@ -307,7 +307,7 @@ const StatCardMini = ({ icon: Icon, label, value, color }) => (
 // ════════════════════════════════════════════════════════════════════════════
 const PerfilUsuario = () => {
   const navigate = useNavigate();
-  
+
   // ✅ CORREGIDO: Desestructurar solo las propiedades que existen en useAuth
   const { user, logout, updateUser } = useAuth();
   const { success, error: apiError } = useNotification();
@@ -318,7 +318,7 @@ const PerfilUsuario = () => {
   const [permisos, setPermisos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('info');
-  
+
   // Modals
   const [editModal, setEditModal] = useState(false);
   const [passwordModal, setPasswordModal] = useState(false);
@@ -342,7 +342,7 @@ const PerfilUsuario = () => {
         setLoading(false);
       }
     };
-    
+
     if (user) {
       fetchData();
     }
@@ -351,13 +351,13 @@ const PerfilUsuario = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const handleSaveProfile = async (data) => {
     setFormLoading(true);
     try {
       // ✅ CORREGIDO: Llamar al backend para persistir los cambios
       const response = await usuarioService.actualizarPerfil(data);
-      
+
       if (response.success) {
         // Actualizar también el estado local/contexto
         if (updateUser) {
@@ -403,7 +403,7 @@ const PerfilUsuario = () => {
     const diff = hoy - ingreso;
     const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
     const months = Math.floor((diff % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000));
-    
+
     if (years > 0) {
       return `${years} año${years > 1 ? 's' : ''}, ${months} mes${months > 1 ? 'es' : ''}`;
     }
@@ -413,11 +413,11 @@ const PerfilUsuario = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // LOADING STATE
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <FloatingHeader />
+
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-48 bg-gray-200 rounded-2xl" />
@@ -434,29 +434,29 @@ const PerfilUsuario = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // VARIABLES DERIVADAS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const tabs = [
     { id: 'info', label: 'Información' },
     { id: 'permisos', label: 'Permisos' },
   ];
 
   // ✅ CORREGIDO: Convertir permisos a formato tabla
-  const permisosTabla = permisos?.permisos 
+  const permisosTabla = permisos?.permisos
     ? Object.entries(permisos.permisos).map(([modulo, acciones]) => ({
-        modulo: modulo.charAt(0).toUpperCase() + modulo.slice(1),
-        ver: acciones.includes('ver'),
-        crear: acciones.includes('crear'),
-        editar: acciones.includes('editar'),
-        eliminar: acciones.includes('eliminar'),
-        exportar: acciones.includes('exportar'),
-      }))
+      modulo: modulo.charAt(0).toUpperCase() + modulo.slice(1),
+      ver: acciones.includes('ver'),
+      crear: acciones.includes('crear'),
+      editar: acciones.includes('editar'),
+      eliminar: acciones.includes('eliminar'),
+      exportar: acciones.includes('exportar'),
+    }))
     : [
-        { modulo: 'Dashboard', ver: true, crear: false, editar: false, eliminar: false },
-        { modulo: 'Clientes', ver: true, crear: false, editar: false, eliminar: false },
-        { modulo: 'Inventario', ver: true, crear: false, editar: false, eliminar: false },
-        { modulo: 'Operaciones', ver: true, crear: false, editar: false, eliminar: false },
-        { modulo: 'Reportes', ver: true, crear: false, editar: false, eliminar: false },
-      ];
+      { modulo: 'Dashboard', ver: true, crear: false, editar: false, eliminar: false },
+      { modulo: 'Clientes', ver: true, crear: false, editar: false, eliminar: false },
+      { modulo: 'Inventario', ver: true, crear: false, editar: false, eliminar: false },
+      { modulo: 'Operaciones', ver: true, crear: false, editar: false, eliminar: false },
+      { modulo: 'Reportes', ver: true, crear: false, editar: false, eliminar: false },
+    ];
 
   // Estadísticas calculadas localmente
   const stats = {
@@ -469,10 +469,10 @@ const PerfilUsuario = () => {
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <FloatingHeader />
+
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* ════════════════════════════════════════════════════════════════ */}
@@ -533,28 +533,28 @@ const PerfilUsuario = () => {
         {/* STATS ROW */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <StatCardMini 
-            icon={Activity} 
-            label="Operaciones" 
-            value={stats.despachosCreados} 
+          <StatCardMini
+            icon={Activity}
+            label="Operaciones"
+            value={stats.despachosCreados}
             color="bg-blue-500"
           />
-          <StatCardMini 
-            icon={User} 
-            label="Clientes" 
-            value={stats.clientesGestionados} 
+          <StatCardMini
+            icon={User}
+            label="Clientes"
+            value={stats.clientesGestionados}
             color="bg-emerald-500"
           />
-          <StatCardMini 
-            icon={FileText} 
-            label="Reportes" 
-            value={stats.reportesGenerados} 
+          <StatCardMini
+            icon={FileText}
+            label="Reportes"
+            value={stats.reportesGenerados}
             color="bg-violet-500"
           />
-          <StatCardMini 
-            icon={Award} 
-            label="Días Activo" 
-            value={stats.diasActivo} 
+          <StatCardMini
+            icon={Award}
+            label="Días Activo"
+            value={stats.diasActivo}
             color="bg-amber-500"
           />
         </div>
@@ -573,9 +573,8 @@ const PerfilUsuario = () => {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${
-                        activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'
-                      }`}
+                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'
+                        }`}
                     >
                       {tab.label}
                       {activeTab === tab.id && (
@@ -640,7 +639,7 @@ const PerfilUsuario = () => {
                           <div>
                             <p className="text-slate-500">Fecha de Ingreso</p>
                             <p className="font-medium text-slate-800">
-                              {user.created_at 
+                              {user.created_at
                                 ? new Date(user.created_at).toLocaleDateString('es-CO')
                                 : '-'
                               }
@@ -667,7 +666,7 @@ const PerfilUsuario = () => {
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
@@ -739,7 +738,7 @@ const PerfilUsuario = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Último acceso</span>
                   <span className="text-slate-800">
-                    {user.ultimo_acceso 
+                    {user.ultimo_acceso
                       ? new Date(user.ultimo_acceso).toLocaleString('es-CO')
                       : 'Ahora'
                     }
@@ -760,28 +759,28 @@ const PerfilUsuario = () => {
             {/* Acciones Rápidas */}
             <InfoCard title="Acciones Rápidas" icon={Settings}>
               <div className="space-y-2">
-                <Button 
-                  variant="ghost" 
-                  icon={Bell} 
-                  fullWidth 
+                <Button
+                  variant="ghost"
+                  icon={Bell}
+                  fullWidth
                   className="justify-start"
                   onClick={() => navigate('/notificaciones')}
                 >
                   Configurar Notificaciones
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  icon={Key} 
-                  fullWidth 
-                  className="justify-start" 
+                <Button
+                  variant="ghost"
+                  icon={Key}
+                  fullWidth
+                  className="justify-start"
                   onClick={() => setPasswordModal(true)}
                 >
                   Cambiar Contraseña
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  icon={Shield} 
-                  fullWidth 
+                <Button
+                  variant="ghost"
+                  icon={Shield}
+                  fullWidth
                   className="justify-start"
                   onClick={() => setActiveTab('permisos')}
                 >
@@ -813,7 +812,7 @@ const PerfilUsuario = () => {
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/* MODALS */}
       {/* ══════════════════════════════════════════════════════════════════ */}
-      
+
       <EditProfileModal
         isOpen={editModal}
         onClose={() => setEditModal(false)}
