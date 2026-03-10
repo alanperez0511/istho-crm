@@ -105,28 +105,7 @@ const menuConfig = [
 // CUSTOM HOOKS
 // ════════════════════════════════════════════════════════════════════════════
 
-/**
- * Hook para modo oscuro
- */
-const useDarkMode = () => {
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(isDark));
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDark]);
-
-  const toggle = useCallback(() => setIsDark(prev => !prev), []);
-
-  return { isDark, toggle };
-};
+import { useThemeContext } from '../../context/ThemeContext';
 
 /**
  * Hook para atajos de teclado
@@ -722,9 +701,8 @@ MobileMenu.propTypes = {
  */
 const FloatingHeader = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, logout } = useAuth();
-  const { isDark, toggle: toggleDark } = useDarkMode();
+  const { isDark, toggleDark } = useThemeContext();
   const { isVisible, isAtTop } = useScrollBehavior();
 
   // Estados locales

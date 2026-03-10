@@ -253,13 +253,12 @@ const Dashboard = () => {
             </p>
           </div>
 
-          {/* Botón de refrescar */}
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
             className={`
              flex items-center gap-2 px-4 py-2 
-    bg-white dark:bg-slate-800 dark:bg-slate-800 dark:bg-slate-800
+    bg-white dark:bg-slate-800
     border border-gray-200 dark:border-slate-700
     rounded-xl 
     hover:bg-gray-50 dark:hover:bg-slate-700
@@ -348,7 +347,7 @@ const Dashboard = () => {
 
           {/* Despachos Recientes - 2 columnas */}
           <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-slate-800 dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
@@ -393,7 +392,7 @@ const Dashboard = () => {
 
             {/* Resumen de alertas por tipo */}
             {!loading && totalAlertas > 0 && (
-              <div className="mt-4 bg-white dark:bg-slate-800 dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 p-4">
+              <div className="mt-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
                 <h4 className="text-sm font-medium text-slate-700 mb-3">Resumen de Alertas</h4>
                 <div className="space-y-2">
                   {alertasPorTipo.agotado?.length > 0 && (

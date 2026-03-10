@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { Menu, MenuItem, IconButton } from '@mui/material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -113,52 +114,76 @@ const PriorityBadge = ({ prioridad }) => {
  * Menú de acciones por fila
  */
 const RowActions = ({ despacho, onView, onEdit, onAnular, canEdit }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleClick = (event) => setAnchorEl(event.currentTarget);
+  const handleClose = () => setAnchorEl(null);
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+    <>
+      <IconButton
+        onClick={handleClick}
+        size="small"
+        className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
       >
         <MoreVertical className="w-4 h-4" />
-      </button>
+      </IconButton>
 
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20">
-            <button
-              onClick={() => { onView(despacho); setIsOpen(false); }}
-              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              <Eye className="w-4 h-4" />
-              Ver detalle
-            </button>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))',
+            mt: 0.5,
+            borderRadius: '0.75rem',
+            border: '1px solid #f3f4f6',
+            minWidth: '160px',
+            '& .MuiMenuItem-root': {
+              fontSize: '0.875rem',
+              color: '#334155',
+              padding: '8px 16px',
+              gap: '8px',
+              '&:hover': {
+                backgroundColor: '#f8fafc',
+              }
+            },
+          },
+        }}
+      >
+        <MenuItem onClick={() => { onView(despacho); handleClose(); }}>
+          <Eye className="w-4 h-4" />
+          Ver detalle
+        </MenuItem>
 
-            {despacho.estado !== 'cerrado' && despacho.estado !== 'anulado' && canEdit && (
-              <>
-                <button
-                  onClick={() => { onEdit(despacho); setIsOpen(false); }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                >
-                  <Pencil className="w-4 h-4" />
-                  Editar
-                </button>
-                <div className="border-t border-gray-100 my-1" />
-                <button
-                  onClick={() => { onAnular(despacho); setIsOpen(false); }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  <XCircle className="w-4 h-4" />
-                  Anular
-                </button>
-              </>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+        {despacho.estado !== 'cerrado' && despacho.estado !== 'anulado' && canEdit && (
+          <MenuItem onClick={() => { onEdit(despacho); handleClose(); }}>
+            <Pencil className="w-4 h-4" />
+            Editar
+          </MenuItem>
+        )}
+        
+        {despacho.estado !== 'cerrado' && despacho.estado !== 'anulado' && canEdit && (
+          <div className="border-t border-gray-100 my-1" />
+        )}
+        
+        {despacho.estado !== 'cerrado' && despacho.estado !== 'anulado' && canEdit && (
+          <MenuItem 
+            onClick={() => { onAnular(despacho); handleClose(); }}
+            sx={{ color: '#dc2626 !important', '&:hover': { backgroundColor: '#fef2f2 !important' } }}
+          >
+            <XCircle className="w-4 h-4" />
+            Anular
+          </MenuItem>
+        )}
+      </Menu>
+    </>
   );
 };
 
@@ -653,7 +678,7 @@ const DespachosList = () => {
           </div>
         ) : (
           // Table View
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
