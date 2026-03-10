@@ -36,6 +36,10 @@ import {
   AlertTriangle,
   Warehouse,
   FileText,
+  BoxIcon,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Lock,
 } from 'lucide-react';
 
 // Layout
@@ -55,6 +59,9 @@ import MovimientoForm from './components/MovimientoForm';
 import useInventario from '../../hooks/useInventario';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
+
+// Service
+import inventarioService from '../../api/inventario.service';
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONSTANTES
@@ -308,10 +315,13 @@ const ProductoDetail = () => {
   const [deleteModal, setDeleteModal] = useState(false);
   const [movimientoModal, setMovimientoModal] = useState({ isOpen: false, tipo: 'entrada' });
   const [formLoading, setFormLoading] = useState(false);
+  const [cajas, setCajas] = useState([]);
+  const [loadingCajas, setLoadingCajas] = useState(false);
 
-  // Permisos
-  const canEdit = checkPermission(user?.rol, 'editar');
-  const canDelete = checkPermission(user?.rol, 'eliminar');
+  // Permisos (restringidos si el producto es gestionado por WMS)
+  const esWMS = !!(currentProducto?.codigo_wms);
+  const canEdit = checkPermission(user?.rol, 'editar') && !esWMS;
+  const canDelete = checkPermission(user?.rol, 'eliminar') && !esWMS;
 
   // ──────────────────────────────────────────────────────────────────────────
   // VARIABLES DERIVADAS
@@ -394,19 +404,33 @@ const ProductoDetail = () => {
   // Tabs
   const tabs = useMemo(() => [
     { id: 'info', label: 'Información' },
+    { id: 'cajas', label: `Cajas (${cajas.length})` },
     { id: 'movimientos', label: `Movimientos (${(movimientos || []).length})` },
     { id: 'estadisticas', label: 'Estadísticas' },
-  ], [movimientos]);
+  ], [movimientos, cajas]);
 
   // ──────────────────────────────────────────────────────────────────────────
   // EFFECTS
   // ──────────────────────────────────────────────────────────────────────────
+
+  const fetchCajas = async (productoId) => {
+    setLoadingCajas(true);
+    try {
+      const res = await inventarioService.getCajas(productoId);
+      setCajas(res?.data || []);
+    } catch {
+      setCajas([]);
+    } finally {
+      setLoadingCajas(false);
+    }
+  };
 
   useEffect(() => {
     if (id) {
       fetchById(id);
       fetchMovimientos(id);
       fetchEstadisticas(id);
+      fetchCajas(id);
     }
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -555,6 +579,12 @@ const ProductoDetail = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {esWMS && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg border border-blue-200">
+                <Lock className="w-3.5 h-3.5" />
+                Gestionado por WMS
+              </span>
+            )}
             {canEdit && (
               <>
                 <Button
@@ -764,6 +794,86 @@ const ProductoDetail = () => {
                         <p className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl">
                           {producto.descripcion}
                         </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab: Cajas */}
+                {activeTab === 'cajas' && (
+                  <div>
+                    {loadingCajas ? (
+                      <div className="space-y-3">
+                        {[0, 1, 2, 3].map((i) => (
+                          <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+                        ))}
+                      </div>
+                    ) : cajas.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <BoxIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-500">No hay cajas registradas para este producto</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left py-3 px-2 font-medium text-slate-500">Caja</th>
+                              <th className="text-left py-3 px-2 font-medium text-slate-500">Lote</th>
+                              <th className="text-left py-3 px-2 font-medium text-slate-500">Ubicacion</th>
+                              <th className="text-right py-3 px-2 font-medium text-slate-500">Cantidad</th>
+                              <th className="text-center py-3 px-2 font-medium text-slate-500">Tipo</th>
+                              <th className="text-center py-3 px-2 font-medium text-slate-500">Estado</th>
+                              <th className="text-left py-3 px-2 font-medium text-slate-500">Operacion</th>
+                              <th className="text-left py-3 px-2 font-medium text-slate-500">Documento</th>
+                              <th className="text-left py-3 px-2 font-medium text-slate-500">Fecha</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cajas.map((caja) => (
+                              <tr key={caja.id} className="border-b border-gray-50 hover:bg-slate-50 transition-colors">
+                                <td className="py-3 px-2 font-mono text-slate-700">{caja.numero_caja}</td>
+                                <td className="py-3 px-2 font-mono text-slate-600">{caja.lote}</td>
+                                <td className="py-3 px-2 font-mono text-slate-600">{caja.ubicacion || '-'}</td>
+                                <td className="py-3 px-2 text-right font-medium text-slate-800">{formatNumber(caja.cantidad)}</td>
+                                <td className="py-3 px-2 text-center">
+                                  {caja.tipo === 'entrada' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">
+                                      <ArrowDownToLine className="w-3 h-3" />
+                                      Entrada
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                                      <ArrowUpFromLine className="w-3 h-3" />
+                                      Salida
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-2 text-center">
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                    caja.estado === 'disponible' ? 'bg-emerald-50 text-emerald-700' :
+                                    caja.estado === 'despachada' ? 'bg-slate-100 text-slate-600' :
+                                    caja.estado === 'en_transito' ? 'bg-blue-50 text-blue-700' :
+                                    caja.estado === 'dañada' ? 'bg-red-50 text-red-700' :
+                                    'bg-slate-100 text-slate-600'
+                                  }`}>
+                                    {caja.estado || '-'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-2 text-slate-600 text-xs">
+                                  {caja.numero_operacion || '-'}
+                                  {caja.numero_picking && (
+                                    <span className="block text-slate-400">{caja.numero_picking}</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-2 font-mono text-xs text-slate-500">{caja.documento}</td>
+                                <td className="py-3 px-2 text-xs text-slate-500">
+                                  {caja.fecha ? new Date(caja.fecha).toLocaleDateString('es-CO') : '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>

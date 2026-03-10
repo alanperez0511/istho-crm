@@ -26,7 +26,7 @@ import {
   AlertCircle,
   Truck,
   Calendar,
-  Route,
+
   ClipboardList,
   BarChart3,
   LogOut,
@@ -46,7 +46,7 @@ import useNotification from '../../hooks/useNotification';
 // ════════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN DEL MENÚ
 // ════════════════════════════════════════════════════════════════════════════
-const menuConfig = [
+const allMenuConfig = [
   {
     id: 'dashboard',
     label: 'Dashboard',
@@ -62,6 +62,7 @@ const menuConfig = [
     label: 'Clientes',
     basePath: '/clientes',
     shortcut: 'C',
+    soloInternos: true, // No visible para rol cliente
     items: [
       { icon: Users, label: 'Lista de Clientes', href: '/clientes', shortcut: 'G C' },
       { icon: Building2, label: 'Por Sector', href: '/clientes?filter=sector' },
@@ -74,32 +75,23 @@ const menuConfig = [
     basePath: '/inventario',
     shortcut: 'I',
     items: [
-      { icon: Package, label: 'Productos', href: '/inventario', shortcut: 'G I' },
-      { icon: Warehouse, label: 'Por Bodega', href: '/inventario?filter=bodega' },
+      { icon: Package, label: 'Maestro de Productos', href: '/inventario', shortcut: 'G I' },
+      { icon: ClipboardList, label: 'Entradas (Ingresos)', href: '/inventario/entradas', shortcut: 'G E' },
+      { icon: Truck, label: 'Salidas (Despachos)', href: '/inventario/salidas', shortcut: 'G S' },
       { icon: AlertCircle, label: 'Alertas de Stock', href: '/inventario/alertas' },
     ],
   },
-  {
-    id: 'despachos',
-    label: 'Despachos',
-    basePath: '/despachos',
-    shortcut: 'E',
-    items: [
-      { icon: Truck, label: 'Despachos Activos', href: '/despachos', shortcut: 'G E' },
-      { icon: Calendar, label: 'Programados', href: '/despachos?filter=programados' },
-      { icon: ClipboardList, label: 'Historial', href: '/despachos?filter=completados' },
-    ],
-  },
-  {
-    id: 'trazabilidad',
-    label: 'Trazabilidad',
-    basePath: '/trazabilidad',
-    shortcut: 'T',
-    items: [
-      { icon: Route, label: 'Seguimiento', href: '/trazabilidad', shortcut: 'G T' },
-    ],
-  },
 ];
+
+/**
+ * Filtra menús según el rol del usuario
+ */
+const getMenuForRole = (rol) => {
+  if (rol === 'cliente') {
+    return allMenuConfig.filter(menu => !menu.soloInternos);
+  }
+  return allMenuConfig;
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // CUSTOM HOOKS
@@ -272,8 +264,9 @@ const KeyboardShortcutsModal = ({ isOpen, onClose }) => {
         { keys: ['G', 'D'], description: 'Ir a Dashboard' },
         { keys: ['G', 'C'], description: 'Ir a Clientes' },
         { keys: ['G', 'I'], description: 'Ir a Inventario' },
-        { keys: ['G', 'E'], description: 'Ir a Despachos' },
-        { keys: ['G', 'T'], description: 'Ir a Trazabilidad' },
+        { keys: ['G', 'E'], description: 'Ir a Entradas' },
+        { keys: ['G', 'S'], description: 'Ir a Salidas' },
+
         { keys: ['G', 'R'], description: 'Ir a Reportes' },
       ]
     },
@@ -510,7 +503,7 @@ MobileMenuSection.propTypes = {
 /**
  * Menú lateral móvil
  */
-const MobileMenu = ({ isOpen, onClose, user, onNavigate, onLogout, currentPath, isDark, onToggleDark, onShowShortcuts }) => {
+const MobileMenu = ({ isOpen, onClose, user, onNavigate, onLogout, currentPath, isDark, onToggleDark, onShowShortcuts, menuItems }) => {
   const [expandedSection, setExpandedSection] = useState(null);
   const menuRef = useRef(null);
 
@@ -605,7 +598,7 @@ const MobileMenu = ({ isOpen, onClose, user, onNavigate, onLogout, currentPath, 
 
         {/* Navigation */}
         <div className="py-2">
-          {menuConfig.map((menu) => (
+          {menuItems.map((menu) => (
             <MobileMenuSection
               key={menu.id}
               menu={menu}
@@ -704,6 +697,9 @@ const FloatingHeader = () => {
   const { user, logout } = useAuth();
   const { isDark, toggleDark } = useThemeContext();
   const { isVisible, isAtTop } = useScrollBehavior();
+
+  // Menú filtrado por rol
+  const menuConfig = getMenuForRole(user?.rol);
 
   // Estados locales
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -855,6 +851,7 @@ const FloatingHeader = () => {
         isDark={isDark}
         onToggleDark={toggleDark}
         onShowShortcuts={() => setIsShortcutsOpen(true)}
+        menuItems={menuConfig}
       />
 
       {/* Shortcuts Modal */}

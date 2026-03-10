@@ -9,11 +9,12 @@ const express = require('express');
 const router = express.Router();
 
 const reporteController = require('../controllers/reporteController');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, filtrarPorCliente } = require('../middleware/auth');
 const { requiereRolMinimo } = require('../middleware/roles');
 
-// Todas las rutas requieren autenticación
+// Todas las rutas requieren autenticación y filtro por cliente
 router.use(verificarToken);
+router.use(filtrarPorCliente);
 
 // =============================================
 // DASHBOARD

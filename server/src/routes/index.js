@@ -13,8 +13,10 @@ const authRoutes = require('./auth.routes');
 const clienteRoutes = require('./cliente.routes');
 const inventarioRoutes = require('./inventario.routes');
 const operacionRoutes = require('./operacion.routes');
+const auditoriasRoutes = require('./auditorias.routes');
 const reporteRoutes = require('./reporte.routes');
 const notificacionesRoutes = require('./notificacionesRoutes');
+const wmsSyncRoutes = require('./wmsSync.routes');
 
 // Info de la API
 router.get('/', (req, res) => {
@@ -27,8 +29,10 @@ router.get('/', (req, res) => {
       clientes: '/clientes - Gestión de clientes y contactos',
       inventario: '/inventario - Gestión de inventario y stock',
       operaciones: '/operaciones - Ingresos y salidas de mercancía',
+      auditorias: '/auditorias - Auditorías WMS (entradas y salidas)',
       reportes: '/reportes - Reportes y exportación',
-      notificaciones: '/notificaciones - Notificaciones'
+      notificaciones: '/notificaciones - Notificaciones',
+      wms: '/wms/sync - Sincronización con WMS Copérnico'
     }
   });
 });
@@ -38,7 +42,9 @@ router.use('/auth', authRoutes);
 router.use('/clientes', clienteRoutes);
 router.use('/inventario', inventarioRoutes);
 router.use('/operaciones', operacionRoutes);
+router.use('/auditorias', auditoriasRoutes);
 router.use('/reportes', reporteRoutes);
 router.use('/notificaciones', notificacionesRoutes);
+router.use('/wms/sync', wmsSyncRoutes);
 
 module.exports = router;

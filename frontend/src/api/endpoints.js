@@ -64,6 +64,9 @@ export const INVENTARIO_ENDPOINTS = {
   ATENDER_ALERTA: (alertaId) => `/inventario/alertas/${alertaId}/atender`,
   DESCARTAR_ALERTA: (alertaId) => `/inventario/alertas/${alertaId}`,
   
+  // Cajas (detalle por operación)
+  CAJAS: (id) => `/inventario/${id}/cajas`,
+
   // Integración WMS (futuro)
   SYNC_WMS: '/inventario/sync-wms',
 };
@@ -89,6 +92,32 @@ export const OPERACIONES_ENDPOINTS = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// AUDITORÍAS (Entradas y Salidas WMS)
+// ════════════════════════════════════════════════════════════════════════════
+
+export const AUDITORIAS_ENDPOINTS = {
+  // Entradas
+  ENTRADAS: '/auditorias/entradas',
+  ENTRADA_BY_ID: (id) => `/auditorias/entradas/${id}`,
+
+  // Salidas
+  SALIDAS: '/auditorias/salidas',
+  SALIDA_BY_ID: (id) => `/auditorias/salidas/${id}`,
+
+  // Acciones sobre una auditoría (entrada o salida)
+  VERIFICAR_LINEA: (id, lineaId) => `/auditorias/${id}/lineas/${lineaId}/verificar`,
+  ELIMINAR_LINEA: (id, lineaId) => `/auditorias/${id}/lineas/${lineaId}`,
+  RESTAURAR_LINEA: (id, lineaId) => `/auditorias/${id}/lineas/${lineaId}/restaurar`,
+  DATOS_LOGISTICOS: (id) => `/auditorias/${id}/logistica`,
+  EVIDENCIAS: (id) => `/auditorias/${id}/evidencias`,
+  CERRAR: (id) => `/auditorias/${id}/cerrar`,
+
+  // KPIs y estadísticas
+  STATS: '/auditorias/stats',
+  RECIENTES: '/auditorias/recientes',
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // DESPACHOS
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -96,7 +125,6 @@ export const DESPACHOS_ENDPOINTS = {
   BASE: '/despachos',
   BY_ID: (id) => `/despachos/${id}`,
   STATS: '/despachos/stats',
-  TRAZABILIDAD: (id) => `/despachos/${id}/trazabilidad`,
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -166,6 +194,7 @@ export const ENDPOINTS = {
   CLIENTES: CLIENTES_ENDPOINTS,
   INVENTARIO: INVENTARIO_ENDPOINTS,
   OPERACIONES: OPERACIONES_ENDPOINTS,
+  AUDITORIAS: AUDITORIAS_ENDPOINTS,
   DESPACHOS: DESPACHOS_ENDPOINTS,
   DOCUMENTOS: DOCUMENTOS_ENDPOINTS,
   REPORTES: REPORTES_ENDPOINTS,

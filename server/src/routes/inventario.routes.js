@@ -14,7 +14,7 @@ const router = express.Router();
 const inventarioController = require('../controllers/inventarioController');
 
 // Middlewares
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, filtrarPorCliente } = require('../middleware/auth');
 const { requiereRol } = require('../middleware/roles');
 
 // Validators
@@ -31,8 +31,9 @@ const {
 // RUTAS PÚBLICAS (requieren solo autenticación)
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Aplicar autenticación a todas las rutas
+// Aplicar autenticación y filtro por cliente a todas las rutas
 router.use(verificarToken);
+router.use(filtrarPorCliente);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSULTAS Y LISTADOS
@@ -97,6 +98,15 @@ router.get('/:id/movimientos',
 router.get('/:id/estadisticas', 
   idParamValidator,
   inventarioController.obtenerEstadisticasProducto
+);
+
+/**
+ * GET /api/v1/inventario/:id/cajas
+ * Obtener cajas/detalles de operaciones asociadas al producto
+ */
+router.get('/:id/cajas',
+  idParamValidator,
+  inventarioController.obtenerCajas
 );
 
 // ═══════════════════════════════════════════════════════════════════════════

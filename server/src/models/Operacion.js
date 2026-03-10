@@ -1,16 +1,19 @@
 /**
  * ISTHO CRM - Modelo Operación
- * 
+ *
  * Gestiona las operaciones de ingreso y salida de mercancía.
  * Vinculado a documentos del WMS (opcional para modo manual).
- * 
+ *
+ * MODIFICACIÓN v1.2.0:
+ * - Campos WMS: numero_picking, tipo_documento_wms, sucursal_entrega, ciudad_destino
+ *
  * MODIFICACIÓN v1.1.0:
  * - documento_wms ahora es opcional (allowNull: true)
  * - Agregado campo vehiculo_tipo
  * - Agregado campo prioridad
- * 
+ *
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.1.0
+ * @version 1.2.0
  */
 
 const { DataTypes } = require('sequelize');
@@ -189,6 +192,34 @@ module.exports = (sequelize) => {
         model: 'usuarios',
         key: 'id'
       }
+    },
+
+    // ═══════════════════════════════════════════════
+    // CAMPOS WMS v1.2.0
+    // ═══════════════════════════════════════════════
+
+    numero_picking: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: 'Número de picking del WMS (para salidas)'
+    },
+
+    tipo_documento_wms: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: 'Tipo de documento del WMS (factura, remisión, etc.)'
+    },
+
+    sucursal_entrega: {
+      type: DataTypes.STRING(200),
+      allowNull: true,
+      comment: 'Sucursal de entrega del WMS'
+    },
+
+    ciudad_destino: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      comment: 'Ciudad de destino del WMS'
     }
   }, {
     tableName: 'operaciones',

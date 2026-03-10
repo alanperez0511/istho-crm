@@ -27,6 +27,8 @@ const INITIAL_DASHBOARD_STATE = {
   inventario: null,
   clientes: null,
   ultimasOperaciones: [],
+  ultimasEntradas: [],
+  ultimasSalidas: [],
   loading: false,
   error: null,
   lastUpdated: null,
@@ -108,6 +110,8 @@ const useDashboard = (options = {}) => {
           inventario: data.inventario || DEFAULT_INVENTARIO,
           clientes: data.clientes || DEFAULT_CLIENTES,
           ultimasOperaciones: Array.isArray(data.ultimasOperaciones) ? data.ultimasOperaciones : [],
+          ultimasEntradas: Array.isArray(data.ultimasEntradas) ? data.ultimasEntradas : [],
+          ultimasSalidas: Array.isArray(data.ultimasSalidas) ? data.ultimasSalidas : [],
           loading: false,
           error: null,
           lastUpdated: new Date(),
@@ -199,6 +203,12 @@ const useDashboard = (options = {}) => {
       despachosEnProceso: operaciones.porEstado?.en_proceso || 0,
       despachosCerrados: operaciones.porEstado?.cerrado || 0,
       despachosAnulados: operaciones.porEstado?.anulado || 0,
+
+      // KPIs de auditoría WMS
+      entradasPendientes: operaciones.entradasPendientes || 0,
+      salidasPendientes: operaciones.salidasPendientes || 0,
+      auditoriasEnProceso: operaciones.enProceso || 0,
+      auditoriasCerradasMes: operaciones.cerradasMes || 0,
       
       // Por tipo
       totalIngresos: operaciones.porTipo?.ingreso || 0,
@@ -404,6 +414,10 @@ const useDashboard = (options = {}) => {
     // Alias para compatibilidad
     despachosStats: state.operaciones || DEFAULT_OPERACIONES,
     despachosRecientes: state.ultimasOperaciones || [],
+
+    // Tablas de auditoría
+    ultimasEntradas: state.ultimasEntradas || [],
+    ultimasSalidas: state.ultimasSalidas || [],
     
     // Datos calculados
     kpis,

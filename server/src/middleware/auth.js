@@ -27,21 +27,27 @@ const logger = require('../utils/logger');
  */
 const verificarToken = async (req, res, next) => {
   try {
-    // Obtener token del header
+    // Obtener token del header o query param (para descargas de archivos)
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader) {
+    let token = null;
+
+    if (authHeader) {
+      // Formato esperado: "Bearer <token>"
+      const parts = authHeader.split(' ');
+
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        return unauthorized(res, 'Formato de token inválido. Use: Bearer <token>');
+      }
+
+      token = parts[1];
+    } else if (req.query.token) {
+      // Fallback: token por query param (usado en window.open para exportar archivos)
+      token = req.query.token;
+    }
+
+    if (!token) {
       return unauthorized(res, 'Token de acceso requerido');
     }
-    
-    // Formato esperado: "Bearer <token>"
-    const parts = authHeader.split(' ');
-    
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
-      return unauthorized(res, 'Formato de token inválido. Use: Bearer <token>');
-    }
-    
-    const token = parts[1];
     
     // Verificar token
     const decoded = jwt.verify(token, jwtConfig.secret, {

@@ -180,11 +180,11 @@ module.exports = (sequelize) => {
       { fields: ['estado'] },
       { fields: ['lote'] },
       { fields: ['fecha_vencimiento'] },
-      // Índice compuesto para SKU único por cliente
-      { 
-        unique: true, 
-        fields: ['cliente_id', 'sku', 'lote'],
-        name: 'idx_cliente_sku_lote'
+      // Índice compuesto para SKU único por cliente (referencia)
+      {
+        unique: true,
+        fields: ['cliente_id', 'sku'],
+        name: 'idx_cliente_sku'
       }
     ]
   });

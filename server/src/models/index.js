@@ -22,6 +22,7 @@ const OperacionAveriaModel = require('./OperacionAveria');
 const OperacionDocumentoModel = require('./OperacionDocumento');
 const NotificacionEmailModel = require('./NotificacionEmail');
 const MovimientoInventarioModel = require('./MovimientoInventario'); // ← NUEVO
+const CajaInventarioModel = require('./CajaInventario'); // ← NUEVO: Cajas individuales
 const Notificacion = require('./Notificacion')(sequelize);
 
 // Inicializar modelos
@@ -36,6 +37,7 @@ const OperacionAveria = OperacionAveriaModel(sequelize);
 const OperacionDocumento = OperacionDocumentoModel(sequelize);
 const NotificacionEmail = NotificacionEmailModel(sequelize);
 const MovimientoInventario = MovimientoInventarioModel(sequelize); // ← NUEVO
+const CajaInventario = CajaInventarioModel(sequelize); // ← NUEVO
 
 // ============================================
 // DEFINIR ASOCIACIONES
@@ -202,6 +204,42 @@ MovimientoInventario.belongsTo(Operacion, {
   as: 'operacion'
 });
 
+// ============================================
+// ASOCIACIONES - CajaInventario
+// ============================================
+
+// Inventario <-> CajaInventario (1:N)
+Inventario.hasMany(CajaInventario, {
+  foreignKey: 'inventario_id',
+  as: 'cajas',
+  onDelete: 'CASCADE'
+});
+CajaInventario.belongsTo(Inventario, {
+  foreignKey: 'inventario_id',
+  as: 'inventario'
+});
+
+// Operacion <-> CajaInventario (1:N)
+Operacion.hasMany(CajaInventario, {
+  foreignKey: 'operacion_id',
+  as: 'cajas',
+  onDelete: 'SET NULL'
+});
+CajaInventario.belongsTo(Operacion, {
+  foreignKey: 'operacion_id',
+  as: 'operacion'
+});
+
+// OperacionDetalle <-> CajaInventario (1:1)
+OperacionDetalle.hasOne(CajaInventario, {
+  foreignKey: 'operacion_detalle_id',
+  as: 'caja'
+});
+CajaInventario.belongsTo(OperacionDetalle, {
+  foreignKey: 'operacion_detalle_id',
+  as: 'detalle'
+});
+
 Notificacion.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
 Usuario.hasMany(Notificacion, { foreignKey: 'usuario_id', as: 'notificaciones' });
 
@@ -242,7 +280,8 @@ const db = {
   OperacionDocumento,
   NotificacionEmail,
   MovimientoInventario,
-  Notificacion  // ← NUEVO
+  CajaInventario,  // ← NUEVO: Cajas individuales
+  Notificacion
 };
 
 /**

@@ -661,7 +661,7 @@ const InventarioList = () => {
                       Cliente
                     </th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Ubicación
+                      Zona
                     </th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       Stock
@@ -710,12 +710,9 @@ const InventarioList = () => {
                           {producto.cliente_nombre || '-'}
                         </td>
                         <td className="py-4 px-4">
-                          <div className="text-sm">
-                            <p className="text-slate-800">{producto.ubicacion || '-'}</p>
-                            <p className="text-xs text-slate-500">
-                              {bodegaLabel?.label || producto.bodega || producto.zona}
-                            </p>
-                          </div>
+                          <span className="text-sm text-slate-600">
+                            {bodegaLabel?.label || producto.zona || '-'}
+                          </span>
                         </td>
                         <td className="py-4 px-4">
                           <StockIndicator

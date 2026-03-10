@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 
 const operacionController = require('../controllers/operacionController');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, filtrarPorCliente } = require('../middleware/auth');
 const { requiereRolMinimo, noClientes } = require('../middleware/roles');
 const { uploadAveria, uploadCumplido } = require('../config/multer');
 const {
@@ -21,8 +21,9 @@ const {
   listarOperacionesValidator
 } = require('../validators/operacionValidator');
 
-// Todas las rutas requieren autenticación
+// Todas las rutas requieren autenticación y filtro por cliente
 router.use(verificarToken);
+router.use(filtrarPorCliente);
 
 // =============================================
 // RUTAS WMS (Simulación)

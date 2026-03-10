@@ -1,14 +1,17 @@
 /**
  * ISTHO CRM - Modelo OperacionDetalle
- * 
+ *
  * Detalle de productos de cada operación.
- * 
+ *
+ * MODIFICACIÓN v1.2.0:
+ * - Campos WMS: numero_caja, lote_externo, documento_asociado, peso
+ *
  * MODIFICACIÓN v1.1.0:
  * - Agregado campo inventario_id para vincular con stock
  * - Permite rastrear reservas y movimientos de inventario
- * 
+ *
  * @author Coordinación TI - ISTHO S.A.S.
- * @version 1.1.0
+ * @version 1.2.0
  */
 
 const { DataTypes } = require('sequelize');
@@ -96,6 +99,34 @@ module.exports = (sequelize) => {
     observaciones_averia: {
       type: DataTypes.TEXT,
       allowNull: true
+    },
+
+    // ═══════════════════════════════════════════════
+    // CAMPOS WMS v1.2.0
+    // ═══════════════════════════════════════════════
+
+    numero_caja: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: 'Número de caja del WMS (un producto puede tener múltiples cajas)'
+    },
+
+    lote_externo: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: 'Lote externo del WMS (lote campo existente = lote interno)'
+    },
+
+    documento_asociado: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      comment: 'Documento/pedido asociado a esta línea (ej: KDC9059)'
+    },
+
+    peso: {
+      type: DataTypes.DECIMAL(15, 4),
+      allowNull: true,
+      comment: 'Peso del producto en KG'
     }
   }, {
     tableName: 'operacion_detalle',

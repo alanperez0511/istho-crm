@@ -17,13 +17,16 @@
  */
 
 const { Op } = require('sequelize');
-const { 
-  Inventario, 
-  MovimientoInventario, 
-  Cliente, 
+const {
+  Inventario,
+  MovimientoInventario,
+  Operacion,
+  OperacionDetalle,
+  CajaInventario,
+  Cliente,
   Usuario,
-  Auditoria, 
-  sequelize 
+  Auditoria,
+  sequelize
 } = require('../models');
 const {
   success,
@@ -136,8 +139,7 @@ const listar = async (req, res) => {
       where[Op.or] = [
         { producto: { [Op.like]: `%${searchTerm}%` } },
         { sku: { [Op.like]: `%${searchTerm}%` } },
-        { codigo_barras: { [Op.like]: `%${searchTerm}%` } },
-        { lote: { [Op.like]: `%${searchTerm}%` } }
+        { codigo_barras: { [Op.like]: `%${searchTerm}%` } }
       ];
     }
     
@@ -614,18 +616,17 @@ const crear = async (req, res) => {
       return notFound(res, 'Cliente no encontrado');
     }
     
-    // Verificar SKU+Lote duplicado
+    // Verificar SKU duplicado por cliente (referencia única)
     const existente = await Inventario.findOne({
       where: {
         cliente_id: datos.cliente_id,
         sku: datos.sku || datos.codigo,
-        lote: datos.lote || null
       }
     });
-    
+
     if (existente) {
       await transaction.rollback();
-      return conflict(res, `Ya existe un item con SKU ${datos.sku || datos.codigo} para este cliente`);
+      return conflict(res, `Ya existe un producto con SKU ${datos.sku || datos.codigo} para este cliente`);
     }
     
     // Mapear campos del frontend
@@ -742,9 +743,7 @@ const actualizar = async (req, res) => {
     if (datos.unidad_medida !== undefined) updateData.unidad_medida = datos.unidad_medida;
     if (datos.stock_minimo !== undefined) updateData.stock_minimo = datos.stock_minimo;
     if (datos.stock_maximo !== undefined) updateData.stock_maximo = datos.stock_maximo;
-    if (datos.ubicacion !== undefined) updateData.ubicacion = datos.ubicacion;
     if (datos.zona || datos.bodega) updateData.zona = datos.zona || datos.bodega;
-    if (datos.lote !== undefined) updateData.lote = datos.lote;
     if (datos.fecha_vencimiento !== undefined) updateData.fecha_vencimiento = datos.fecha_vencimiento;
     if (datos.costo_unitario !== undefined) updateData.costo_unitario = datos.costo_unitario;
     if (datos.estado !== undefined) updateData.estado = datos.estado;
@@ -1105,6 +1104,97 @@ const descartarAlerta = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CAJAS Y DETALLES DE OPERACIONES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /inventario/:id/cajas
+ * Obtener cajas/detalles de operaciones asociadas a un producto
+ */
+const obtenerCajas = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const inventario = await Inventario.findByPk(id);
+    if (!inventario) {
+      return notFound(res, 'Producto no encontrado');
+    }
+
+    // Buscar cajas del modelo CajaInventario
+    const cajasDB = await CajaInventario.findAll({
+      where: { inventario_id: id },
+      include: [{
+        model: Operacion,
+        as: 'operacion',
+        attributes: ['id', 'numero_operacion', 'tipo', 'estado', 'fecha_operacion', 'numero_picking', 'documento_wms']
+      }],
+      order: [['fecha_movimiento', 'DESC'], ['created_at', 'DESC']]
+    });
+
+    // Si no hay cajas en el nuevo modelo, hacer fallback a OperacionDetalle (datos legacy)
+    if (cajasDB.length === 0) {
+      const detalles = await OperacionDetalle.findAll({
+        where: {
+          [Op.or]: [
+            { inventario_id: id },
+            { sku: inventario.sku }
+          ]
+        },
+        include: [{
+          model: Operacion,
+          as: 'operacion',
+          where: { cliente_id: inventario.cliente_id },
+          attributes: ['id', 'numero_operacion', 'tipo', 'estado', 'fecha_operacion', 'numero_picking', 'documento_wms']
+        }],
+        order: [[{ model: Operacion, as: 'operacion' }, 'fecha_operacion', 'DESC']],
+        attributes: ['id', 'producto', 'cantidad', 'numero_caja', 'lote', 'lote_externo', 'documento_asociado', 'peso', 'created_at']
+      });
+
+      const cajasLegacy = detalles.map(d => ({
+        id: d.id,
+        numero_caja: d.numero_caja || '-',
+        producto: d.producto,
+        cantidad: parseFloat(d.cantidad) || 0,
+        lote: d.lote || d.lote_externo || '-',
+        ubicacion: '-',
+        documento: d.documento_asociado || d.operacion?.documento_wms || '-',
+        peso: d.peso ? parseFloat(d.peso) : null,
+        tipo: d.operacion?.tipo === 'ingreso' ? 'entrada' : 'salida',
+        estado: d.operacion?.tipo === 'ingreso' ? 'disponible' : 'despachada',
+        numero_operacion: d.operacion?.numero_operacion,
+        numero_picking: d.operacion?.numero_picking,
+        estado_operacion: d.operacion?.estado,
+        fecha: d.operacion?.fecha_operacion || d.created_at,
+      }));
+
+      return success(res, cajasLegacy);
+    }
+
+    const cajas = cajasDB.map(c => ({
+      id: c.id,
+      numero_caja: c.numero_caja || '-',
+      lote: c.lote || c.lote_externo || '-',
+      ubicacion: c.ubicacion || '-',
+      cantidad: parseFloat(c.cantidad) || 0,
+      peso: c.peso ? parseFloat(c.peso) : null,
+      unidad_medida: c.unidad_medida,
+      tipo: c.tipo,
+      estado: c.estado,
+      documento: c.documento_asociado || c.operacion?.documento_wms || '-',
+      numero_operacion: c.operacion?.numero_operacion,
+      numero_picking: c.operacion?.numero_picking,
+      estado_operacion: c.operacion?.estado,
+      fecha: c.fecha_movimiento || c.operacion?.fecha_operacion || c.created_at,
+    }));
+
+    return success(res, cajas);
+  } catch (error) {
+    logger.error('Error al obtener cajas:', { message: error.message });
+    return serverError(res, 'Error al obtener cajas del producto', error);
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1118,12 +1208,15 @@ module.exports = {
   crear,
   actualizar,
   eliminar,
-  
+
   // Movimientos
   ajustarCantidad,
   obtenerMovimientos,
   obtenerEstadisticasProducto,
-  
+
+  // Cajas
+  obtenerCajas,
+
   // Alertas
   atenderAlerta,
   descartarAlerta

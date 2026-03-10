@@ -1,0 +1,67 @@
+/**
+ * ISTHO CRM - Rutas de Auditorías WMS
+ *
+ * Endpoints para el módulo de auditoría de entradas/salidas.
+ *
+ * @author Coordinación TI - ISTHO S.A.S.
+ * @version 1.0.0
+ */
+
+const express = require('express');
+const router = express.Router();
+
+const auditoriaWmsController = require('../controllers/auditoriaWmsController');
+const { verificarToken } = require('../middleware/auth');
+const { requiereRolMinimo } = require('../middleware/roles');
+
+// Todas las rutas requieren autenticación
+router.use(verificarToken);
+
+// =============================================
+// ESTADÍSTICAS Y RECIENTES
+// =============================================
+
+router.get('/stats', auditoriaWmsController.estadisticas);
+router.get('/recientes', auditoriaWmsController.recientes);
+
+// =============================================
+// ENTRADAS (Ingresos)
+// =============================================
+
+router.get('/entradas', auditoriaWmsController.listarEntradas);
+router.get('/entradas/:id', auditoriaWmsController.obtenerEntradaPorId);
+
+// =============================================
+// SALIDAS (Despachos)
+// =============================================
+
+router.get('/salidas', auditoriaWmsController.listarSalidas);
+router.get('/salidas/:id', auditoriaWmsController.obtenerSalidaPorId);
+
+// =============================================
+// ACCIONES SOBRE LÍNEAS
+// =============================================
+
+router.put('/:id/lineas/:lineaId/verificar', requiereRolMinimo('operador'), auditoriaWmsController.verificarLinea);
+router.delete('/:id/lineas/:lineaId', requiereRolMinimo('operador'), auditoriaWmsController.eliminarLinea);
+router.put('/:id/lineas/:lineaId/restaurar', requiereRolMinimo('operador'), auditoriaWmsController.restaurarLinea);
+
+// =============================================
+// DATOS LOGÍSTICOS
+// =============================================
+
+router.put('/:id/logistica', requiereRolMinimo('operador'), auditoriaWmsController.guardarDatosLogisticos);
+
+// =============================================
+// EVIDENCIAS
+// =============================================
+
+router.post('/:id/evidencias', requiereRolMinimo('operador'), auditoriaWmsController.subirEvidencias);
+
+// =============================================
+// CIERRE
+// =============================================
+
+router.post('/:id/cerrar', requiereRolMinimo('operador'), auditoriaWmsController.cerrarAuditoria);
+
+module.exports = router;

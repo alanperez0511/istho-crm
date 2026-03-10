@@ -24,7 +24,8 @@ import { AuthProvider } from './context/AuthContext';
 import PrivateRoute, {
   AdminRoute,
   SupervisorRoute,
-  OperadorRoute
+  OperadorRoute,
+  ClienteRoute
 } from './components/auth/PrivateRoute';
 
 // Layout
@@ -68,14 +69,13 @@ const InventarioList = lazy(() => import('./pages/Inventario/InventarioList'));
 const ProductoDetail = lazy(() => import('./pages/Inventario/ProductoDetail'));
 const AlertasInventario = lazy(() => import('./pages/Inventario/AlertasInventario'));
 
-// Despachos
-const DespachosList = lazy(() => import('./pages/Despachos/DespachosList'));
-const DespachoDetail = lazy(() => import('./pages/Despachos/DespachoDetail'));
+// Inventario Entradas
+const EntradasList = lazy(() => import('./pages/Inventario/Entradas/EntradasList'));
+const EntradaAuditoria = lazy(() => import('./pages/Inventario/Entradas/EntradaAuditoria'));
 
-// Trazabilidad
-const TrazabilidadList = lazy(() => import('./pages/Trazabilidad/TrazabilidadList'));
-const TrazabilidadTimeline = lazy(() => import('./pages/Trazabilidad/TrazabilidadTimeline'));
-const EvidenciasView = lazy(() => import('./pages/Trazabilidad/EvidenciasView'));
+// Inventario Salidas
+const SalidasList = lazy(() => import('./pages/Inventario/Salidas/SalidasList'));
+const SalidaAuditoria = lazy(() => import('./pages/Inventario/Salidas/SalidaAuditoria'));
 
 // Reportes
 const ReportesList = lazy(() => import('./pages/Reportes/ReportesList'));
@@ -158,10 +158,10 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
 
                 {/* ────────────────────────────────────────────────────────── */}
-                {/* CLIENTES */}
+                {/* CLIENTES - Solo usuarios internos */}
                 {/* ────────────────────────────────────────────────────────── */}
-                <Route path="/clientes" element={<ClientesList />} />
-                <Route path="/clientes/:id" element={<ClienteDetail />} />
+                <Route path="/clientes" element={<OperadorRoute><ClientesList /></OperadorRoute>} />
+                <Route path="/clientes/:id" element={<OperadorRoute><ClienteDetail /></OperadorRoute>} />
 
                 {/* ────────────────────────────────────────────────────────── */}
                 {/* INVENTARIO */}
@@ -169,32 +169,24 @@ function App() {
                 <Route path="/inventario" element={<InventarioList />} />
                 <Route path="/inventario/productos/:id" element={<ProductoDetail />} />
                 <Route path="/inventario/alertas" element={<AlertasInventario />} />
+                
+                <Route path="/inventario/entradas" element={<EntradasList />} />
+                <Route path="/inventario/entradas/:id" element={<EntradaAuditoria />} />
+
+                <Route path="/inventario/salidas" element={<SalidasList />} />
+                <Route path="/inventario/salidas/:id" element={<SalidaAuditoria />} />
 
                 {/* ────────────────────────────────────────────────────────── */}
-                {/* DESPACHOS (Operaciones) */}
-                {/* ────────────────────────────────────────────────────────── */}
-                <Route path="/despachos" element={<DespachosList />} />
-                <Route path="/despachos/:id" element={<DespachoDetail />} />
-
-                {/* ────────────────────────────────────────────────────────── */}
-                {/* TRAZABILIDAD */}
-                {/* ────────────────────────────────────────────────────────── */}
-                <Route path="/trazabilidad" element={<TrazabilidadList />} />
-                <Route path="/trazabilidad/mapa" element={<TrazabilidadList />} />
-                <Route path="/trazabilidad/timeline/:id" element={<TrazabilidadTimeline />} />
-                <Route path="/trazabilidad/evidencias/:id" element={<EvidenciasView />} />
-
-                {/* ────────────────────────────────────────────────────────── */}
-                {/* REPORTES - Solo supervisor y admin */}
+                {/* REPORTES */}
                 {/* ────────────────────────────────────────────────────────── */}
                 <Route path="/reportes" element={<ReportesList />} />
                 <Route path="/reportes/despachos" element={<ReporteDespachos />} />
                 <Route path="/reportes/inventario" element={<ReporteInventario />} />
-                <Route path="/reportes/clientes" element={<ReporteClientes />} />
+                <Route path="/reportes/clientes" element={<OperadorRoute><ReporteClientes /></OperadorRoute>} />
                 <Route path="/reportes/operativo" element={<ReporteDespachos />} />
-                <Route path="/reportes/kpis" element={<ReporteDespachos />} />
-                <Route path="/reportes/financiero" element={<ReporteClientes />} />
-                <Route path="/reportes/crear" element={<ReportesList />} />
+                <Route path="/reportes/kpis" element={<OperadorRoute><ReporteDespachos /></OperadorRoute>} />
+                <Route path="/reportes/financiero" element={<OperadorRoute><ReporteClientes /></OperadorRoute>} />
+                <Route path="/reportes/crear" element={<OperadorRoute><ReportesList /></OperadorRoute>} />
 
                 {/* ────────────────────────────────────────────────────────── */}
                 {/* PERFIL Y CONFIGURACIÓN */}

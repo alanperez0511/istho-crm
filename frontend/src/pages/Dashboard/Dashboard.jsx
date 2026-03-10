@@ -1,34 +1,34 @@
 /**
  * ============================================================================
- * ISTHO CRM - Dashboard (Fase 5 - Integración Completa)
+ * ISTHO CRM - Dashboard (Refactored v3.0 - Auditoría WMS)
  * ============================================================================
- * Dashboard conectado al backend real mediante hooks.
- * Muestra KPIs, gráficos, alertas y actividad reciente.
- * 
- * CORRECCIONES v2.1.0:
- * - Corregidos template literals
- * - Notificación inteligente según tipos de alerta reales
+ * Dashboard actualizado para reflejar el flujo de auditoría de Entradas y
+ * Salidas del WMS. Muestra KPIs de auditoría, tablas de operaciones
+ * recientes, gráficos y alertas de inventario.
  * 
  * @author Coordinación TI ISTHO
- * @version 2.1.0
- * @date Enero 2026
+ * @version 3.0.0
+ * @date Marzo 2026
  */
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
-  Truck,
   Package,
   TrendingUp,
   AlertTriangle,
   RefreshCw,
   CheckCircle,
   Clock,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Loader2,
+  FileCheck,
+  Activity,
+  ChevronRight,
+  Eye,
 } from 'lucide-react';
-
-// Layout
-
 
 // Common Components
 import { KpiCard, DataTable, AlertWidget } from '../../components/common';
@@ -44,69 +44,197 @@ import useDashboard from '../../hooks/useDashboard';
 import useNotification from '../../hooks/useNotification';
 
 // ════════════════════════════════════════════════════════════════════════════
-// CONFIGURACIÓN
+// CONFIGURACIÓN DE KPIs
 // ════════════════════════════════════════════════════════════════════════════
 
-// KPIs Config
 const KPI_CONFIG = [
   {
-    id: 'clientes',
-    title: 'Clientes Activos',
-    icon: Users,
-    iconBg: 'bg-blue-100',
-    iconColor: 'text-blue-600',
-    kpiKey: 'clientesActivos',
-    changeKey: 'clientesNuevosMes',
-    changePrefix: '+',
-    changeSuffix: ' este mes',
+    id: 'entradas_pendientes',
+    title: 'Entradas Pendientes',
+    icon: ArrowDownCircle,
+    iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    kpiKey: 'entradasPendientes',
+    fallback: 0,
   },
   {
-    id: 'despachos',
-    title: 'Despachos del Mes',
-    icon: Truck,
-    iconBg: 'bg-emerald-100',
-    iconColor: 'text-emerald-600',
-    kpiKey: 'despachosMes',
+    id: 'salidas_pendientes',
+    title: 'Salidas Pendientes',
+    icon: ArrowUpCircle,
+    iconBg: 'bg-blue-100 dark:bg-blue-900/30',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    kpiKey: 'salidasPendientes',
+    fallback: 0,
   },
   {
-    id: 'inventario',
+    id: 'auditorias_cerradas',
+    title: 'Cerradas este Mes',
+    icon: FileCheck,
+    iconBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    kpiKey: 'auditoriasCerradasMes',
+    fallback: 0,
+    changeKey: 'tasaCumplimiento',
+    changeSuffix: '% cumplimiento',
+  },
+  {
+    id: 'productos_stock',
     title: 'Productos en Stock',
     icon: Package,
-    iconBg: 'bg-violet-100',
-    iconColor: 'text-violet-600',
+    iconBg: 'bg-violet-100 dark:bg-violet-900/30',
+    iconColor: 'text-violet-600 dark:text-violet-400',
     kpiKey: 'totalProductos',
-  },
-  {
-    id: 'tasaEntrega',
-    title: 'Tasa de Cumplimiento',
-    icon: TrendingUp,
-    iconBg: 'bg-orange-100',
-    iconColor: 'text-orange-600',
-    kpiKey: 'tasaCumplimiento',
-    suffix: '%',
+    fallback: 0,
   },
 ];
 
-// Columnas de tabla de despachos
-const DESPACHOS_COLUMNS = [
-  { key: 'numero_operacion', label: 'ID', type: 'id' },
-  {
-    key: 'cliente',
-    label: 'Cliente',
-    render: (value, row) => row.cliente?.razon_social || 'Sin cliente'
+// ════════════════════════════════════════════════════════════════════════════
+// STATUS BADGE MINI
+// ════════════════════════════════════════════════════════════════════════════
+
+const STATUS_STYLES = {
+  pendiente: {
+    bg: 'bg-amber-50 dark:bg-amber-900/20',
+    text: 'text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+    label: 'Pendiente',
   },
-  {
-    key: 'tipo',
-    label: 'Tipo',
-    render: (value) => value === 'ingreso' ? 'Ingreso' : 'Salida'
+  en_proceso: {
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    text: 'text-blue-700 dark:text-blue-300',
+    dot: 'bg-blue-500',
+    label: 'En Proceso',
   },
-  { key: 'estado', label: 'Estado', type: 'status' },
-  {
-    key: 'created_at',
-    label: 'Fecha',
-    render: (value) => new Date(value).toLocaleDateString('es-CO')
+  cerrado: {
+    bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+    label: 'Cerrado',
   },
-];
+};
+
+const StatusBadgeMini = ({ status }) => {
+  const s = STATUS_STYLES[status] || STATUS_STYLES.pendiente;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+      {s.label}
+    </span>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// OPERATIONS TABLE ROW
+// ════════════════════════════════════════════════════════════════════════════
+
+const OperationRow = ({ op, type, onClick }) => {
+  const progress = op.lineas > 0 ? Math.round((op.verificadas / op.lineas) * 100) : 0;
+  const accentColor = type === 'entrada' ? 'emerald' : 'blue';
+
+  return (
+    <tr
+      onClick={() => onClick(op)}
+      className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/20 cursor-pointer transition-colors group"
+    >
+      <td className="px-4 py-3">
+        <p className={`text-sm font-semibold text-${accentColor}-600 dark:text-${accentColor}-400`}>{op.documento}</p>
+      </td>
+      <td className="px-4 py-3">
+        <p className="text-sm text-slate-700 dark:text-slate-200 font-medium truncate max-w-[180px]">{op.cliente}</p>
+      </td>
+      <td className="px-4 py-3 hidden md:table-cell">
+        <p className="text-xs text-slate-500 dark:text-slate-400">{op.tipo}</p>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 max-w-[60px] h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all bg-${accentColor}-500`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <span className="text-xs text-slate-400 font-mono">{op.verificadas}/{op.lineas}</span>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <StatusBadgeMini status={op.estado} />
+      </td>
+      <td className="px-4 py-3 text-right">
+        <Eye className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors inline-block" />
+      </td>
+    </tr>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// OPERATIONS TABLE CARD
+// ════════════════════════════════════════════════════════════════════════════
+
+const OperationsCard = ({ title, subtitle, icon: Icon, accentColor, operations, type, onRowClick, onViewAll }) => (
+  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+    <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg bg-${accentColor}-100 dark:bg-${accentColor}-900/30`}>
+          <Icon className={`w-5 h-5 text-${accentColor}-600 dark:text-${accentColor}-400`} />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{title}</h3>
+          <p className="text-xs text-slate-400 dark:text-slate-500">{subtitle}</p>
+        </div>
+      </div>
+      <button
+        onClick={onViewAll}
+        className={`text-xs font-semibold text-${accentColor}-600 dark:text-${accentColor}-400 hover:underline flex items-center gap-1`}
+      >
+        Ver todas <ChevronRight className="w-3.5 h-3.5" />
+      </button>
+    </div>
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="bg-slate-50/50 dark:bg-slate-900/30">
+            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Doc</th>
+            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Cliente</th>
+            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider hidden md:table-cell">Tipo</th>
+            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Líneas</th>
+            <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Estado</th>
+            <th className="px-4 py-2.5 w-8" />
+          </tr>
+        </thead>
+        <tbody>
+          {operations.map((op) => (
+            <OperationRow key={op.id} op={op} type={type} onClick={onRowClick} />
+          ))}
+          {operations.length === 0 && (
+            <tr>
+              <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">No hay operaciones recientes</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+// ════════════════════════════════════════════════════════════════════════════
+// QUICK ACTION CARD
+// ════════════════════════════════════════════════════════════════════════════
+
+const QuickAction = ({ icon: Icon, label, description, color, onClick }) => (
+  <button
+    onClick={onClick}
+    className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-transparent hover:shadow-md dark:hover:shadow-lg transition-all group text-left w-full"
+  >
+    <div className={`p-3 rounded-xl bg-${color}-100 dark:bg-${color}-900/30 group-hover:scale-110 transition-transform`}>
+      <Icon className={`w-6 h-6 text-${color}-600 dark:text-${color}-400`} />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</p>
+      <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{description}</p>
+    </div>
+    <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-1 transition-all" />
+  </button>
+);
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
@@ -115,13 +243,10 @@ const DESPACHOS_COLUMNS = [
 const Dashboard = () => {
   const navigate = useNavigate();
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // HOOKS
-  // ──────────────────────────────────────────────────────────────────────────
+  // ── HOOKS ──
   const { user } = useAuth();
   const { inventoryAlert, info } = useNotification();
 
-  // Hook principal del dashboard con auto-refresh cada 60 segundos
   const {
     loading,
     error,
@@ -130,56 +255,31 @@ const Dashboard = () => {
     alertas,
     alertasPorTipo,
     totalAlertas,
-    despachosRecientes,
     chartData,
     refresh,
     lastUpdated,
+    ultimasEntradas,
+    ultimasSalidas,
   } = useDashboard({
     autoFetch: true,
-    // Si el usuario es cliente, filtrar por su cliente_id
     clienteId: user?.rol === 'cliente' ? user?.cliente_id : null,
-    refreshInterval: 60000, // Refrescar cada minuto
+    refreshInterval: 60000,
   });
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // EFECTOS
-  // ──────────────────────────────────────────────────────────────────────────
-
-  // Mostrar notificación de alertas al cargar (solo una vez)
+  // ── EFFECTS ──
   useEffect(() => {
     if (!loading && totalAlertas > 0) {
-      // Construir mensaje inteligente según tipos de alerta presentes
-      const tiposPresentes = [];
-
-      if (alertasPorTipo.agotado?.length > 0) {
-        tiposPresentes.push(`${alertasPorTipo.agotado.length} agotado(s)`);
-      }
-      if (alertasPorTipo.stock_bajo?.length > 0) {
-        tiposPresentes.push(`${alertasPorTipo.stock_bajo.length} con stock bajo`);
-      }
-      if (alertasPorTipo.vencimiento?.length > 0) {
-        tiposPresentes.push(`${alertasPorTipo.vencimiento.length} por vencer`);
-      }
-
-      // Usar la nueva función de alerta de inventario
       inventoryAlert(totalAlertas, alertasPorTipo);
     }
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // HANDLERS
-  // ──────────────────────────────────────────────────────────────────────────
-
-  const handleDespachoClick = (row) => {
-    navigate(`/despachos/${row.id}`);
-  };
+  // ── HANDLERS ──
+  const handleEntradaClick = (row) => navigate(`/inventario/entradas/${row.id}`);
+  const handleSalidaClick = (row) => navigate(`/inventario/salidas/${row.id}`);
 
   const handleAlertClick = (alert) => {
-    // Navegar según tipo de alerta
-    if (alert.type === 'inventario') {
+    if (alert.type === 'inventario' || alert.type === 'vencimiento') {
       navigate('/inventario/alertas');
-    } else if (alert.type === 'vencimiento') {
-      navigate('/inventario/alertas?tipo=vencimiento');
     }
   };
 
@@ -188,23 +288,15 @@ const Dashboard = () => {
     info('Actualizando datos...');
   };
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // PREPARAR DATOS PARA GRÁFICOS
-  // ──────────────────────────────────────────────────────────────────────────
-
-  // Datos para gráfico de barras (despachos por estado)
+  // ── CHART DATA ──
   const barData = chartData.despachosPorEstado?.map(item => ({
     label: item.name,
     value1: item.value,
   })) || [];
 
-  // Datos para gráfico circular (clientes por estado o ingresos vs salidas)
   const pieData = chartData.ingresosVsSalidas || [];
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // FORMATEAR ALERTAS PARA EL WIDGET
-  // ──────────────────────────────────────────────────────────────────────────
-
+  // ── ALERTS FORMAT ──
   const formattedAlertas = alertas.slice(0, 5).map(alerta => ({
     id: alerta.id,
     type: alerta.tipo === 'stock_bajo' ? 'inventario' :
@@ -220,19 +312,9 @@ const Dashboard = () => {
     originalData: alerta,
   }));
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ──────────────────────────────────────────────────────────────────────────
-
+  // ── RENDER ──
   return (
-    <div className="min-h-screen 
-  bg-gradient-to-br 
-  from-slate-50 to-slate-100
-  dark:from-slate-900 dark:to-slate-950">
-      {/* Header */}
-
-
-      {/* Main Content */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
 
         {/* ════════════════════════════════════════════════════════════════ */}
@@ -244,7 +326,7 @@ const Dashboard = () => {
               Bienvenido, {user?.nombre_completo?.split(' ')[0] || 'Usuario'}
             </h1>
             <p className="text-slate-500 mt-1 dark:text-slate-400">
-              Panel de control de CRM
+              Panel de Auditoría WMS
               {lastUpdated && (
                 <span className="text-xs ml-2 text-slate-400 dark:text-slate-600">
                   • Actualizado: {new Date(lastUpdated).toLocaleTimeString('es-CO')}
@@ -257,25 +339,23 @@ const Dashboard = () => {
             onClick={handleRefresh}
             disabled={isRefreshing}
             className={`
-             flex items-center gap-2 px-4 py-2 
-    bg-white dark:bg-slate-800
-    border border-gray-200 dark:border-slate-700
-    rounded-xl 
-    hover:bg-gray-50 dark:hover:bg-slate-700
-    transition-colors shadow-sm
+              flex items-center gap-2 px-4 py-2 
+              bg-white dark:bg-slate-800
+              border border-gray-200 dark:border-slate-700
+              rounded-xl 
+              hover:bg-gray-50 dark:hover:bg-slate-700
+              transition-colors shadow-sm
               ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
-            <RefreshCw className={`w-4 h-4 text-slate-500 dark:text-slate-400 ${isRefreshing ? 'animate-spin' : ''}` } />
-            <span className="hidden sm:inline">Actualizar</span>
+            <RefreshCw className={`w-4 h-4 text-slate-500 dark:text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline text-sm text-slate-600 dark:text-slate-300">Actualizar</span>
           </button>
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* ERROR STATE */}
-        {/* ════════════════════════════════════════════════════════════════ */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300">
             <p className="font-medium">Error al cargar datos</p>
             <p className="text-sm">{error}</p>
           </div>
@@ -284,18 +364,17 @@ const Dashboard = () => {
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* KPI CARDS */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {KPI_CONFIG.map((kpiConfig) => {
-            // Obtener valor del KPI
-            let value = kpis[kpiConfig.kpiKey] ?? '-';
+            let value = kpis[kpiConfig.kpiKey] ?? kpiConfig.fallback ?? '-';
             if (kpiConfig.suffix && value !== '-') {
               value = `${value}${kpiConfig.suffix}`;
             }
 
-            // Obtener cambio si existe
             let change = null;
-            if (kpiConfig.changeKey && kpis[kpiConfig.changeKey]) {
-              change = `${kpiConfig.changePrefix || ''}${kpis[kpiConfig.changeKey]}${kpiConfig.changeSuffix || ''}`;
+            if (kpiConfig.changeKey && (kpis[kpiConfig.changeKey] || kpiConfig.changeSuffix)) {
+              const changeVal = kpis[kpiConfig.changeKey] || '0';
+              change = `${kpiConfig.changePrefix || ''}${changeVal}${kpiConfig.changeSuffix || ''}`;
             }
 
             return (
@@ -315,13 +394,46 @@ const Dashboard = () => {
         </div>
 
         {/* ════════════════════════════════════════════════════════════════ */}
+        {/* QUICK ACTIONS */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+          <QuickAction
+            icon={ArrowDownCircle}
+            label="Entradas"
+            description="Auditar recepciones WMS"
+            color="emerald"
+            onClick={() => navigate('/inventario/entradas')}
+          />
+          <QuickAction
+            icon={ArrowUpCircle}
+            label="Salidas"
+            description="Auditar despachos WMS"
+            color="blue"
+            onClick={() => navigate('/inventario/salidas')}
+          />
+          <QuickAction
+            icon={Package}
+            label="Inventario"
+            description="Maestro de productos"
+            color="violet"
+            onClick={() => navigate('/inventario')}
+          />
+          <QuickAction
+            icon={Users}
+            label="Clientes"
+            description="Gestión de clientes"
+            color="orange"
+            onClick={() => navigate('/clientes')}
+          />
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════════ */}
         {/* CHARTS ROW */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Bar Chart - Despachos por Estado */}
           <BarChart
-            title="Despachos por Estado"
-            subtitle="Distribución actual"
+            title="Auditorías por Estado"
+            subtitle="Distribución actual de operaciones"
             data={barData}
             legend={[
               { label: 'Cantidad', color: '#E65100' },
@@ -330,9 +442,8 @@ const Dashboard = () => {
             loading={loading}
           />
 
-          {/* Pie Chart - Ingresos vs Salidas */}
           <PieChart
-            title="Ingresos vs Salidas"
+            title="Entradas vs Salidas"
             subtitle="Operaciones del mes"
             data={pieData}
             size={180}
@@ -341,43 +452,89 @@ const Dashboard = () => {
         </div>
 
         {/* ════════════════════════════════════════════════════════════════ */}
-        {/* BOTTOM ROW - TABLE & ALERTS */}
+        {/* OPERATIONS TABLES */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <OperationsCard
+            title="Entradas Recientes"
+            subtitle="Últimas recepciones del WMS"
+            icon={ArrowDownCircle}
+            accentColor="emerald"
+            operations={ultimasEntradas}
+            type="entrada"
+            onRowClick={handleEntradaClick}
+            onViewAll={() => navigate('/inventario/entradas')}
+          />
+
+          <OperationsCard
+            title="Salidas Recientes"
+            subtitle="Últimos despachos del WMS"
+            icon={ArrowUpCircle}
+            accentColor="blue"
+            operations={ultimasSalidas}
+            type="salida"
+            onRowClick={handleSalidaClick}
+            onViewAll={() => navigate('/inventario/salidas')}
+          />
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* ALERTS + SUMMARY */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Despachos Recientes - 2 columnas */}
-          <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                      Despachos Recientes
-                    </h3>
-                    <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">
-                      Últimas operaciones del sistema
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => navigate('/despachos')}
-                    className="text-sm text-orange-600 hover:text-orange-700 font-medium"
-                  >
-                    Ver todos
-                  </button>
+          {/* Resumen Rápido de Auditoría */}
+          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                <Activity className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Resumen de Auditoría</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Estado actual del proceso de verificación</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Pendientes */}
+              <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-5 h-5 text-amber-500" />
+                  <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">Pendientes</span>
                 </div>
+                <p className="text-3xl font-bold text-amber-600 dark:text-amber-400 mb-1">
+                  {(kpis.entradasPendientes ?? 0) + (kpis.salidasPendientes ?? 0)}
+                </p>
+                <p className="text-xs text-amber-500/80 dark:text-amber-400/60">Requieren atención</p>
               </div>
 
-              <DataTable
-                columns={DESPACHOS_COLUMNS}
-                data={despachosRecientes}
-                onRowClick={handleDespachoClick}
-                loading={loading}
-                emptyMessage="No hay despachos recientes"
-              />
+              {/* En Proceso */}
+              <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Loader2 className="w-5 h-5 text-blue-500" />
+                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">En Proceso</span>
+                </div>
+                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+                  {kpis.auditoriasEnProceso ?? 0}
+                </p>
+                <p className="text-xs text-blue-500/80 dark:text-blue-400/60">Verificándose ahora</p>
+              </div>
+
+              {/* Cerradas */}
+              <div className="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-500" />
+                  <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Cerradas</span>
+                </div>
+                <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">
+                  {kpis.auditoriasCerradasMes ?? 0}
+                </p>
+                <p className="text-xs text-emerald-500/80 dark:text-emerald-400/60">Completadas este mes</p>
+              </div>
             </div>
           </div>
 
-          {/* Alertas Widget - 1 columna */}
+          {/* Alertas Widget */}
           <div className="lg:col-span-1">
             <AlertWidget
               title="Alertas de Inventario"
@@ -390,36 +547,35 @@ const Dashboard = () => {
               emptyMessage="Sin alertas pendientes"
             />
 
-            {/* Resumen de alertas por tipo */}
             {!loading && totalAlertas > 0 && (
               <div className="mt-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
-                <h4 className="text-sm font-medium text-slate-700 mb-3">Resumen de Alertas</h4>
+                <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Resumen de Alertas</h4>
                 <div className="space-y-2">
                   {alertasPorTipo.agotado?.length > 0 && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-red-600 flex items-center gap-2">
+                      <span className="text-red-600 dark:text-red-400 flex items-center gap-2">
                         <Package className="w-4 h-4" />
                         Agotados
                       </span>
-                      <span className="font-medium">{alertasPorTipo.agotado.length}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{alertasPorTipo.agotado.length}</span>
                     </div>
                   )}
                   {alertasPorTipo.stock_bajo?.length > 0 && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-amber-600 flex items-center gap-2">
+                      <span className="text-amber-600 dark:text-amber-400 flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4" />
                         Stock Bajo
                       </span>
-                      <span className="font-medium">{alertasPorTipo.stock_bajo.length}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{alertasPorTipo.stock_bajo.length}</span>
                     </div>
                   )}
                   {alertasPorTipo.vencimiento?.length > 0 && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-orange-600 flex items-center gap-2">
+                      <span className="text-orange-600 dark:text-orange-400 flex items-center gap-2">
                         <Clock className="w-4 h-4" />
                         Por Vencer
                       </span>
-                      <span className="font-medium">{alertasPorTipo.vencimiento.length}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{alertasPorTipo.vencimiento.length}</span>
                     </div>
                   )}
                 </div>
@@ -431,7 +587,7 @@ const Dashboard = () => {
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* FOOTER */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
+        <footer className="text-center py-6 mt-8 text-slate-500 dark:text-slate-400 text-sm border-t border-gray-200 dark:border-slate-700">
           © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
           Centro Logístico Industrial del Norte, Girardota, Antioquia
         </footer>

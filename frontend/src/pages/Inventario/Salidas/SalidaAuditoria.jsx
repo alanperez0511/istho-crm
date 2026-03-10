@@ -1,0 +1,795 @@
+/**
+ * ============================================================================
+ * ISTHO CRM - SalidaAuditoria (Vista de Auditoría de Salida/Despacho)
+ * ============================================================================
+ * Pantalla completa de verificación de un documento de salida del WMS.
+ * Incluye: Stepper de estado, líneas interactivas, formulario logístico,
+ * y zona de carga de evidencias.
+ * 
+ * @author Coordinación TI ISTHO
+ * @version 1.0.0
+ * @date Marzo 2026
+ */
+
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  Package,
+  Trash2,
+  Check,
+  X,
+  Upload,
+  FileText,
+  Image,
+  Building2,
+  Truck,
+  User,
+  CreditCard,
+  Phone,
+  MapPin,
+  MessageSquare,
+  Shield,
+  Eye,
+  AlertCircle,
+} from 'lucide-react';
+
+import auditoriasService from '../../../api/auditorias.service';
+
+// ════════════════════════════════════════════════════════════════════════════
+// STATUS STEPPER
+// ════════════════════════════════════════════════════════════════════════════
+
+const STEPS = [
+  { key: 'pendiente', label: 'Pendiente', icon: Clock, description: 'Documento recibido del WMS' },
+  { key: 'en_proceso', label: 'En Proceso', icon: Loader2, description: 'Verificando líneas y datos' },
+  { key: 'cerrado', label: 'Cerrado', icon: CheckCircle2, description: 'Auditoría completada' },
+];
+
+const StatusStepper = ({ currentStatus }) => {
+  const currentIdx = STEPS.findIndex((s) => s.key === currentStatus);
+
+  return (
+    <div className="flex items-center justify-between w-full">
+      {STEPS.map((step, idx) => {
+        const Icon = step.icon;
+        const isCompleted = idx < currentIdx;
+        const isCurrent = idx === currentIdx;
+
+        return (
+          <div key={step.key} className="flex items-center flex-1 last:flex-none">
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
+                  isCompleted
+                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                    : isCurrent
+                    ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/30 animate-pulse'
+                    : 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-400'
+                }`}
+              >
+                {isCompleted ? (
+                  <Check className="w-6 h-6" />
+                ) : (
+                  <Icon className={`w-6 h-6 ${isCurrent && step.key === 'en_proceso' ? 'animate-spin' : ''}`} />
+                )}
+              </div>
+              <p className={`mt-2 text-xs font-semibold ${
+                isCompleted ? 'text-emerald-600 dark:text-emerald-400'
+                  : isCurrent ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-400 dark:text-slate-500'
+              }`}>
+                {step.label}
+              </p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:block">
+                {step.description}
+              </p>
+            </div>
+            {idx < STEPS.length - 1 && (
+              <div className={`flex-1 h-0.5 mx-3 mt-[-24px] transition-all duration-500 ${
+                idx < currentIdx ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
+              }`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// SECTION WRAPPER
+// ════════════════════════════════════════════════════════════════════════════
+
+const SECTION_COLORS = {
+  emerald: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-600 dark:text-emerald-400' },
+  blue:    { bg: 'bg-blue-100 dark:bg-blue-900/30',    text: 'text-blue-600 dark:text-blue-400' },
+  violet:  { bg: 'bg-violet-100 dark:bg-violet-900/30',  text: 'text-violet-600 dark:text-violet-400' },
+  slate:   { bg: 'bg-slate-100 dark:bg-slate-900/30',   text: 'text-slate-600 dark:text-slate-400' },
+};
+
+const Section = ({ title, icon: Icon, children, badge, color = 'blue' }) => {
+  const styles = SECTION_COLORS[color] || SECTION_COLORS.blue;
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${styles.bg}`}>
+            <Icon className={`w-5 h-5 ${styles.text}`} />
+          </div>
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{title}</h2>
+        </div>
+        {badge}
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// INPUT FIELD
+// ════════════════════════════════════════════════════════════════════════════
+
+const FormField = ({ icon: Icon, label, value, onChange, placeholder, required, type = 'text', disabled }) => (
+  <div>
+    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+      <Icon className="w-4 h-4 text-slate-400" />
+      {label}
+      {required && <span className="text-red-500">*</span>}
+    </label>
+    {type === 'textarea' ? (
+      <textarea
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        rows={3}
+        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+      />
+    ) : (
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      />
+    )}
+  </div>
+);
+
+// ════════════════════════════════════════════════════════════════════════════
+// LIGHTBOX MODAL
+// ════════════════════════════════════════════════════════════════════════════
+
+const Lightbox = ({ src, alt, onClose }) => {
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+      <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
+        <X className="w-6 h-6" />
+      </button>
+      <img src={src} alt={alt} className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl object-contain" onClick={(e) => e.stopPropagation()} />
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// FILE PREVIEW GALLERY
+// ════════════════════════════════════════════════════════════════════════════
+
+const FilePreviewGallery = ({ files, onRemoveFile, readOnly = false }) => {
+  const [lightboxIdx, setLightboxIdx] = useState(null);
+
+  const previews = useMemo(() =>
+    files.map((file) => ({
+      file,
+      url: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+      isImage: file.type.startsWith('image/'),
+      isPdf: file.type === 'application/pdf',
+    })),
+  [files]);
+
+  useEffect(() => {
+    return () => previews.forEach((p) => p.url && URL.revokeObjectURL(p.url));
+  }, [previews]);
+
+  const pdfFiles = previews.filter((p) => p.isPdf);
+  const imageFiles = previews.filter((p) => p.isImage);
+
+  if (files.length === 0 && readOnly) {
+    return <p className="text-sm text-slate-400 text-center py-4">No hay evidencias adjuntas.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {lightboxIdx !== null && imageFiles[lightboxIdx] && (
+        <Lightbox src={imageFiles[lightboxIdx].url} alt={imageFiles[lightboxIdx].file.name} onClose={() => setLightboxIdx(null)} />
+      )}
+
+      {pdfFiles.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Documento PDF</p>
+          {pdfFiles.map((p, idx) => (
+            <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 group">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                  <FileText className="w-5 h-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{p.file.name}</p>
+                  <p className="text-xs text-slate-400">{(p.file.size / 1024).toFixed(1)} KB</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => window.open(URL.createObjectURL(p.file), '_blank')} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Ver PDF">
+                  <Eye className="w-4 h-4" />
+                </button>
+                {!readOnly && (
+                  <button onClick={() => onRemoveFile(files.indexOf(p.file))} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {imageFiles.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Fotografías</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {imageFiles.map((p, idx) => (
+              <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900">
+                <img src={p.url} alt={p.file.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center gap-2">
+                  <button onClick={() => setLightboxIdx(idx)} className="p-2 bg-white/90 rounded-lg text-slate-700 hover:bg-white transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100" title="Ver imagen">
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  {!readOnly && (
+                    <button onClick={() => onRemoveFile(files.indexOf(p.file))} className="p-2 bg-red-500/90 rounded-lg text-white hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100" title="Eliminar">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/60 to-transparent">
+                  <p className="text-[10px] text-white truncate">{p.file.name}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// DROPZONE COMPONENT (with inline previews)
+// ════════════════════════════════════════════════════════════════════════════
+
+const EvidenceDropzone = ({ files, onAddFiles, onRemoveFile, maxPhotos = 5 }) => {
+  const fileInputRef = useRef(null);
+  const [dragActive, setDragActive] = useState(false);
+
+  const pdfFiles = files.filter((f) => f.type === 'application/pdf');
+  const imageFiles = files.filter((f) => f.type.startsWith('image/'));
+
+  const handleDrag = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
+    else if (e.type === 'dragleave') setDragActive(false);
+  }, []);
+
+  const processFiles = useCallback((newFiles) => {
+    const validFiles = [];
+    for (const file of newFiles) {
+      if (file.type === 'application/pdf' && pdfFiles.length === 0) {
+        validFiles.push(file);
+      } else if (file.type.startsWith('image/') && imageFiles.length + validFiles.filter(f => f.type.startsWith('image/')).length < maxPhotos) {
+        validFiles.push(file);
+      }
+    }
+    if (validFiles.length > 0) onAddFiles(validFiles);
+  }, [pdfFiles.length, imageFiles.length, maxPhotos, onAddFiles]);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files?.length) processFiles([...e.dataTransfer.files]);
+  }, [processFiles]);
+
+  const handleChange = (e) => {
+    if (e.target.files?.length) processFiles([...e.target.files]);
+    e.target.value = '';
+  };
+
+  return (
+    <div className="space-y-4">
+      <div
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDragOver={handleDrag}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={`relative border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 ${
+          dragActive
+            ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/10 scale-[1.02]'
+            : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/30'
+        }`}
+      >
+        <input ref={fileInputRef} type="file" multiple accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleChange} className="hidden" />
+        <Upload className={`w-10 h-10 mx-auto mb-3 ${dragActive ? 'text-blue-500' : 'text-slate-400'}`} />
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+          Arrastra archivos aquí o <span className="text-blue-600 dark:text-blue-400 underline">haz clic para seleccionar</span>
+        </p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">
+          1 documento PDF + máximo {maxPhotos} fotografías (JPG, PNG, WebP)
+        </p>
+      </div>
+
+      <div className="flex gap-3">
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+          pdfFiles.length > 0 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+        }`}>
+          <FileText className="w-3.5 h-3.5" />
+          PDF: {pdfFiles.length}/1
+        </span>
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+          imageFiles.length > 0 ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+        }`}>
+          <Image className="w-3.5 h-3.5" />
+          Fotos: {imageFiles.length}/{maxPhotos}
+        </span>
+      </div>
+
+      {files.length > 0 && (
+        <FilePreviewGallery files={files} onRemoveFile={onRemoveFile} readOnly={false} />
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
+
+const SalidaAuditoria = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+  // Estado de carga
+  const [pageLoading, setPageLoading] = useState(true);
+  const [pageError, setPageError] = useState(null);
+  const [salidaData, setSalidaData] = useState(null);
+
+  const [estado, setEstado] = useState('pendiente');
+  const [lineas, setLineas] = useState([]);
+
+  const [formData, setFormData] = useState({
+    conductor: '',
+    cedula: '',
+    placa: '',
+    telefono: '',
+    origen: '',
+    destino: '',
+    observaciones: '',
+  });
+
+  const [files, setFiles] = useState([]);
+  const [closing, setClosing] = useState(false);
+
+  // Cargar datos desde API
+  useEffect(() => {
+    const fetchSalida = async () => {
+      try {
+        const response = await auditoriasService.getSalidaById(id);
+        if (response.success && response.data) {
+          const data = response.data;
+          setSalidaData(data);
+          setEstado(data.estado || 'pendiente');
+          setLineas(data.lineas || []);
+          if (data.logistica) {
+            setFormData({
+              conductor: data.logistica.conductor || '',
+              cedula: data.logistica.cedula || '',
+              placa: data.logistica.placa || '',
+              telefono: data.logistica.telefono || '',
+              origen: data.logistica.origen || '',
+              destino: data.logistica.destino || '',
+              observaciones: data.logistica.observaciones || '',
+            });
+          }
+        }
+      } catch {
+        setPageError('No se pudo cargar la auditoría. Verifique que el servidor esté activo e intente nuevamente.');
+      } finally {
+        setPageLoading(false);
+      }
+    };
+    fetchSalida();
+  }, [id]);
+
+  // ── HANDLERS ──
+  const handleFieldChange = (field) => (e) => {
+    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const handleVerificarLinea = async (lineaId) => {
+    const linea = lineas.find((l) => l.id === lineaId);
+    const nuevoEstado = !linea?.verificado;
+
+    setLineas((prev) => prev.map((l) => (l.id === lineaId ? { ...l, verificado: nuevoEstado } : l)));
+    if (estado === 'pendiente') setEstado('en_proceso');
+
+    try {
+      await auditoriasService.verificarLinea(id, lineaId, nuevoEstado);
+    } catch {
+      // Mantener cambio local
+    }
+  };
+
+  const handleEliminarLinea = async (lineaId) => {
+    setLineas((prev) => prev.map((l) => (l.id === lineaId ? { ...l, eliminado: true } : l)));
+    if (estado === 'pendiente') setEstado('en_proceso');
+
+    try {
+      await auditoriasService.eliminarLinea(id, lineaId);
+    } catch {
+      // Mantener cambio local
+    }
+  };
+
+  const handleRestaurarLinea = async (lineaId) => {
+    setLineas((prev) => prev.map((l) => (l.id === lineaId ? { ...l, eliminado: false } : l)));
+
+    try {
+      await auditoriasService.restaurarLinea(id, lineaId);
+    } catch {
+      // Mantener cambio local
+    }
+  };
+
+  const handleAddFiles = useCallback((newFiles) => {
+    setFiles((prev) => [...prev, ...newFiles]);
+    if (estado === 'pendiente') setEstado('en_proceso');
+  }, [estado]);
+
+  const handleRemoveFile = (idx) => {
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // ── PROGRESS ──
+  const lineasActivas = lineas.filter((l) => !l.eliminado);
+  const lineasVerificadas = lineasActivas.filter((l) => l.verificado);
+  const lineasProgress = lineasActivas.length > 0 ? Math.round((lineasVerificadas.length / lineasActivas.length) * 100) : 0;
+
+  const requiredFields = ['conductor', 'cedula', 'placa', 'telefono', 'origen', 'destino'];
+  const filledFields = requiredFields.filter((f) => formData[f].trim() !== '');
+  const formProgress = Math.round((filledFields.length / requiredFields.length) * 100);
+
+  const hasPdf = files.some((f) => f.type === 'application/pdf');
+  const hasPhotos = files.some((f) => f.type.startsWith('image/'));
+  const evidenceProgress = hasPdf && hasPhotos ? 100 : hasPdf || hasPhotos ? 50 : 0;
+
+  const totalProgress = Math.round((lineasProgress + formProgress + evidenceProgress) / 3);
+  const canClose = lineasProgress === 100 && formProgress === 100 && evidenceProgress === 100;
+  const isCerrado = estado === 'cerrado';
+
+  const handleCerrarAuditoria = async () => {
+    if (!canClose || closing) return;
+    setClosing(true);
+
+    try {
+      await auditoriasService.guardarDatosLogisticos(id, formData);
+      if (files.length > 0) {
+        await auditoriasService.subirEvidencias(id, files);
+      }
+      await auditoriasService.cerrar(id, { enviar_correo: true });
+      setEstado('cerrado');
+    } catch {
+      setEstado('cerrado');
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  // ── RENDER ──
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 dark:text-slate-400">Cargando auditoría...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (pageError || !salidaData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
+        <main className="pt-28 px-4 pb-8 max-w-5xl mx-auto">
+          <button
+            onClick={() => navigate('/inventario/salidas')}
+            className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 mb-6 transition-colors group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            Volver a Salidas
+          </button>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-red-200 dark:border-red-800/50 p-8 text-center">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-8 h-8 text-red-500 dark:text-red-400" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+              No se pudo cargar la auditoría
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md mx-auto">
+              {pageError || 'La salida solicitada no fue encontrada. Es posible que haya sido eliminada o que el ID sea incorrecto.'}
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-colors"
+              >
+                Reintentar
+              </button>
+              <button
+                onClick={() => navigate('/inventario/salidas')}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-xl transition-colors"
+              >
+                Volver al listado
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
+      <main className="pt-28 px-4 pb-32 max-w-5xl mx-auto">
+
+        <button
+          onClick={() => navigate('/inventario/salidas')}
+          className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 mb-6 transition-colors group"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          Volver a Salidas
+        </button>
+
+        {/* HEADER CARD */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+                <Truck className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+                  {salidaData.documento}
+                </h1>
+                <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <Building2 className="w-4 h-4" />
+                    {salidaData.cliente}
+                  </span>
+                  <span>•</span>
+                  <span>{salidaData.tipo_documento}</span>
+                  <span>•</span>
+                  <span>{new Date(salidaData.fecha_salida).toLocaleDateString('es-CO')}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Progreso</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalProgress}%</p>
+              </div>
+              <div className="w-16 h-16 relative">
+                <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="5" className="text-slate-100 dark:text-slate-700" />
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeDasharray={`${totalProgress * 1.76} 176`} className="text-blue-500 transition-all duration-700" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <StatusStepper currentStatus={estado} />
+        </div>
+
+        <div className="space-y-6">
+
+          {/* LÍNEAS */}
+          <Section
+            title="Líneas de Operación (WMS)"
+            icon={Package}
+            color="blue"
+            badge={
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                lineasProgress === 100 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+              }`}>
+                {lineasVerificadas.length}/{lineasActivas.length} verificadas
+              </span>
+            }
+          >
+            <div className="space-y-3">
+              {lineas.map((linea) => (
+                <div
+                  key={linea.id}
+                  className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${
+                    linea.eliminado
+                      ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800/50 opacity-60'
+                      : linea.verificado
+                      ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/50'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <button
+                      onClick={() => !linea.eliminado && !isCerrado && handleVerificarLinea(linea.id)}
+                      disabled={linea.eliminado || isCerrado}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 border-2 transition-all ${
+                        linea.eliminado
+                          ? 'border-red-300 dark:border-red-700 bg-red-100 dark:bg-red-900/30 cursor-not-allowed'
+                          : linea.verificado
+                          ? 'border-emerald-500 bg-emerald-500 text-white cursor-pointer shadow-md shadow-emerald-500/20'
+                          : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 cursor-pointer'
+                      }`}
+                    >
+                      {linea.eliminado ? <X className="w-4 h-4 text-red-500 dark:text-red-400" /> : linea.verificado ? <Check className="w-4 h-4" /> : null}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${linea.eliminado ? 'line-through text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>
+                        {linea.producto}
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 font-mono">
+                        SKU: {linea.sku} • {linea.cantidad_esperada} {linea.unidad}
+                      </p>
+                    </div>
+                  </div>
+                  {!isCerrado && (
+                    <div className="flex items-center gap-2 ml-4">
+                      {linea.eliminado ? (
+                        <button onClick={() => handleRestaurarLinea(linea.id)} className="px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                          Restaurar
+                        </button>
+                      ) : (
+                        <button onClick={() => handleEliminarLinea(linea.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Quitar línea (no salió)">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          {/* DATOS LOGÍSTICOS */}
+          <Section
+            title="Datos Logísticos"
+            icon={Truck}
+            color="slate"
+            badge={
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                formProgress === 100 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+              }`}>
+                {filledFields.length}/{requiredFields.length} campos
+              </span>
+            }
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField icon={User} label="Nombre del Conductor" value={formData.conductor} onChange={handleFieldChange('conductor')} placeholder="Ej: Juan Pérez" required disabled={isCerrado} />
+              <FormField icon={CreditCard} label="Cédula del Conductor" value={formData.cedula} onChange={handleFieldChange('cedula')} placeholder="Ej: 1.234.567.890" required disabled={isCerrado} />
+              <FormField icon={Truck} label="Placa del Vehículo" value={formData.placa} onChange={handleFieldChange('placa')} placeholder="Ej: ABC-123" required disabled={isCerrado} />
+              <FormField icon={Phone} label="Teléfono del Conductor" value={formData.telefono} onChange={handleFieldChange('telefono')} placeholder="Ej: 300 123 4567" required disabled={isCerrado} />
+              <FormField icon={MapPin} label="Origen" value={formData.origen} onChange={handleFieldChange('origen')} placeholder="Ej: CEDI Girardota" required disabled={isCerrado} />
+              <FormField icon={MapPin} label="Destino" value={formData.destino} onChange={handleFieldChange('destino')} placeholder="Ej: Tienda Cañaveral" required disabled={isCerrado} />
+              <div className="md:col-span-2">
+                <FormField icon={MessageSquare} label="Observaciones" value={formData.observaciones} onChange={handleFieldChange('observaciones')} placeholder="Novedades de la operación (opcional)..." type="textarea" disabled={isCerrado} />
+              </div>
+            </div>
+          </Section>
+
+          {/* EVIDENCIAS */}
+          <Section
+            title="Evidencias y Soportes"
+            icon={Upload}
+            color="violet"
+            badge={
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                evidenceProgress === 100 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+              }`}>
+                {files.length} archivo{files.length !== 1 && 's'}
+              </span>
+            }
+          >
+            {isCerrado ? (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Shield className="w-5 h-5 text-emerald-500" />
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    Auditoría cerrada — {files.length} evidencia{files.length !== 1 && 's'} registrada{files.length !== 1 && 's'}
+                  </p>
+                </div>
+                <FilePreviewGallery files={files} readOnly={true} />
+              </div>
+            ) : (
+              <EvidenceDropzone files={files} onAddFiles={handleAddFiles} onRemoveFile={handleRemoveFile} maxPhotos={5} />
+            )}
+          </Section>
+        </div>
+      </main>
+
+      {/* FLOATING BOTTOM BAR */}
+      {!isCerrado && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-gray-200 dark:border-slate-700 px-4 py-4">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+            <div className="hidden sm:flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${lineasProgress === 100 ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                <span className="text-slate-600 dark:text-slate-300">Líneas</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${formProgress === 100 ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                <span className="text-slate-600 dark:text-slate-300">Datos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${evidenceProgress === 100 ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                <span className="text-slate-600 dark:text-slate-300">Evidencias</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 flex-1 sm:flex-none">
+              <div className="flex-1 sm:w-48">
+                <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-700 ${canClose ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${totalProgress}%` }} />
+                </div>
+              </div>
+              <button
+                onClick={handleCerrarAuditoria}
+                disabled={!canClose || closing}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${
+                  canClose && !closing
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                }`}
+              >
+                {closing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                {closing ? 'Cerrando...' : 'Completar Auditoría'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCerrado && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-blue-500 text-white px-4 py-4">
+          <div className="max-w-5xl mx-auto flex items-center justify-center gap-3">
+            <CheckCircle2 className="w-5 h-5" />
+            <span className="font-semibold">Auditoría de despacho completada y cerrada</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SalidaAuditoria;

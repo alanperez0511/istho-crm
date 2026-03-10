@@ -356,6 +356,23 @@ const inventarioService = {
     }
   },
   
+  // ──────────────────────────────────────────────────────────────────────────
+  // CAJAS (DETALLE POR OPERACIÓN)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  getCajas: async (id) => {
+    try {
+      const response = await apiClient.get(INVENTARIO_ENDPOINTS.CAJAS(id));
+      return response;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.message || 'Error al obtener cajas',
+        code: 'GET_CAJAS_ERROR',
+      };
+    }
+  },
+
   // ════════════════════════════════════════════════════════════════════════
   // UTILIDADES
   // ════════════════════════════════════════════════════════════════════════

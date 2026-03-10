@@ -331,33 +331,48 @@ const getDashboard = async (req, res) => {
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     const inicioSemana = new Date(hoy);
     inicioSemana.setDate(hoy.getDate() - hoy.getDay());
-    
+
+    // Filtro base por cliente (inyectado por filtrarPorCliente middleware)
+    const clienteFilter = req.query.cliente_id ? { cliente_id: req.query.cliente_id } : {};
+    const esCliente = !!req.query.cliente_id;
+
     // ═══════════════════════════════════════════════════════════════════════
     // OPERACIONES
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     const [
       totalOperaciones,
       operacionesMes,
       operacionesSemana,
       operacionesPendientes,
       operacionesPorTipoRaw,
-      operacionesPorEstadoRaw
+      operacionesPorEstadoRaw,
+      entradasPendientes,
+      salidasPendientes,
+      enProceso,
+      cerradasMes
     ] = await Promise.all([
-      Operacion.count(),
-      Operacion.count({ where: { created_at: { [Op.gte]: inicioMes } } }),
-      Operacion.count({ where: { created_at: { [Op.gte]: inicioSemana } } }),
-      Operacion.count({ where: { estado: { [Op.in]: ['pendiente', 'en_proceso'] } } }),
+      Operacion.count({ where: { ...clienteFilter } }),
+      Operacion.count({ where: { ...clienteFilter, created_at: { [Op.gte]: inicioMes } } }),
+      Operacion.count({ where: { ...clienteFilter, created_at: { [Op.gte]: inicioSemana } } }),
+      Operacion.count({ where: { ...clienteFilter, estado: { [Op.in]: ['pendiente', 'en_proceso'] } } }),
       Operacion.findAll({
         attributes: ['tipo', [sequelize.fn('COUNT', sequelize.col('id')), 'cantidad']],
+        where: { ...clienteFilter },
         group: ['tipo'],
         raw: true
       }),
       Operacion.findAll({
         attributes: ['estado', [sequelize.fn('COUNT', sequelize.col('id')), 'cantidad']],
+        where: { ...clienteFilter },
         group: ['estado'],
         raw: true
-      })
+      }),
+      // KPIs de auditoría
+      Operacion.count({ where: { ...clienteFilter, tipo: 'ingreso', estado: { [Op.in]: ['pendiente', 'en_proceso'] } } }),
+      Operacion.count({ where: { ...clienteFilter, tipo: 'salida', estado: { [Op.in]: ['pendiente', 'en_proceso'] } } }),
+      Operacion.count({ where: { ...clienteFilter, estado: 'en_proceso' } }),
+      Operacion.count({ where: { ...clienteFilter, estado: 'cerrado', created_at: { [Op.gte]: inicioMes } } }),
     ]);
     
     // Convertir arrays a objetos para el frontend
@@ -389,6 +404,7 @@ const getDashboard = async (req, res) => {
     // INVENTARIO
     // ═══════════════════════════════════════════════════════════════════════
     
+    const invFilter = clienteFilter;
     const [
       totalItems,
       totalUnidades,
@@ -396,17 +412,19 @@ const getDashboard = async (req, res) => {
       itemsStockBajo,
       itemsPorVencer
     ] = await Promise.all([
-      Inventario.count(),
-      Inventario.sum('cantidad'),
+      Inventario.count({ where: { ...invFilter } }),
+      Inventario.sum('cantidad', { where: { ...invFilter } }),
       Inventario.findAll({
         attributes: [[sequelize.literal('SUM(cantidad * COALESCE(costo_unitario, 0))'), 'valor']],
+        where: { ...invFilter },
         raw: true
       }),
       Inventario.count({
-        where: sequelize.literal('cantidad <= stock_minimo AND stock_minimo > 0')
+        where: { ...invFilter, [Op.and]: [sequelize.literal('cantidad <= stock_minimo AND stock_minimo > 0')] }
       }),
       Inventario.count({
         where: {
+          ...invFilter,
           fecha_vencimiento: {
             [Op.between]: [hoy, new Date(hoy.getTime() + 30 * 24 * 60 * 60 * 1000)]
           }
@@ -418,14 +436,16 @@ const getDashboard = async (req, res) => {
     // CLIENTES
     // ═══════════════════════════════════════════════════════════════════════
     
+    // Para clientes, solo mostrar su propio dato
+    const clienteWhere = esCliente ? { id: req.query.cliente_id } : {};
     const [
       totalClientes,
       clientesActivos,
       clientesNuevosMes
     ] = await Promise.all([
-      Cliente.count(),
-      Cliente.count({ where: { estado: 'activo' } }),
-      Cliente.count({ where: { created_at: { [Op.gte]: inicioMes } } })
+      Cliente.count({ where: { ...clienteWhere } }),
+      Cliente.count({ where: { ...clienteWhere, estado: 'activo' } }),
+      esCliente ? 0 : Cliente.count({ where: { created_at: { [Op.gte]: inicioMes } } })
     ]);
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -433,10 +453,45 @@ const getDashboard = async (req, res) => {
     // ═══════════════════════════════════════════════════════════════════════
     
     const ultimasOperaciones = await Operacion.findAll({
+      where: { ...clienteFilter },
       limit: 5,
       order: [['created_at', 'DESC']],
       include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
       attributes: ['id', 'numero_operacion', 'tipo', 'estado', 'total_unidades', 'created_at']
+    });
+
+    // Últimas entradas y salidas por separado (para tablas del dashboard)
+    const [ultimasEntradas, ultimasSalidas] = await Promise.all([
+      Operacion.findAll({
+        where: { ...clienteFilter, tipo: 'ingreso' },
+        limit: 5,
+        order: [['created_at', 'DESC']],
+        include: [
+          { model: Cliente, as: 'cliente', attributes: ['razon_social'] },
+          { model: OperacionDetalle, as: 'detalles', attributes: ['id'] }
+        ],
+        attributes: ['id', 'numero_operacion', 'documento_wms', 'tipo', 'estado', 'total_unidades', 'total_referencias', 'created_at']
+      }),
+      Operacion.findAll({
+        where: { ...clienteFilter, tipo: 'salida' },
+        limit: 5,
+        order: [['created_at', 'DESC']],
+        include: [
+          { model: Cliente, as: 'cliente', attributes: ['razon_social'] },
+          { model: OperacionDetalle, as: 'detalles', attributes: ['id'] }
+        ],
+        attributes: ['id', 'numero_operacion', 'documento_wms', 'tipo', 'estado', 'total_unidades', 'total_referencias', 'created_at']
+      }),
+    ]);
+
+    const formatOp = (op) => ({
+      id: op.id,
+      documento: op.documento_wms || op.numero_operacion,
+      cliente: op.cliente?.razon_social || 'N/A',
+      tipo: op.tipo,
+      lineas: op.detalles?.length || 0,
+      verificadas: 0,
+      estado: op.estado,
     });
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -451,8 +506,12 @@ const getDashboard = async (req, res) => {
           mes: operacionesMes || 0,
           semana: operacionesSemana || 0,
           pendientes: operacionesPendientes || 0,
-          porTipo,    // Ahora es objeto: { ingreso: N, salida: N, ... }
-          porEstado   // Ahora es objeto: { pendiente: N, en_proceso: N, ... }
+          entradasPendientes: entradasPendientes || 0,
+          salidasPendientes: salidasPendientes || 0,
+          enProceso: enProceso || 0,
+          cerradasMes: cerradasMes || 0,
+          porTipo,
+          porEstado
         },
         inventario: {
           totalItems: totalItems || 0,
@@ -468,7 +527,9 @@ const getDashboard = async (req, res) => {
           activos: clientesActivos || 0,
           nuevosMes: clientesNuevosMes || 0
         },
-        ultimasOperaciones: ultimasOperaciones || []
+        ultimasOperaciones: ultimasOperaciones || [],
+        ultimasEntradas: ultimasEntradas.map(formatOp),
+        ultimasSalidas: ultimasSalidas.map(formatOp)
       }
     });
     
