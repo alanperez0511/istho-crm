@@ -240,7 +240,16 @@ const auditoriasService = {
   subirEvidencias: async (auditoriaId, files) => {
     try {
       const formData = new FormData();
-      files.forEach((file) => {
+      
+      // Solo subir archivos que sean instancias de File (archivos nuevos)
+      // Los archivos ya subidos vienen como objetos planos de la BD
+      const filesToUpload = files.filter(f => f instanceof File || (f.isUploaded === false));
+      
+      if (filesToUpload.length === 0) {
+        return { success: true, message: 'No hay archivos nuevos para subir', data: { archivos: [] } };
+      }
+
+      filesToUpload.forEach((file) => {
         formData.append('evidencias', file);
       });
 

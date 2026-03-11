@@ -13,6 +13,7 @@ const router = express.Router();
 const auditoriaWmsController = require('../controllers/auditoriaWmsController');
 const { verificarToken } = require('../middleware/auth');
 const { requiereRolMinimo } = require('../middleware/roles');
+const { uploadCumplido } = require('../config/multer');
 
 // Todas las rutas requieren autenticación
 router.use(verificarToken);
@@ -56,7 +57,7 @@ router.put('/:id/logistica', requiereRolMinimo('operador'), auditoriaWmsControll
 // EVIDENCIAS
 // =============================================
 
-router.post('/:id/evidencias', requiereRolMinimo('operador'), auditoriaWmsController.subirEvidencias);
+router.post('/:id/evidencias', requiereRolMinimo('operador'), uploadCumplido.array('evidencias', 6), auditoriaWmsController.subirEvidencias);
 
 // =============================================
 // CIERRE

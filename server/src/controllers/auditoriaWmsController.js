@@ -15,6 +15,8 @@ const {
   Cliente,
   Usuario,
   Auditoria,
+  OperacionDocumento,
+  CajaInventario,
   sequelize
 } = require('../models');
 const {
@@ -65,7 +67,7 @@ const listarEntradas = async (req, res) => {
         {
           model: OperacionDetalle,
           as: 'detalles',
-          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia']
+          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'verificado']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -83,7 +85,7 @@ const listarEntradas = async (req, res) => {
       fecha_ingreso: op.fecha_operacion || op.created_at,
       estado: op.estado,
       lineas: op.detalles?.length || 0,
-      verificadas: 0,
+      verificadas: (op.detalles || []).filter(d => d.verificado).length,
     }));
 
     return paginated(res, entradas, { total: count, page, limit });
@@ -112,7 +114,12 @@ const obtenerEntradaPorId = async (req, res) => {
         {
           model: OperacionDetalle,
           as: 'detalles',
-          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'lote', 'fecha_vencimiento']
+          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'lote', 'fecha_vencimiento', 'verificado', 'numero_caja']
+        },
+        {
+          model: OperacionDocumento,
+          as: 'documentos',
+          attributes: ['id', 'archivo_nombre', 'archivo_url', 'archivo_tipo', 'archivo_tamanio', 'created_at']
         }
       ]
     });
@@ -132,11 +139,13 @@ const obtenerEntradaPorId = async (req, res) => {
         id: d.id,
         sku: d.sku || '',
         producto: d.producto,
-        cantidad: d.cantidad,
+        cantidad_esperada: d.cantidad,
         unidad: d.unidad_medida || 'UND',
         cantidad_averia: d.cantidad_averia || 0,
         lote: d.lote || '',
         fecha_vencimiento: d.fecha_vencimiento || null,
+        verificado: !!d.verificado,
+        caja: d.numero_caja || '',
       })),
       logistica: {
         conductor: operacion.conductor_nombre || '',
@@ -147,6 +156,14 @@ const obtenerEntradaPorId = async (req, res) => {
         destino: operacion.destino || '',
         observaciones: operacion.observaciones || '',
       },
+      evidencias: (operacion.documentos || []).map(doc => ({
+        id: doc.id,
+        nombre: doc.archivo_nombre,
+        url: doc.archivo_url,
+        tipo: doc.archivo_tipo,
+        tamanio: doc.archivo_tamanio,
+        fecha: doc.created_at
+      }))
     };
 
     return success(res, data);
@@ -193,7 +210,7 @@ const listarSalidas = async (req, res) => {
         {
           model: OperacionDetalle,
           as: 'detalles',
-          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia']
+          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'verificado']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -211,7 +228,7 @@ const listarSalidas = async (req, res) => {
       fecha_salida: op.fecha_operacion || op.created_at,
       estado: op.estado,
       lineas: op.detalles?.length || 0,
-      verificadas: 0,
+      verificadas: (op.detalles || []).filter(d => d.verificado).length,
     }));
 
     return paginated(res, salidas, { total: count, page, limit });
@@ -240,7 +257,12 @@ const obtenerSalidaPorId = async (req, res) => {
         {
           model: OperacionDetalle,
           as: 'detalles',
-          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'lote', 'fecha_vencimiento']
+          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'lote', 'fecha_vencimiento', 'verificado', 'numero_caja']
+        },
+        {
+          model: OperacionDocumento,
+          as: 'documentos',
+          attributes: ['id', 'archivo_nombre', 'archivo_url', 'archivo_tipo', 'archivo_tamanio', 'created_at']
         }
       ]
     });
@@ -260,11 +282,13 @@ const obtenerSalidaPorId = async (req, res) => {
         id: d.id,
         sku: d.sku || '',
         producto: d.producto,
-        cantidad: d.cantidad,
+        cantidad_esperada: d.cantidad,
         unidad: d.unidad_medida || 'UND',
         cantidad_averia: d.cantidad_averia || 0,
         lote: d.lote || '',
         fecha_vencimiento: d.fecha_vencimiento || null,
+        verificado: !!d.verificado,
+        caja: d.numero_caja || '',
       })),
       logistica: {
         conductor: operacion.conductor_nombre || '',
@@ -275,6 +299,14 @@ const obtenerSalidaPorId = async (req, res) => {
         destino: operacion.destino || '',
         observaciones: operacion.observaciones || '',
       },
+      evidencias: (operacion.documentos || []).map(doc => ({
+        id: doc.id,
+        nombre: doc.archivo_nombre,
+        url: doc.archivo_url,
+        tipo: doc.archivo_tipo,
+        tamanio: doc.archivo_tamanio,
+        fecha: doc.created_at
+      }))
     };
 
     return success(res, data);
@@ -295,7 +327,7 @@ const obtenerSalidaPorId = async (req, res) => {
 const verificarLinea = async (req, res) => {
   try {
     const { id, lineaId } = req.params;
-    const { cantidad_averia, tipo_averia, observaciones_averia } = req.body;
+    const { cantidad_averia, tipo_averia, observaciones_averia, verificado } = req.body;
 
     const detalle = await OperacionDetalle.findOne({
       where: { id: lineaId, operacion_id: id }
@@ -309,6 +341,7 @@ const verificarLinea = async (req, res) => {
     if (cantidad_averia !== undefined) updateData.cantidad_averia = cantidad_averia;
     if (tipo_averia !== undefined) updateData.tipo_averia = tipo_averia;
     if (observaciones_averia !== undefined) updateData.observaciones_averia = observaciones_averia;
+    if (verificado !== undefined) updateData.verificado = !!verificado;
 
     await detalle.update(updateData);
 
@@ -481,6 +514,22 @@ const subirEvidencias = async (req, res) => {
     if (archivos.length === 0) {
       return errorResponse(res, 'No se recibieron archivos', 400);
     }
+
+    // Guardar evidencias en la base de datos
+    const promesasDocumentos = archivos.map(file => {
+      return OperacionDocumento.create({
+        operacion_id: id,
+        tipo_documento: 'cumplido',
+        nombre: `Evidencia - ${file.originalname}`,
+        archivo_nombre: file.originalname,
+        archivo_url: `/uploads/${file.fieldname === 'evidencias' ? 'cumplidos' : 'temp'}/${file.filename}`,
+        archivo_tipo: file.mimetype,
+        archivo_tamanio: file.size,
+        subido_por: req.user?.id
+      });
+    });
+
+    await Promise.all(promesasDocumentos);
 
     await Auditoria.registrar({
       tabla: 'operaciones',

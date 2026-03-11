@@ -262,9 +262,6 @@ export const createUploadClient = () => {
   const uploadClient = axios.create({
     baseURL: API_BASE_URL,
     timeout: 60000, // 60 segundos para uploads
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
   });
   
   // Agregar token

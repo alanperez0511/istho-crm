@@ -127,6 +127,12 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(15, 4),
       allowNull: true,
       comment: 'Peso del producto en KG'
+    },
+
+    verificado: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: 'Indica si la línea ha sido verificada en la auditoría'
     }
   }, {
     tableName: 'operacion_detalle',

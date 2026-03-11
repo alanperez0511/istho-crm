@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 
 import auditoriasService from '../../../api/auditorias.service';
+import { useAlert } from '../../../context/AlertContext';
 
 // ════════════════════════════════════════════════════════════════════════════
 // STATUS STEPPER
@@ -278,90 +279,150 @@ const FilePreviewGallery = ({ files, onRemoveFile, readOnly = false }) => {
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// DROPZONE COMPONENT (with inline previews)
+// DROPZONE COMPONENT (Improved with type separation)
 // ════════════════════════════════════════════════════════════════════════════
 
 const EvidenceDropzone = ({ files, onAddFiles, onRemoveFile, maxPhotos = 5 }) => {
-  const fileInputRef = useRef(null);
-  const [dragActive, setDragActive] = useState(false);
+  const [dragActive, setDragActive] = useState({ pdf: false, photos: false });
+  const pdfInputRef = useRef(null);
+  const photoInputRef = useRef(null);
 
-  const pdfFiles = files.filter((f) => f.type === 'application/pdf');
-  const imageFiles = files.filter((f) => f.type.startsWith('image/'));
+  const pdfFiles = files.filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  const imageFiles = files.filter((f) => f.type.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(f.name));
 
-  const handleDrag = useCallback((e) => {
+  const onDrag = (type) => (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
-    else if (e.type === 'dragleave') setDragActive(false);
-  }, []);
-
-  const processFiles = useCallback((newFiles) => {
-    const validFiles = [];
-    for (const file of newFiles) {
-      if (file.type === 'application/pdf' && pdfFiles.length === 0) {
-        validFiles.push(file);
-      } else if (file.type.startsWith('image/') && imageFiles.length + validFiles.filter(f => f.type.startsWith('image/')).length < maxPhotos) {
-        validFiles.push(file);
-      }
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(prev => ({ ...prev, [type]: true }));
+    } else if (e.type === "dragleave") {
+      setDragActive(prev => ({ ...prev, [type]: false }));
     }
-    if (validFiles.length > 0) onAddFiles(validFiles);
-  }, [pdfFiles.length, imageFiles.length, maxPhotos, onAddFiles]);
+  };
 
-  const handleDrop = useCallback((e) => {
+  const onDrop = (type) => (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files?.length) processFiles([...e.dataTransfer.files]);
-  }, [processFiles]);
+    setDragActive(prev => ({ ...prev, [type]: false }));
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFiles(type, [...e.dataTransfer.files]);
+    }
+  };
 
-  const handleChange = (e) => {
-    if (e.target.files?.length) processFiles([...e.target.files]);
-    e.target.value = '';
+  const handleFiles = (type, newFiles) => {
+    const validFiles = [];
+    if (type === 'pdf') {
+      const pdf = newFiles.find(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+      if (pdf && pdfFiles.length === 0) validFiles.push(pdf);
+    } else {
+      const photos = newFiles.filter(f => f.type.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(f.name));
+      const remaining = maxPhotos - imageFiles.length;
+      validFiles.push(...photos.slice(0, remaining));
+    }
+    
+    if (validFiles.length > 0) onAddFiles(validFiles);
   };
 
   return (
-    <div className="space-y-4">
-      <div
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 ${
-          dragActive
-            ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/10 scale-[1.02]'
-            : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/30'
-        }`}
-      >
-        <input ref={fileInputRef} type="file" multiple accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleChange} className="hidden" />
-        <Upload className={`w-10 h-10 mx-auto mb-3 ${dragActive ? 'text-blue-500' : 'text-slate-400'}`} />
-        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
-          Arrastra archivos aquí o <span className="text-blue-600 dark:text-blue-400 underline">haz clic para seleccionar</span>
-        </p>
-        <p className="text-xs text-slate-400 dark:text-slate-500">
-          1 documento PDF + máximo {maxPhotos} fotografías (JPG, PNG, WebP)
-        </p>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* PDF Upload Area */}
+      <div className="space-y-3">
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-emerald-500" />
+          Documento Supporte (PDF)
+        </label>
+        
+        <div
+          onDragEnter={onDrag('pdf')}
+          onDragLeave={onDrag('pdf')}
+          onDragOver={onDrag('pdf')}
+          onDrop={onDrop('pdf')}
+          onClick={() => pdfFiles.length === 0 && pdfInputRef.current?.click()}
+          className={`relative h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${
+            pdfFiles.length > 0
+              ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-900/10'
+              : dragActive.pdf
+              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 scale-[1.02]'
+              : 'border-slate-300 dark:border-slate-600 hover:border-emerald-400 cursor-pointer'
+          }`}
+        >
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept=".pdf"
+            onChange={(e) => handleFiles('pdf', [...e.target.files])}
+            className="hidden"
+          />
+          
+          {pdfFiles.length > 0 ? (
+            <div className="text-center p-4">
+              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center mx-auto mb-2">
+                <FileText className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate max-w-[180px]">
+                {pdfFiles[0].name}
+              </p>
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemoveFile(files.indexOf(pdfFiles[0])); }}
+                className="mt-2 text-[10px] font-bold text-red-500 hover:text-red-600 uppercase tracking-wider"
+              >
+                Cambiar archivo
+              </button>
+            </div>
+          ) : (
+            <>
+              <Upload className="w-8 h-8 text-slate-400 mb-2" />
+              <p className="text-xs text-slate-500 dark:text-slate-400 text-center px-4">
+                Sube la factura o remisión (1 archivo)
+              </p>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-3">
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-          pdfFiles.length > 0 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-        }`}>
-          <FileText className="w-3.5 h-3.5" />
-          PDF: {pdfFiles.length}/1
-        </span>
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-          imageFiles.length > 0 ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-        }`}>
-          <Image className="w-3.5 h-3.5" />
-          Fotos: {imageFiles.length}/{maxPhotos}
-        </span>
+      {/* Photos Upload Area */}
+      <div className="space-y-3">
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+          <Image className="w-4 h-4 text-blue-500" />
+          Fotos de la Carga ({imageFiles.length}/{maxPhotos})
+        </label>
+        
+        <div
+          onDragEnter={onDrag('photos')}
+          onDragLeave={onDrag('photos')}
+          onDragOver={onDrag('photos')}
+          onDrop={onDrop('photos')}
+          onClick={() => imageFiles.length < maxPhotos && photoInputRef.current?.click()}
+          className={`relative h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${
+            imageFiles.length >= maxPhotos
+              ? 'border-blue-500 bg-blue-50/30 dark:bg-blue-900/10 cursor-default'
+              : dragActive.photos
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-[1.02]'
+              : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 cursor-pointer'
+          }`}
+        >
+          <input
+            ref={photoInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={(e) => handleFiles('photos', [...e.target.files])}
+            className="hidden"
+          />
+          
+          <Upload className={`w-8 h-8 mb-2 ${imageFiles.length >= maxPhotos ? 'text-blue-500' : 'text-slate-400'}`} />
+          <p className="text-xs text-slate-500 dark:text-slate-400 text-center px-4">
+            {imageFiles.length >= maxPhotos 
+              ? 'Límite de fotos alcanzado' 
+              : 'Sube fotos del precinto, placa y carga'}
+          </p>
+        </div>
       </div>
 
-      {files.length > 0 && (
+      {/* Gallery Previews */}
+      <div className="md:col-span-2">
         <FilePreviewGallery files={files} onRemoveFile={onRemoveFile} readOnly={false} />
-      )}
+      </div>
     </div>
   );
 };
@@ -373,6 +434,7 @@ const EvidenceDropzone = ({ files, onAddFiles, onRemoveFile, maxPhotos = 5 }) =>
 const SalidaAuditoria = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showAlert, showConfirm } = useAlert();
 
   // Estado de carga
   const [pageLoading, setPageLoading] = useState(true);
@@ -415,6 +477,16 @@ const SalidaAuditoria = () => {
               destino: data.logistica.destino || '',
               observaciones: data.logistica.observaciones || '',
             });
+          }
+          if (data.evidencias) {
+            setFiles(data.evidencias.map(ev => ({
+              id: ev.id,
+              name: ev.nombre,
+              url: ev.url,
+              type: ev.tipo,
+              size: ev.tamanio,
+              isUploaded: true
+            })));
           }
         }
       } catch {
@@ -494,17 +566,47 @@ const SalidaAuditoria = () => {
 
   const handleCerrarAuditoria = async () => {
     if (!canClose || closing) return;
+
+    const confirmed = await showConfirm({
+      type: 'success',
+      title: '¿Confirmar Despacho?',
+      message: 'Esta acción cerrará la auditoría y no podrá modificarse posteriormente.',
+      confirmText: 'Sí, despachar ahora',
+      cancelText: 'Seguir revisando'
+    });
+
+    if (!confirmed) return;
+
     setClosing(true);
 
     try {
+      // 1. Guardar datos logísticos
       await auditoriasService.guardarDatosLogisticos(id, formData);
+
+      // 2. Subir evidencias si hay archivos
       if (files.length > 0) {
-        await auditoriasService.subirEvidencias(id, files);
+        try {
+          await auditoriasService.subirEvidencias(id, files);
+        } catch (uploadError) {
+          console.error('Error al subir evidencias:', uploadError);
+          showAlert({
+            type: 'warning',
+            title: 'Atención',
+            message: 'Hubo un problema al subir las fotos/PDF, pero intentaremos cerrar la auditoría.'
+          });
+        }
       }
+
+      // 3. Cerrar auditoría
       await auditoriasService.cerrar(id, { enviar_correo: true });
       setEstado('cerrado');
-    } catch {
-      setEstado('cerrado');
+    } catch (error) {
+      console.error('Error al cerrar auditoría:', error);
+      showAlert({
+        type: 'error',
+        title: 'Error de Despacho',
+        message: 'No se pudo completar el cierre de la salida. Por favor reintente.'
+      });
     } finally {
       setClosing(false);
     }
@@ -662,6 +764,7 @@ const SalidaAuditoria = () => {
                       </p>
                       <p className="text-xs text-slate-400 dark:text-slate-500 font-mono">
                         SKU: {linea.sku} • {linea.cantidad_esperada} {linea.unidad}
+                        {linea.caja && <span className="ml-1 text-blue-500 font-bold">• Caja: {linea.caja}</span>}
                       </p>
                     </div>
                   </div>

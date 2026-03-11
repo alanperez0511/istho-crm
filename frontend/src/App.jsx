@@ -20,6 +20,7 @@ import { SnackbarProvider } from 'notistack';
 // ════════════════════════════════════════════════════════════════════════════
 // PROVIDERS Y COMPONENTES DE AUTH
 // ════════════════════════════════════════════════════════════════════════════
+import { AlertProvider } from './context/AlertContext';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute, {
   AdminRoute,
@@ -93,6 +94,7 @@ const Notificaciones = lazy(() => import('./pages/Perfil/Notificaciones'));
 // ════════════════════════════════════════════════════════════════════════════
 const ComingSoon = ({ title }) => (
   <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+    <FloatingHeader />
     <div className="text-center">
       <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
         <span className="text-4xl">🚧</span>
@@ -135,9 +137,11 @@ function App() {
     <BrowserRouter>
       {/* Provider de notificaciones toast */}
       <SnackbarProvider {...snackbarConfig}>
-        {/* Provider de autenticación */}
-        <AuthProvider>
-          <Suspense fallback={<PageLoader />}>
+        {/* Provider de alertas personalizadas */}
+        <AlertProvider>
+          {/* Provider de autenticación */}
+          <AuthProvider>
+            <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* ══════════════════════════════════════════════════════════ */}
               {/* RUTAS PÚBLICAS */}
@@ -209,8 +213,9 @@ function App() {
             </Routes>
           </Suspense>
         </AuthProvider>
-      </SnackbarProvider>
-    </BrowserRouter>
+      </AlertProvider>
+    </SnackbarProvider>
+  </BrowserRouter>
   );
 }
 

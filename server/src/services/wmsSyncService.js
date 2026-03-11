@@ -209,7 +209,17 @@ const syncEntrada = async (data) => {
       const sku = linea.producto.toString().trim();
       const cantidad = parseFloat(linea.cantidad) || 0;
 
-      const descripcionProducto = (linea.descripcion || linea.producto).toString().trim();
+      // Buscar descripción en el catálogo maestro
+      const productoMaestro = await Inventario.findOne({
+        where: { cliente_id: cliente.id, sku },
+        transaction
+      });
+
+      // Lógica de descripción: Preferir maestro si lo que viene es el SKU o está vacío
+      let descripcionProducto = (linea.descripcion || linea.producto || 'Producto S/D').toString().trim();
+      if (productoMaestro?.producto && (descripcionProducto === sku || !linea.descripcion)) {
+        descripcionProducto = productoMaestro.producto;
+      }
 
       // Crear detalle de operación
       const detalle = await OperacionDetalle.create({
@@ -253,12 +263,25 @@ const syncEntrada = async (data) => {
         ultima_sincronizacion_wms: new Date(),
       }, { transaction });
 
+      // Verificar si la caja ya existe para evitar duplicados si el WMS re-envía
+      let numeroCaja = linea.caja ? linea.caja.toString() : null;
+      if (numeroCaja) {
+        const cajaExistente = await CajaInventario.findOne({
+          where: { numero_caja: numeroCaja, estado: 'disponible' },
+          transaction
+        });
+        if (cajaExistente) {
+          logger.warn(`[WMS Sync] La caja ${numeroCaja} ya existe y está disponible. Omitiendo duplicado.`);
+          continue; 
+        }
+      }
+
       // Crear caja en el nuevo modelo
-      await CajaInventario.create({
+      const nuevaCaja = await CajaInventario.create({
         inventario_id: inventario.id,
         operacion_id: operacion.id,
         operacion_detalle_id: detalle.id,
-        numero_caja: linea.caja ? linea.caja.toString() : null,
+        numero_caja: numeroCaja,
         lote: linea.lote || null,
         lote_externo: linea.lote_externo || null,
         ubicacion: linea.ubicacion || null,
@@ -271,6 +294,11 @@ const syncEntrada = async (data) => {
         fecha_vencimiento: linea.fecha_vencimiento || null,
         fecha_movimiento: new Date(),
       }, { transaction });
+
+      // Si no venía número de caja, podemos asignar el ID como número único
+      if (!numeroCaja) {
+        await nuevaCaja.update({ numero_caja: `CJ-${nuevaCaja.id.toString().padStart(6, '0')}` }, { transaction });
+      }
 
       // Registrar movimiento
       await MovimientoInventario.create({
@@ -379,9 +407,18 @@ const syncSalida = async (data) => {
       const sku = linea.producto.toString().trim();
       const cantidad = parseFloat(linea.cantidad) || 0;
 
-      const descripcionProducto = (linea.descripcion || linea.producto).toString().trim();
+      // Buscar descripción en el catálogo maestro
+      const productoMaestro = await Inventario.findOne({
+        where: { cliente_id: cliente.id, sku },
+        transaction
+      });
 
-      const detalle = await OperacionDetalle.create({
+      // Lógica de descripción: Preferir maestro si lo que viene es el SKU o está vacío
+      let descripcionProducto = (linea.descripcion || linea.producto || 'Producto S/D').toString().trim();
+      if (productoMaestro?.producto && (descripcionProducto === sku || !linea.descripcion)) {
+        descripcionProducto = productoMaestro.producto;
+      }
+     const detalle = await OperacionDetalle.create({
         operacion_id: operacion.id,
         sku,
         producto: descripcionProducto,
@@ -416,12 +453,35 @@ const syncSalida = async (data) => {
           ultima_sincronizacion_wms: new Date(),
         }, { transaction });
 
-        // Crear caja de salida
+        // Manejo de cajas para la salida
+        const numeroCajaSalida = linea.caja ? linea.caja.toString() : null;
+        
+        if (numeroCajaSalida) {
+          // Intentar encontrar la caja específica que está saliendo
+          const cajaStock = await CajaInventario.findOne({
+            where: { 
+              numero_caja: numeroCajaSalida, 
+              inventario_id: inventario.id,
+              estado: 'disponible' 
+            },
+            transaction
+          });
+
+          if (cajaStock) {
+            // Marcar la caja original como despachada
+            await cajaStock.update({ 
+              estado: 'despachada',
+              operacion_id: operacion.id // Vincular a la salida
+            }, { transaction });
+          }
+        }
+
+        // Crear registro de movimiento de caja (tipo salida)
         await CajaInventario.create({
           inventario_id: inventario.id,
           operacion_id: operacion.id,
           operacion_detalle_id: detalle.id,
-          numero_caja: linea.caja ? linea.caja.toString() : null,
+          numero_caja: numeroCajaSalida,
           lote: linea.lote_interno || linea.lote || null,
           lote_externo: linea.lote_externo || null,
           ubicacion: linea.ubicacion || null,

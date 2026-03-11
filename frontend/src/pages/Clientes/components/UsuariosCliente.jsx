@@ -67,6 +67,8 @@ const UsuarioRow = ({
     hace30Dias.setDate(hace30Dias.getDate() - 30);
     return ultimoAcceso > hace30Dias;
   };
+
+  
   
   return (
     <div className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
