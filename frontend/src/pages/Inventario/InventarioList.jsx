@@ -63,20 +63,6 @@ import { useAuth } from '../../context/AuthContext';
 // ════════════════════════════════════════════════════════════════════════════
 
 const FILTER_OPTIONS = {
-  categoria: [
-    { value: 'lacteos', label: 'Lácteos' },
-    { value: 'bebidas', label: 'Bebidas' },
-    { value: 'construccion', label: 'Construcción' },
-    { value: 'envases', label: 'Envases' },
-    { value: 'quimicos', label: 'Químicos' },
-    { value: 'alimentos', label: 'Alimentos' },
-  ],
-  bodega: [
-    { value: 'BOD-01', label: 'Área 01 - Refrigerados' },
-    { value: 'BOD-02', label: 'Área 02 - Secos' },
-    { value: 'BOD-03', label: 'Área 03 - Químicos' },
-    { value: 'BOD-04', label: 'Área 04 - Construcción' },
-  ],
   estado: [
     { value: 'disponible', label: 'Disponible' },
     { value: 'bajo_stock', label: 'Bajo Stock' },
@@ -202,24 +188,29 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
  * Indicador visual de stock
  */
 const StockIndicator = ({ actual, minimo }) => {
-  const porcentaje = minimo > 0 ? (actual / minimo) * 100 : 100;
-  let colorClass = 'bg-emerald-500';
+  let porcentaje;
+  let colorClass;
 
-  if (actual === 0) {
+  if (!actual || actual <= 0) {
+    porcentaje = 0;
     colorClass = 'bg-red-500';
-  } else if (porcentaje <= 100) {
-    colorClass = 'bg-amber-500';
+  } else if (minimo > 0) {
+    porcentaje = Math.min((actual / minimo) * 100, 100);
+    colorClass = actual <= minimo ? 'bg-amber-500' : 'bg-emerald-500';
+  } else {
+    porcentaje = 100;
+    colorClass = 'bg-emerald-500';
   }
 
   return (
     <div className="flex items-center gap-2">
-      <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+      <div className="w-20 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
         <div
           className={`h-full transition-all duration-300 ${colorClass}`}
-          style={{ width: `${Math.min(porcentaje, 100)}%` }}
+          style={{ width: `${porcentaje}%` }}
         />
       </div>
-      <span className="text-sm font-medium text-slate-700">
+      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
         {actual.toLocaleString()}
       </span>
     </div>
@@ -437,6 +428,15 @@ const InventarioList = () => {
   };
 
   // ──────────────────────────────────────────────────────────────────────────
+  // OPCIONES DINÁMICAS DE FILTRO (CLIENTES)
+  // ──────────────────────────────────────────────────────────────────────────
+  const clienteOptions = [...new Map(
+    productos
+      .filter(p => p.cliente_nombre && p.cliente_id)
+      .map(p => [p.cliente_id, { value: String(p.cliente_id), label: p.cliente_nombre }])
+  ).values()];
+
+  // ──────────────────────────────────────────────────────────────────────────
   // KPIs PARA DISPLAY
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -455,7 +455,7 @@ const InventarioList = () => {
   // ──────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
 
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
@@ -464,8 +464,8 @@ const InventarioList = () => {
         {/* ════════════════════════════════════════════════════════════════ */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">Inventario</h1>
-            <p className="text-slate-500 mt-1">
+            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Inventario</h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">
               Gestiona el inventario de productos
             </p>
           </div>
@@ -542,7 +542,7 @@ const InventarioList = () => {
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* SEARCH & FILTERS */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
               <SearchBar
@@ -568,21 +568,14 @@ const InventarioList = () => {
           </div>
 
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FilterDropdown
-                  label="Categoría"
-                  options={FILTER_OPTIONS.categoria}
-                  value={filters.categoria}
-                  onChange={(v) => handleFilterChange('categoria', v)}
-                  placeholder="Todas las categorías"
-                />
-                <FilterDropdown
-                  label="Bodega"
-                  options={FILTER_OPTIONS.bodega}
-                  value={filters.bodega}
-                  onChange={(v) => handleFilterChange('bodega', v)}
-                  placeholder="Todas las bodegas"
+                  label="Cliente"
+                  options={clienteOptions}
+                  value={filters.cliente_id}
+                  onChange={(v) => handleFilterChange('cliente_id', v)}
+                  placeholder="Todos los clientes"
                 />
                 <FilterDropdown
                   label="Estado"
@@ -613,10 +606,30 @@ const InventarioList = () => {
           </p>
         </div>
 
+        {/* Active filter chips */}
+        {Object.keys(filters).length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {Object.entries(filters).map(([key, value]) => {
+              let label = value;
+              if (key === 'cliente_id') {
+                label = clienteOptions.find(c => c.value === value)?.label || value;
+              } else if (key === 'estado') {
+                label = FILTER_OPTIONS.estado.find(c => c.value === value)?.label || value;
+              }
+              return (
+                <span key={key} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                  {label}
+                  <button onClick={() => handleFilterChange(key, null)} className="hover:text-orange-900 dark:hover:text-orange-100">×</button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* TABLE */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
           {loading ? (
             <div className="p-4">
               {[0, 1, 2, 3, 4].map((i) => (
@@ -653,26 +666,23 @@ const InventarioList = () => {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <tr className="border-b border-gray-100 dark:border-slate-700">
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Producto
                     </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Cliente
                     </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Zona
-                    </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Stock
                     </th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Estado
                     </th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Valor
                     </th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Acciones
                     </th>
                   </tr>
@@ -683,36 +693,30 @@ const InventarioList = () => {
                     const stockActual = producto.stock_actual || producto.cantidad || 0;
                     const stockMinimo = producto.stock_minimo || 0;
                     const costoUnitario = producto.costo_unitario || 0;
-                    const bodegaLabel = FILTER_OPTIONS.bodega.find(b => b.value === producto.bodega || b.value === producto.zona);
 
                     return (
                       <tr
                         key={producto.id}
-                        className="border-b border-gray-50 hover:bg-slate-50 transition-colors"
+                        className="border-b border-gray-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
                       >
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                              <Package className="w-5 h-5 text-slate-500" />
+                            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center">
+                              <Package className="w-5 h-5 text-slate-500 dark:text-slate-400" />
                             </div>
                             <div>
                               <p
-                                className="text-sm font-medium text-slate-800 hover:text-orange-600 cursor-pointer"
+                                className="text-sm font-medium text-slate-800 dark:text-slate-100 hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer"
                                 onClick={() => handleView(producto)}
                               >
                                 {producto.nombre || producto.producto}
                               </p>
-                              <p className="text-xs text-slate-500">{producto.codigo || producto.sku}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{producto.codigo || producto.sku}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-sm text-slate-600">
+                        <td className="py-4 px-4 text-sm text-slate-600 dark:text-slate-300">
                           {producto.cliente_nombre || '-'}
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-sm text-slate-600">
-                            {bodegaLabel?.label || producto.zona || '-'}
-                          </span>
                         </td>
                         <td className="py-4 px-4">
                           <StockIndicator
@@ -723,7 +727,7 @@ const InventarioList = () => {
                         <td className="py-4 px-4 text-center">
                           <StatusChip status={producto.estado} />
                         </td>
-                        <td className="py-4 px-4 text-sm text-slate-800 text-right font-medium">
+                        <td className="py-4 px-4 text-sm text-slate-800 dark:text-slate-200 text-right font-medium">
                           {formatCurrency(stockActual * costoUnitario)}
                         </td>
                         <td className="py-4 px-4 text-center">
@@ -758,7 +762,7 @@ const InventarioList = () => {
         </div>
 
         {/* Footer */}
-        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
+        <footer className="text-center py-6 mt-8 text-slate-500 dark:text-slate-400 text-sm border-t border-gray-200 dark:border-slate-700">
           © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
           Centro Logístico Industrial del Norte, Girardota, Antioquia
         </footer>

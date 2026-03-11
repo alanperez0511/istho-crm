@@ -11,7 +11,7 @@
  * @date Marzo 2026
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -42,6 +42,9 @@ import { BarChart, PieChart } from '../../components/charts';
 import { useAuth } from '../../context/AuthContext';
 import useDashboard from '../../hooks/useDashboard';
 import useNotification from '../../hooks/useNotification';
+import inventarioService from '../../api/inventario.service';
+import logoNegro from '../../assets/logo-negro.png';
+import logoBlanco from '../../assets/logo-blanco.png';
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN DE KPIs
@@ -252,9 +255,6 @@ const Dashboard = () => {
     error,
     isRefreshing,
     kpis,
-    alertas,
-    alertasPorTipo,
-    totalAlertas,
     chartData,
     refresh,
     lastUpdated,
@@ -266,25 +266,61 @@ const Dashboard = () => {
     refreshInterval: 60000,
   });
 
+  // ── ALERTAS REALES DEL BACKEND ──
+  const [realAlertas, setRealAlertas] = useState([]);
+  const [loadingAlertas, setLoadingAlertas] = useState(true);
+  const [alertasCounts, setAlertasCounts] = useState({ agotado: 0, stock_bajo: 0, vencimiento: 0 });
+
+  const fetchAlertas = useCallback(async () => {
+    try {
+      setLoadingAlertas(true);
+      const response = await inventarioService.getAlertas();
+      const data = response?.data || response || [];
+      const items = Array.isArray(data) ? data : [];
+      setRealAlertas(items);
+      setAlertasCounts({
+        agotado: items.filter(a => a.tipo === 'agotado').length,
+        stock_bajo: items.filter(a => a.tipo === 'bajo_stock').length,
+        vencimiento: items.filter(a => a.tipo === 'vencimiento').length,
+      });
+    } catch {
+      setRealAlertas([]);
+    } finally {
+      setLoadingAlertas(false);
+    }
+  }, []);
+
   // ── EFFECTS ──
   useEffect(() => {
-    if (!loading && totalAlertas > 0) {
-      inventoryAlert(totalAlertas, alertasPorTipo);
+    fetchAlertas();
+  }, [fetchAlertas]);
+
+  useEffect(() => {
+    if (!loadingAlertas && realAlertas.length > 0) {
+      const porTipo = {
+        agotado: realAlertas.filter(a => a.tipo === 'agotado'),
+        stock_bajo: realAlertas.filter(a => a.tipo === 'bajo_stock'),
+        vencimiento: realAlertas.filter(a => a.tipo === 'vencimiento'),
+      };
+      inventoryAlert(realAlertas.length, porTipo);
     }
-  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadingAlertas]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── HANDLERS ──
   const handleEntradaClick = (row) => navigate(`/inventario/entradas/${row.id}`);
   const handleSalidaClick = (row) => navigate(`/inventario/salidas/${row.id}`);
 
   const handleAlertClick = (alert) => {
-    if (alert.type === 'inventario' || alert.type === 'vencimiento') {
+    if (alert.originalData?.producto_id) {
+      navigate(`/inventario/${alert.originalData.producto_id}`);
+    } else {
       navigate('/inventario/alertas');
     }
   };
 
   const handleRefresh = () => {
     refresh();
+    fetchAlertas();
     info('Actualizando datos...');
   };
 
@@ -296,19 +332,21 @@ const Dashboard = () => {
 
   const pieData = chartData.ingresosVsSalidas || [];
 
-  // ── ALERTS FORMAT ──
-  const formattedAlertas = alertas.slice(0, 5).map(alerta => ({
+  // ── ALERTS FORMAT (desde alertas reales del backend) ──
+  const formattedAlertas = realAlertas.slice(0, 5).map(alerta => ({
     id: alerta.id,
-    type: alerta.tipo === 'stock_bajo' ? 'inventario' :
-      alerta.tipo === 'agotado' ? 'inventario' :
-        alerta.tipo === 'vencimiento' ? 'vencimiento' : 'documento',
-    title: alerta.tipo === 'stock_bajo' ? `Stock bajo - ${alerta.nombre}` :
-      alerta.tipo === 'agotado' ? `Agotado - ${alerta.nombre}` :
-        `Por vencer - ${alerta.nombre}`,
-    description: alerta.mensaje || `${alerta.cantidad_actual || 0} unidades disponibles`,
+    type: alerta.tipo === 'vencimiento' ? 'vencimiento' : 'inventario',
+    title: alerta.tipo === 'bajo_stock'
+      ? `Stock bajo - ${alerta.producto_nombre || alerta.nombre}`
+      : alerta.tipo === 'agotado'
+        ? `Agotado - ${alerta.producto_nombre || alerta.nombre}`
+        : `Por vencer - ${alerta.producto_nombre || alerta.nombre}`,
+    description: alerta.tipo === 'vencimiento'
+      ? `Vence en ${alerta.dias_restantes || '?'} días`
+      : `${alerta.stock_actual ?? alerta.stockActual ?? 0} ${alerta.unidad_medida || 'UND'} disponibles`,
     date: alerta.fecha_vencimiento
       ? `Vence: ${new Date(alerta.fecha_vencimiento).toLocaleDateString('es-CO')}`
-      : 'Actualizado recientemente',
+      : alerta.cliente_nombre || alerta.cliente || '',
     originalData: alerta,
   }));
 
@@ -481,7 +519,7 @@ const Dashboard = () => {
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* ALERTS + SUMMARY */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
           {/* Resumen Rápido de Auditoría */}
           <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
@@ -542,40 +580,40 @@ const Dashboard = () => {
               onAlertClick={handleAlertClick}
               onViewAll={() => navigate('/inventario/alertas')}
               maxItems={4}
-              loading={loading}
+              loading={loadingAlertas}
               emptyIcon={CheckCircle}
               emptyMessage="Sin alertas pendientes"
             />
 
-            {!loading && totalAlertas > 0 && (
+            {!loadingAlertas && realAlertas.length > 0 && (
               <div className="mt-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
                 <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Resumen de Alertas</h4>
                 <div className="space-y-2">
-                  {alertasPorTipo.agotado?.length > 0 && (
+                  {alertasCounts.agotado > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-red-600 dark:text-red-400 flex items-center gap-2">
                         <Package className="w-4 h-4" />
                         Agotados
                       </span>
-                      <span className="font-medium text-slate-700 dark:text-slate-300">{alertasPorTipo.agotado.length}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{alertasCounts.agotado}</span>
                     </div>
                   )}
-                  {alertasPorTipo.stock_bajo?.length > 0 && (
+                  {alertasCounts.stock_bajo > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-amber-600 dark:text-amber-400 flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4" />
                         Stock Bajo
                       </span>
-                      <span className="font-medium text-slate-700 dark:text-slate-300">{alertasPorTipo.stock_bajo.length}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{alertasCounts.stock_bajo}</span>
                     </div>
                   )}
-                  {alertasPorTipo.vencimiento?.length > 0 && (
+                  {alertasCounts.vencimiento > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-orange-600 dark:text-orange-400 flex items-center gap-2">
                         <Clock className="w-4 h-4" />
                         Por Vencer
                       </span>
-                      <span className="font-medium text-slate-700 dark:text-slate-300">{alertasPorTipo.vencimiento.length}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{alertasCounts.vencimiento}</span>
                     </div>
                   )}
                 </div>
@@ -587,9 +625,13 @@ const Dashboard = () => {
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* FOOTER */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        <footer className="text-center py-6 mt-8 text-slate-500 dark:text-slate-400 text-sm border-t border-gray-200 dark:border-slate-700">
-          © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
-          Centro Logístico Industrial del Norte, Girardota, Antioquia
+        <footer className="flex flex-col items-center gap-3 py-6 mt-8 text-slate-500 dark:text-slate-400 text-sm border-t border-gray-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <img src={logoNegro} alt="ISTHO" className="w-6 h-6 rounded dark:hidden" />
+            <img src={logoBlanco} alt="ISTHO" className="w-6 h-6 rounded hidden dark:block" />
+            <span>© 2026 ISTHO S.A.S. - Sistema CRM Interno</span>
+          </div>
+          <span className="text-xs text-slate-400 dark:text-slate-500">Centro Logístico Industrial del Norte, Girardota, Antioquia</span>
         </footer>
       </main>
     </div>

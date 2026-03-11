@@ -23,6 +23,7 @@ const createDir = (dir) => {
 const UPLOAD_DIRS = {
   averias: path.join(__dirname, '../../uploads/averias'),
   cumplidos: path.join(__dirname, '../../uploads/cumplidos'),
+  logos: path.join(__dirname, '../../uploads/logos'),
   temp: path.join(__dirname, '../../uploads/temp')
 };
 
@@ -113,8 +114,34 @@ const uploadCumplido = multer({
   }
 });
 
+/**
+ * Configuración de almacenamiento para logos de clientes
+ */
+const storageLogos = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOAD_DIRS.logos);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const filename = `logo_${req.params.id}_${Date.now()}${ext}`;
+    cb(null, filename);
+  }
+});
+
+/**
+ * Upload para logos de clientes
+ */
+const uploadLogo = multer({
+  storage: storageLogos,
+  fileFilter: imageFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  }
+});
+
 module.exports = {
   uploadAveria,
   uploadCumplido,
+  uploadLogo,
   UPLOAD_DIRS
 };

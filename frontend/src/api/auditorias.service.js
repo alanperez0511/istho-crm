@@ -291,6 +291,67 @@ const auditoriasService = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
+  // AVERÍAS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Registrar una avería en una operación
+   *
+   * @param {number} operacionId - ID de la operación
+   * @param {Object} data - Datos de la avería
+   * @param {number} data.detalle_id - ID del detalle/línea afectada
+   * @param {string} data.sku - SKU del producto
+   * @param {number} data.cantidad - Cantidad averiada
+   * @param {string} data.tipo_averia - Tipo de avería
+   * @param {string} [data.descripcion] - Descripción adicional
+   * @param {File} [data.foto] - Foto de evidencia
+   * @returns {Promise<Object>}
+   */
+  registrarAveria: async (operacionId, data) => {
+    try {
+      const formData = new FormData();
+      formData.append('detalle_id', data.detalle_id);
+      formData.append('sku', data.sku);
+      formData.append('cantidad', data.cantidad);
+      formData.append('tipo_averia', data.tipo_averia);
+      if (data.descripcion) formData.append('descripcion', data.descripcion);
+      if (data.foto) formData.append('foto', data.foto);
+
+      const uploadClient = createUploadClient();
+      const response = await uploadClient.post(
+        `/operaciones/${operacionId}/averias`,
+        formData
+      );
+      return response;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.message || 'Error al registrar avería',
+        code: 'REGISTRAR_AVERIA_ERROR',
+      };
+    }
+  },
+
+  /**
+   * Obtener averías de una operación
+   *
+   * @param {number} operacionId - ID de la operación
+   * @returns {Promise<Object>}
+   */
+  getAverias: async (operacionId) => {
+    try {
+      const response = await apiClient.get(`/operaciones/${operacionId}/averias`);
+      return response;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.message || 'Error al obtener averías',
+        code: 'GET_AVERIAS_ERROR',
+      };
+    }
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
   // CIERRE
   // ══════════════════════════════════════════════════════════════════════════
 

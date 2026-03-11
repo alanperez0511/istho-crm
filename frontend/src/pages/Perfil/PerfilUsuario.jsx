@@ -1,18 +1,13 @@
 /**
  * ============================================================================
- * ISTHO CRM - PerfilUsuario (CORREGIDO)
+ * ISTHO CRM - PerfilUsuario
  * ============================================================================
- * Página de perfil de usuario conectada al backend real.
- * 
- * CORRECCIONES:
- * - useAuth desestructurado correctamente
- * - usuarioService.getPermisos() usa estructura correcta
- * - Eliminadas llamadas a métodos inexistentes
- * - Permisos mostrados desde rol del usuario
- * 
+ * Página de perfil de usuario con datos reales, modo oscuro y adaptación
+ * para usuarios portal (cliente).
+ *
  * @author Coordinación TI ISTHO
- * @version 2.1.0
- * @date Enero 2026
+ * @version 3.0.0
+ * @date Marzo 2026
  */
 
 import { useState, useEffect } from 'react';
@@ -38,17 +33,15 @@ import {
   Settings,
   LogOut,
   CheckCircle,
+  Eye,
+  EyeOff,
+  AlertTriangle,
 } from 'lucide-react';
-
-// Layout
-
 
 // Components
 import { Button, Modal, StatusChip } from '../../components/common';
 
-// ════════════════════════════════════════════════════════════════════════════
-// HOOKS E INTEGRACIÓN
-// ════════════════════════════════════════════════════════════════════════════
+// Hooks e integración
 import { useAuth } from '../../context/AuthContext';
 import useNotification from '../../hooks/useNotification';
 import authService from '../../api/auth.service';
@@ -65,7 +58,6 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave, loading }) => {
       setFormData({
         nombre: usuario.nombre || '',
         apellido: usuario.apellido || '',
-        email: usuario.email || '',
         telefono: usuario.telefono || '',
         cargo: usuario.cargo || '',
         departamento: usuario.departamento || '',
@@ -80,6 +72,9 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave, loading }) => {
   const handleSubmit = () => {
     onSave(formData);
   };
+
+  const inputClasses = 'w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500';
+  const readOnlyClasses = 'w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400';
 
   return (
     <Modal
@@ -97,77 +92,54 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave, loading }) => {
       }
     >
       <div className="space-y-4">
-        {/* Avatar */}
-        <div className="flex items-center gap-4">
-          <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">
-            {(formData.nombre || '')[0]}{(formData.apellido || '')[0]}
-          </div>
-          <div>
-            <Button variant="outline" size="sm" icon={Camera}>
-              Cambiar Foto
-            </Button>
-            <p className="text-xs text-slate-400 mt-1">JPG, PNG. Máx 2MB</p>
-          </div>
-        </div>
-
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre</label>
             <input
               type="text"
               value={formData.nombre || ''}
               onChange={(e) => handleChange('nombre', e.target.value)}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+              className={inputClasses}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Apellido</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Apellido</label>
             <input
               type="text"
               value={formData.apellido || ''}
               onChange={(e) => handleChange('apellido', e.target.value)}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+              className={inputClasses}
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
-          <input
-            type="email"
-            value={formData.email || ''}
-            onChange={(e) => handleChange('email', e.target.value)}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Teléfono</label>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Teléfono</label>
           <input
             type="tel"
             value={formData.telefono || ''}
             onChange={(e) => handleChange('telefono', e.target.value)}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+            className={inputClasses}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Cargo</label>
             <input
               type="text"
               value={formData.cargo || ''}
               readOnly
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-500"
+              className={readOnlyClasses}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Departamento</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Departamento</label>
             <input
               type="text"
               value={formData.departamento || ''}
               readOnly
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-500"
+              className={readOnlyClasses}
             />
           </div>
         </div>
@@ -185,11 +157,16 @@ const ChangePasswordModal = ({ isOpen, onClose, onSubmit, loading }) => {
     newPassword: '',
     confirmPassword: '',
   });
+  const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false });
   const [error, setError] = useState('');
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setError('');
+  };
+
+  const toggleShow = (field) => {
+    setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
   const handleSubmit = () => {
@@ -201,15 +178,47 @@ const ChangePasswordModal = ({ isOpen, onClose, onSubmit, loading }) => {
       setError('La contraseña debe tener al menos 8 caracteres');
       return;
     }
+    if (!/[A-Z]/.test(formData.newPassword)) {
+      setError('Debe contener al menos una mayúscula');
+      return;
+    }
+    if (!/[0-9]/.test(formData.newPassword)) {
+      setError('Debe contener al menos un número');
+      return;
+    }
     onSubmit(formData);
   };
 
   useEffect(() => {
     if (isOpen) {
       setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setShowPasswords({ current: false, new: false, confirm: false });
       setError('');
     }
   }, [isOpen]);
+
+  const inputClasses = 'w-full px-4 py-2.5 pr-10 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500';
+
+  const PasswordInput = ({ label, field, value, showKey }) => (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{label}</label>
+      <div className="relative">
+        <input
+          type={showPasswords[showKey] ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => handleChange(field, e.target.value)}
+          className={inputClasses}
+        />
+        <button
+          type="button"
+          onClick={() => toggleShow(showKey)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+        >
+          {showPasswords[showKey] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <Modal
@@ -227,48 +236,36 @@ const ChangePasswordModal = ({ isOpen, onClose, onSubmit, loading }) => {
       }
     >
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña Actual</label>
-          <input
-            type="password"
-            value={formData.currentPassword}
-            onChange={(e) => handleChange('currentPassword', e.target.value)}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Nueva Contraseña</label>
-          <input
-            type="password"
-            value={formData.newPassword}
-            onChange={(e) => handleChange('newPassword', e.target.value)}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Confirmar Contraseña</label>
-          <input
-            type="password"
-            value={formData.confirmPassword}
-            onChange={(e) => handleChange('confirmPassword', e.target.value)}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-          />
-        </div>
+        <PasswordInput label="Contraseña Actual" field="currentPassword" value={formData.currentPassword} showKey="current" />
+        <PasswordInput label="Nueva Contraseña" field="newPassword" value={formData.newPassword} showKey="new" />
+        <PasswordInput label="Confirmar Contraseña" field="confirmPassword" value={formData.confirmPassword} showKey="confirm" />
 
         {error && (
-          <p className="text-sm text-red-500 bg-red-50 p-3 rounded-lg">{error}</p>
+          <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            {error}
+          </div>
         )}
 
-        <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
-          <p className="font-medium mb-1">Requisitos de contraseña:</p>
-          <ul className="list-disc list-inside space-y-0.5">
-            <li>Mínimo 8 caracteres</li>
-            <li>Al menos una letra mayúscula</li>
-            <li>Al menos un número</li>
-            <li>Al menos un carácter especial</li>
-          </ul>
+        <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 space-y-1">
+          <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Requisitos:</p>
+          {[
+            { ok: formData.newPassword.length >= 8, text: 'Mínimo 8 caracteres' },
+            { ok: /[A-Z]/.test(formData.newPassword), text: 'Al menos una mayúscula' },
+            { ok: /[a-z]/.test(formData.newPassword), text: 'Al menos una minúscula' },
+            { ok: /[0-9]/.test(formData.newPassword), text: 'Al menos un número' },
+          ].map((req, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs">
+              <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${
+                req.ok ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
+              }`}>
+                {req.ok && <span className="text-white text-[8px]">✓</span>}
+              </div>
+              <span className={req.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}>
+                {req.text}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </Modal>
@@ -280,11 +277,11 @@ const ChangePasswordModal = ({ isOpen, onClose, onSubmit, loading }) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 const InfoCard = ({ title, icon: Icon, children, action }) => (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700">
       <div className="flex items-center gap-2">
-        {Icon && <Icon className="w-5 h-5 text-slate-500" />}
-        <h3 className="font-semibold text-slate-800">{title}</h3>
+        {Icon && <Icon className="w-5 h-5 text-slate-500 dark:text-slate-400" />}
+        <h3 className="font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
       </div>
       {action}
     </div>
@@ -293,28 +290,69 @@ const InfoCard = ({ title, icon: Icon, children, action }) => (
 );
 
 const StatCardMini = ({ icon: Icon, label, value, color }) => (
-  <div className="text-center p-4 bg-slate-50 rounded-xl">
+  <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-transparent dark:border-slate-700">
     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2 ${color}`}>
       <Icon className="w-5 h-5 text-white" />
     </div>
-    <p className="text-xl font-bold text-slate-800">{value}</p>
-    <p className="text-xs text-slate-500">{label}</p>
+    <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
+    <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
   </div>
 );
+
+// ════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Obtener iniciales del usuario
+ */
+const getInitials = (user) => {
+  if (user.nombre && user.apellido) {
+    return `${user.nombre[0]}${user.apellido[0]}`.toUpperCase();
+  }
+  if (user.nombre_completo) {
+    const parts = user.nombre_completo.trim().split(/\s+/);
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return parts[0][0].toUpperCase();
+  }
+  return (user.username || 'U')[0].toUpperCase();
+};
+
+/**
+ * Obtener nombre display
+ */
+const getDisplayName = (user) => {
+  if (user.nombre && user.apellido) return `${user.nombre} ${user.apellido}`;
+  if (user.nombre_completo) return user.nombre_completo;
+  return user.username || 'Usuario';
+};
+
+/**
+ * Calcular antigüedad
+ */
+const calcularAntiguedad = (fecha) => {
+  if (!fecha) return '-';
+  const ingreso = new Date(fecha);
+  const hoy = new Date();
+  const diff = hoy - ingreso;
+  const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+  const months = Math.floor((diff % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000));
+
+  if (years > 0) return `${years} año${years > 1 ? 's' : ''}, ${months} mes${months > 1 ? 'es' : ''}`;
+  if (months > 0) return `${months} mes${months > 1 ? 'es' : ''}`;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  return `${days} día${days !== 1 ? 's' : ''}`;
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 const PerfilUsuario = () => {
   const navigate = useNavigate();
-
-  // ✅ CORREGIDO: Desestructurar solo las propiedades que existen en useAuth
   const { user, logout, updateUser } = useAuth();
   const { success, error: apiError } = useNotification();
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // ESTADOS
-  // ──────────────────────────────────────────────────────────────────────────
+  // Estados
   const [permisos, setPermisos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('info');
@@ -324,14 +362,11 @@ const PerfilUsuario = () => {
   const [passwordModal, setPasswordModal] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // CARGAR PERMISOS
-  // ──────────────────────────────────────────────────────────────────────────
+  // Cargar permisos
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // ✅ CORREGIDO: Usar getPermisos que genera permisos localmente
         const permisosResponse = await usuarioService.getPermisos();
         if (permisosResponse.success && permisosResponse.data) {
           setPermisos(permisosResponse.data);
@@ -342,10 +377,7 @@ const PerfilUsuario = () => {
         setLoading(false);
       }
     };
-
-    if (user) {
-      fetchData();
-    }
+    if (user) fetchData();
   }, [user]);
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -355,14 +387,9 @@ const PerfilUsuario = () => {
   const handleSaveProfile = async (data) => {
     setFormLoading(true);
     try {
-      // ✅ CORREGIDO: Llamar al backend para persistir los cambios
       const response = await usuarioService.actualizarPerfil(data);
-
       if (response.success) {
-        // Actualizar también el estado local/contexto
-        if (updateUser) {
-          updateUser(response.data || data);
-        }
+        if (updateUser) updateUser(response.data || data);
         success('Perfil actualizado correctamente');
         setEditModal(false);
       } else {
@@ -378,12 +405,17 @@ const PerfilUsuario = () => {
   const handleChangePassword = async (data) => {
     setFormLoading(true);
     try {
-      await authService.changePassword({
+      const result = await authService.changePassword({
         password_actual: data.currentPassword,
         password_nuevo: data.newPassword,
+        confirmar_password: data.confirmPassword,
       });
-      success('Contraseña actualizada correctamente');
-      setPasswordModal(false);
+      if (result.success) {
+        success('Contraseña actualizada correctamente');
+        setPasswordModal(false);
+      } else {
+        throw new Error(result.message || 'Error al cambiar contraseña');
+      }
     } catch (err) {
       apiError(err);
     } finally {
@@ -396,34 +428,19 @@ const PerfilUsuario = () => {
     navigate('/login');
   };
 
-  const calcularAntiguedad = (fechaIngreso) => {
-    if (!fechaIngreso) return '-';
-    const ingreso = new Date(fechaIngreso);
-    const hoy = new Date();
-    const diff = hoy - ingreso;
-    const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
-    const months = Math.floor((diff % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000));
-
-    if (years > 0) {
-      return `${years} año${years > 1 ? 's' : ''}, ${months} mes${months > 1 ? 'es' : ''}`;
-    }
-    return `${months} mes${months > 1 ? 'es' : ''}`;
-  };
-
   // ──────────────────────────────────────────────────────────────────────────
   // LOADING STATE
   // ──────────────────────────────────────────────────────────────────────────
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
-            <div className="h-48 bg-gray-200 rounded-2xl" />
+            <div className="h-48 bg-gray-200 dark:bg-slate-700 rounded-2xl" />
             <div className="grid grid-cols-3 gap-6">
-              <div className="col-span-2 h-96 bg-gray-200 rounded-2xl" />
-              <div className="h-96 bg-gray-200 rounded-2xl" />
+              <div className="col-span-2 h-96 bg-gray-200 dark:bg-slate-700 rounded-2xl" />
+              <div className="h-96 bg-gray-200 dark:bg-slate-700 rounded-2xl" />
             </div>
           </div>
         </main>
@@ -435,35 +452,37 @@ const PerfilUsuario = () => {
   // VARIABLES DERIVADAS
   // ──────────────────────────────────────────────────────────────────────────
 
+  const isPortalUser = user.rol === 'cliente';
+  const clienteInfo = user.cliente_info;
+  const displayName = getDisplayName(user);
+  const initials = getInitials(user);
+
   const tabs = [
     { id: 'info', label: 'Información' },
     { id: 'permisos', label: 'Permisos' },
   ];
 
-  // ✅ CORREGIDO: Convertir permisos a formato tabla
   const permisosTabla = permisos?.permisos
     ? Object.entries(permisos.permisos).map(([modulo, acciones]) => ({
-      modulo: modulo.charAt(0).toUpperCase() + modulo.slice(1),
-      ver: acciones.includes('ver'),
-      crear: acciones.includes('crear'),
-      editar: acciones.includes('editar'),
-      eliminar: acciones.includes('eliminar'),
-      exportar: acciones.includes('exportar'),
-    }))
-    : [
-      { modulo: 'Dashboard', ver: true, crear: false, editar: false, eliminar: false },
-      { modulo: 'Clientes', ver: true, crear: false, editar: false, eliminar: false },
-      { modulo: 'Inventario', ver: true, crear: false, editar: false, eliminar: false },
-      { modulo: 'Operaciones', ver: true, crear: false, editar: false, eliminar: false },
-      { modulo: 'Reportes', ver: true, crear: false, editar: false, eliminar: false },
-    ];
+        modulo: modulo.charAt(0).toUpperCase() + modulo.slice(1),
+        ver: acciones.includes('ver'),
+        crear: acciones.includes('crear'),
+        editar: acciones.includes('editar'),
+        eliminar: acciones.includes('eliminar'),
+        exportar: acciones.includes('exportar'),
+      }))
+    : [];
 
-  // Estadísticas calculadas localmente
-  const stats = {
-    despachosCreados: 0,
-    clientesGestionados: 0,
-    reportesGenerados: 0,
-    diasActivo: Math.floor((new Date() - new Date(user.fecha_ingreso || user.created_at || Date.now())) / (1000 * 60 * 60 * 24)),
+  const diasActivo = Math.floor(
+    (new Date() - new Date(user.created_at || Date.now())) / (1000 * 60 * 60 * 24)
+  );
+
+  // Rol label
+  const rolLabels = {
+    admin: 'Administrador',
+    supervisor: 'Supervisor',
+    operador: 'Operador',
+    cliente: 'Portal Cliente',
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -471,35 +490,35 @@ const PerfilUsuario = () => {
   // ──────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-
-
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* HEADER CARD */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center gap-6">
             {/* Avatar */}
             <div className="relative">
               <div className="w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                {(user.nombre || 'U')[0]}{(user.apellido || '')[0]}
+                {initials}
               </div>
-              <button className="absolute -bottom-2 -right-2 p-2 bg-white rounded-xl shadow-md hover:bg-slate-50 transition-colors">
-                <Camera className="w-4 h-4 text-slate-500" />
+              <button className="absolute -bottom-2 -right-2 p-2 bg-white dark:bg-slate-700 rounded-xl shadow-md hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">
+                <Camera className="w-4 h-4 text-slate-500 dark:text-slate-400" />
               </button>
             </div>
 
             {/* Info */}
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold text-slate-800">
-                  {user.nombre} {user.apellido}
+                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+                  {displayName}
                 </h1>
-                <StatusChip status={user.estado || 'activo'} />
+                <StatusChip status={user.activo !== false ? 'activo' : 'inactivo'} />
               </div>
-              <p className="text-slate-500 mb-2">{user.cargo || 'Usuario'}</p>
-              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
+              <p className="text-slate-500 dark:text-slate-400 mb-2">
+                {user.cargo || rolLabels[user.rol] || 'Usuario'}
+              </p>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
                 <span className="flex items-center gap-1">
                   <Mail className="w-4 h-4" />
                   {user.email}
@@ -512,8 +531,14 @@ const PerfilUsuario = () => {
                 )}
                 <span className="flex items-center gap-1">
                   <Shield className="w-4 h-4" />
-                  <span className="capitalize">{user.rol || 'Usuario'}</span>
+                  <span className="capitalize">{rolLabels[user.rol] || user.rol}</span>
                 </span>
+                {isPortalUser && clienteInfo && (
+                  <span className="flex items-center gap-1">
+                    <Building2 className="w-4 h-4" />
+                    {clienteInfo.razon_social}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -533,30 +558,10 @@ const PerfilUsuario = () => {
         {/* STATS ROW */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <StatCardMini
-            icon={Activity}
-            label="Operaciones"
-            value={stats.despachosCreados}
-            color="bg-blue-500"
-          />
-          <StatCardMini
-            icon={User}
-            label="Clientes"
-            value={stats.clientesGestionados}
-            color="bg-emerald-500"
-          />
-          <StatCardMini
-            icon={FileText}
-            label="Reportes"
-            value={stats.reportesGenerados}
-            color="bg-violet-500"
-          />
-          <StatCardMini
-            icon={Award}
-            label="Días Activo"
-            value={stats.diasActivo}
-            color="bg-amber-500"
-          />
+          <StatCardMini icon={Activity} label="Rol" value={rolLabels[user.rol] || user.rol} color="bg-blue-500" />
+          <StatCardMini icon={Building2} label={isPortalUser ? 'Cliente' : 'Departamento'} value={isPortalUser ? (clienteInfo?.razon_social?.split(' ')[0] || '-') : (user.departamento || 'Operaciones')} color="bg-emerald-500" />
+          <StatCardMini icon={Clock} label="Último Acceso" value={user.ultimo_acceso ? new Date(user.ultimo_acceso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : 'N/A'} color="bg-violet-500" />
+          <StatCardMini icon={Award} label="Días Activo" value={diasActivo} color="bg-amber-500" />
         </div>
 
         {/* ════════════════════════════════════════════════════════════════ */}
@@ -565,16 +570,19 @@ const PerfilUsuario = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
               {/* Tabs */}
-              <div className="border-b border-gray-100">
+              <div className="border-b border-gray-100 dark:border-slate-700">
                 <nav className="flex px-6">
                   {tabs.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${activeTab === tab.id ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'
-                        }`}
+                      className={`py-4 px-4 text-sm font-medium transition-colors relative ${
+                        activeTab === tab.id
+                          ? 'text-orange-600 dark:text-orange-400'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                      }`}
                     >
                       {tab.label}
                       {activeTab === tab.id && (
@@ -590,63 +598,98 @@ const PerfilUsuario = () => {
                 {activeTab === 'info' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      <h4 className="font-semibold text-slate-800">Datos Personales</h4>
+                      <h4 className="font-semibold text-slate-800 dark:text-slate-100">Datos Personales</h4>
                       <div className="space-y-3">
                         <div className="flex items-center gap-3 text-sm">
-                          <User className="w-5 h-5 text-slate-400" />
+                          <User className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                           <div>
-                            <p className="text-slate-500">Nombre Completo</p>
-                            <p className="font-medium text-slate-800">{user.nombre} {user.apellido}</p>
+                            <p className="text-slate-500 dark:text-slate-400">Nombre Completo</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-100">{displayName}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
-                          <Mail className="w-5 h-5 text-slate-400" />
+                          <Mail className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                           <div>
-                            <p className="text-slate-500">Correo Electrónico</p>
-                            <p className="font-medium text-slate-800">{user.email}</p>
+                            <p className="text-slate-500 dark:text-slate-400">Correo Electrónico</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-100">{user.email}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
-                          <Phone className="w-5 h-5 text-slate-400" />
+                          <Phone className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                           <div>
-                            <p className="text-slate-500">Teléfono</p>
-                            <p className="font-medium text-slate-800">{user.telefono || '-'}</p>
+                            <p className="text-slate-500 dark:text-slate-400">Teléfono</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-100">{user.telefono || 'No registrado'}</p>
                           </div>
                         </div>
+                        {user.username && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <User className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                            <div>
+                              <p className="text-slate-500 dark:text-slate-400">Usuario</p>
+                              <p className="font-medium text-slate-800 dark:text-slate-100 font-mono">{user.username}</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="font-semibold text-slate-800">Información Laboral</h4>
+                      <h4 className="font-semibold text-slate-800 dark:text-slate-100">Información Laboral</h4>
                       <div className="space-y-3">
                         <div className="flex items-center gap-3 text-sm">
-                          <Building2 className="w-5 h-5 text-slate-400" />
+                          <Building2 className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                           <div>
-                            <p className="text-slate-500">Empresa</p>
-                            <p className="font-medium text-slate-800">ISTHO S.A.S</p>
+                            <p className="text-slate-500 dark:text-slate-400">Empresa</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-100">
+                              {isPortalUser && clienteInfo ? clienteInfo.razon_social : 'ISTHO S.A.S'}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 text-sm">
-                          <MapPin className="w-5 h-5 text-slate-400" />
-                          <div>
-                            <p className="text-slate-500">Sede</p>
-                            <p className="font-medium text-slate-800">Centro Logístico Industrial del Norte</p>
-                            <p className="text-xs text-slate-400">Girardota, Antioquia</p>
+                        {!isPortalUser && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <MapPin className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                            <div>
+                              <p className="text-slate-500 dark:text-slate-400">Sede</p>
+                              <p className="font-medium text-slate-800 dark:text-slate-100">Centro Logístico Industrial del Norte</p>
+                              <p className="text-xs text-slate-400">Girardota, Antioquia</p>
+                            </div>
                           </div>
-                        </div>
+                        )}
+                        {user.cargo && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <Award className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                            <div>
+                              <p className="text-slate-500 dark:text-slate-400">Cargo</p>
+                              <p className="font-medium text-slate-800 dark:text-slate-100">{user.cargo}</p>
+                            </div>
+                          </div>
+                        )}
+                        {user.departamento && !isPortalUser && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <Settings className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                            <div>
+                              <p className="text-slate-500 dark:text-slate-400">Departamento</p>
+                              <p className="font-medium text-slate-800 dark:text-slate-100">{user.departamento}</p>
+                            </div>
+                          </div>
+                        )}
                         <div className="flex items-center gap-3 text-sm">
-                          <Calendar className="w-5 h-5 text-slate-400" />
+                          <Calendar className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                           <div>
-                            <p className="text-slate-500">Fecha de Ingreso</p>
-                            <p className="font-medium text-slate-800">
+                            <p className="text-slate-500 dark:text-slate-400">Fecha de Registro</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-100">
                               {user.created_at
-                                ? new Date(user.created_at).toLocaleDateString('es-CO')
-                                : '-'
+                                ? new Date(user.created_at).toLocaleDateString('es-CO', {
+                                    year: 'numeric', month: 'long', day: 'numeric'
+                                  })
+                                : 'No disponible'
                               }
                             </p>
-                            <p className="text-xs text-emerald-600">
-                              Antigüedad: {calcularAntiguedad(user.created_at)}
-                            </p>
+                            {user.created_at && (
+                              <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                Antigüedad: {calcularAntiguedad(user.created_at)}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -659,64 +702,53 @@ const PerfilUsuario = () => {
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
-                        <Shield className="w-5 h-5 text-slate-500" />
-                        <span className="text-sm text-slate-500">Rol actual:</span>
-                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-sm font-medium capitalize">
-                          {permisos?.rol || user.rol || 'Usuario'}
+                        <Shield className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                        <span className="text-sm text-slate-500 dark:text-slate-400">Rol actual:</span>
+                        <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full text-sm font-medium">
+                          {rolLabels[user.rol] || user.rol}
                         </span>
                       </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-slate-50">
-                            <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Módulo</th>
-                            <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Ver</th>
-                            <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Crear</th>
-                            <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Editar</th>
-                            <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Eliminar</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {permisosTabla.map((permiso, idx) => (
-                            <tr key={idx} className="border-b border-gray-50">
-                              <td className="py-3 px-4 text-sm font-medium text-slate-800">
-                                {permiso.modulo}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {permiso.ver ? (
-                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {permiso.crear ? (
-                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {permiso.editar ? (
-                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {permiso.eliminar ? (
-                                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
-                                ) : (
-                                  <X className="w-5 h-5 text-slate-300 mx-auto" />
-                                )}
-                              </td>
+                    {permisosTabla.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-700/50">
+                              <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Módulo</th>
+                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Ver</th>
+                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Crear</th>
+                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Editar</th>
+                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Eliminar</th>
+                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Exportar</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {permisosTabla.map((permiso, idx) => (
+                              <tr key={idx} className="border-b border-gray-50 dark:border-slate-700">
+                                <td className="py-3 px-4 text-sm font-medium text-slate-800 dark:text-slate-200">
+                                  {permiso.modulo}
+                                </td>
+                                {['ver', 'crear', 'editar', 'eliminar', 'exportar'].map((accion) => (
+                                  <td key={accion} className="py-3 px-4 text-center">
+                                    {permiso[accion] ? (
+                                      <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                    ) : (
+                                      <X className="w-5 h-5 text-slate-300 dark:text-slate-600 mx-auto" />
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                        <Shield className="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                        <p>No se pudieron cargar los permisos</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -729,15 +761,15 @@ const PerfilUsuario = () => {
             <InfoCard title="Sesión Actual" icon={Shield}>
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Estado</span>
-                  <span className="flex items-center gap-1 text-emerald-600">
+                  <span className="text-slate-500 dark:text-slate-400">Estado</span>
+                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                     <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                     Activo
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Último acceso</span>
-                  <span className="text-slate-800">
+                  <span className="text-slate-500 dark:text-slate-400">Último acceso</span>
+                  <span className="text-slate-800 dark:text-slate-200 text-xs">
                     {user.ultimo_acceso
                       ? new Date(user.ultimo_acceso).toLocaleString('es-CO')
                       : 'Ahora'
@@ -745,11 +777,17 @@ const PerfilUsuario = () => {
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">ID Usuario</span>
-                  <span className="text-slate-800 font-mono">{user.id || '-'}</span>
+                  <span className="text-slate-500 dark:text-slate-400">ID Usuario</span>
+                  <span className="text-slate-800 dark:text-slate-200 font-mono">{user.id || '-'}</span>
                 </div>
+                {user.username && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500 dark:text-slate-400">Username</span>
+                    <span className="text-slate-800 dark:text-slate-200 font-mono text-xs">{user.username}</span>
+                  </div>
+                )}
               </div>
-              <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700">
                 <Button variant="outline" icon={LogOut} fullWidth onClick={handleLogout}>
                   Cerrar Sesión
                 </Button>
@@ -766,7 +804,7 @@ const PerfilUsuario = () => {
                   className="justify-start"
                   onClick={() => navigate('/notificaciones')}
                 >
-                  Configurar Notificaciones
+                  Ver Notificaciones
                 </Button>
                 <Button
                   variant="ghost"
@@ -803,8 +841,8 @@ const PerfilUsuario = () => {
         </div>
 
         {/* Footer */}
-        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
-          © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
+        <footer className="text-center py-6 mt-8 text-slate-500 dark:text-slate-400 text-sm border-t border-gray-200 dark:border-slate-700">
+          © 2026 ISTHO S.A.S. - Sistema CRM<br />
           Centro Logístico Industrial del Norte, Girardota, Antioquia
         </footer>
       </main>

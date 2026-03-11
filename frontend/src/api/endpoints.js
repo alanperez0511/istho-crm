@@ -39,6 +39,8 @@ export const CLIENTES_ENDPOINTS = {
   INVENTARIO: (id) => `/clientes/${id}/inventario`,
   DESPACHOS: (id) => `/clientes/${id}/despachos`,
   DOCUMENTOS: (id) => `/clientes/${id}/documentos`,
+  HISTORIAL: (id) => `/clientes/${id}/historial`,
+  LOGO: (id) => `/clientes/${id}/logo`,
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -186,6 +188,18 @@ export const DASHBOARD_ENDPOINTS = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// PLANTILLAS EMAIL
+// ════════════════════════════════════════════════════════════════════════════
+
+export const PLANTILLAS_EMAIL_ENDPOINTS = {
+  BASE: '/plantillas-email',
+  BY_ID: (id) => `/plantillas-email/${id}`,
+  CAMPOS: (tipo) => `/plantillas-email/campos/${tipo}`,
+  PREVIEW: (id) => `/plantillas-email/${id}/preview`,
+  PREVIEW_RAW: '/plantillas-email/preview-raw',
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // EXPORT UNIFICADO
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -201,6 +215,7 @@ export const ENDPOINTS = {
   NOTIFICACIONES: NOTIFICACIONES_ENDPOINTS,
   USUARIOS: USUARIOS_ENDPOINTS,
   DASHBOARD: DASHBOARD_ENDPOINTS,
+  PLANTILLAS_EMAIL: PLANTILLAS_EMAIL_ENDPOINTS,
 };
 
 export default ENDPOINTS;

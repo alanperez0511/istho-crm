@@ -16,6 +16,7 @@
 const { sequelize, Cliente, Inventario, Operacion, OperacionDetalle, MovimientoInventario, CajaInventario } = require('../models');
 const { Op } = require('sequelize');
 const logger = require('../utils/logger');
+const notificacionService = require('./notificacionService');
 
 // ============================================================================
 // HELPERS
@@ -138,6 +139,16 @@ const syncProductos = async (data) => {
 
     await transaction.commit();
     logger.info(`[WMS Sync] Productos sincronizados para ${cliente.razon_social}: ${resultado.creados} creados, ${resultado.actualizados} actualizados`);
+
+    // Notificar sync de productos solo si hubo cambios
+    if (resultado.creados > 0 || resultado.errores.length > 0) {
+      notificacionService.notificarSyncWms({
+        exitosa: resultado.errores.length === 0,
+        mensaje: `Productos sincronizados para ${cliente.razon_social}: ${resultado.creados} creados, ${resultado.actualizados} actualizados${resultado.errores.length > 0 ? `, ${resultado.errores.length} errores` : ''}.`,
+        detalles: resultado,
+      }).catch(() => {});
+    }
+
     return resultado;
   } catch (error) {
     await transaction.rollback();
@@ -261,6 +272,7 @@ const syncEntrada = async (data) => {
       await inventario.update({
         cantidad: stockAnterior + cantidad,
         ultima_sincronizacion_wms: new Date(),
+        alertas_silenciadas: null, // Limpiar alertas silenciadas al cambiar stock
       }, { transaction });
 
       // Verificar si la caja ya existe para evitar duplicados si el WMS re-envía
@@ -319,15 +331,21 @@ const syncEntrada = async (data) => {
 
     logger.info(`[WMS Sync] Entrada creada: ${numeroOperacion} para ${cliente.razon_social} (${detalles.length} líneas, ${totalUnidades} unidades)`);
 
-    return {
+    const resultado = {
       operacion_id: operacion.id,
       numero_operacion: numeroOperacion,
+      cliente_id: cliente.id,
       cliente: cliente.razon_social,
       documento_wms: documento_origen,
       total_lineas: detalles.length,
       total_unidades: totalUnidades,
       estado: 'pendiente',
     };
+
+    // Notificar usuarios del cliente + admins
+    notificacionService.notificarEntradaWms(resultado).catch(() => {});
+
+    return resultado;
   } catch (error) {
     await transaction.rollback();
     throw error;
@@ -451,6 +469,7 @@ const syncSalida = async (data) => {
         await inventario.update({
           cantidad: nuevoStock,
           ultima_sincronizacion_wms: new Date(),
+          alertas_silenciadas: null, // Limpiar alertas silenciadas al cambiar stock
         }, { transaction });
 
         // Manejo de cajas para la salida
@@ -514,15 +533,21 @@ const syncSalida = async (data) => {
 
     logger.info(`[WMS Sync] Salida creada: ${numeroOperacion} para ${cliente.razon_social} (Picking: ${numero_picking}, ${detalles.length} líneas)`);
 
-    return {
+    const resultado = {
       operacion_id: operacion.id,
       numero_operacion: numeroOperacion,
+      cliente_id: cliente.id,
       cliente: cliente.razon_social,
       numero_picking,
       total_lineas: detalles.length,
       total_unidades: totalUnidades,
       estado: 'pendiente',
     };
+
+    // Notificar usuarios del cliente + admins
+    notificacionService.notificarSalidaWms(resultado).catch(() => {});
+
+    return resultado;
   } catch (error) {
     await transaction.rollback();
     throw error;

@@ -27,6 +27,7 @@ const {
   sequelize
 } = require('../models');
 const wmsService = require('../services/wmsService');
+const notificacionService = require('../services/notificacionService');
 const {
   success,
   successMessage,
@@ -1138,10 +1139,24 @@ const cerrar = async (req, res) => {
     });
     
     await transaction.commit();
-    
-    // Enviar correo (fuera de transacción)
+
+    // Notificar in-app a usuarios del cliente + admins
+    notificacionService.notificarOperacionCerrada(operacion, req.user.nombre_completo).catch(err => {
+      logger.error('Error al enviar notificación de cierre:', { message: err.message, operacion_id: operacion.id, cliente_id: operacion.cliente_id });
+    });
+
+    // Enviar correo (fuera de transacción) — recargar con cerrador para el email
     let resultadoCorreo = { success: false };
     if (enviar_correo !== false && correosEnvio) {
+      await operacion.reload({
+        include: [
+          { model: Cliente, as: 'cliente' },
+          { model: OperacionDetalle, as: 'detalles' },
+          { model: OperacionDocumento, as: 'documentos' },
+          { model: OperacionAveria, as: 'averias' },
+          { model: Usuario, as: 'cerrador', attributes: ['id', 'nombre_completo'] }
+        ]
+      });
       resultadoCorreo = await emailService.enviarCierreOperacion(operacion, correosEnvio);
       
       await operacion.update({
@@ -1268,6 +1283,31 @@ const anular = async (req, res) => {
   }
 };
 
+/**
+ * GET /operaciones/:id/averias
+ * Listar averías de una operación
+ */
+const listarAverias = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const operacion = await Operacion.findByPk(id);
+    if (!operacion) {
+      return notFound(res, 'Operación no encontrada');
+    }
+
+    const averias = await OperacionAveria.findAll({
+      where: { operacion_id: id },
+      order: [['created_at', 'DESC']],
+    });
+
+    return success(res, averias);
+  } catch (error) {
+    logger.error('Error al listar averías:', { message: error.message });
+    return serverError(res, 'Error al obtener las averías', error);
+  }
+};
+
 module.exports = {
   listarDocumentosWMS,
   buscarDocumentoWMS,
@@ -1277,6 +1317,7 @@ module.exports = {
   crear,
   actualizarTransporte,
   registrarAveria,
+  listarAverias,
   subirDocumento,
   cerrar,
   anular

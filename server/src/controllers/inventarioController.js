@@ -47,6 +47,7 @@ const {
   sanitizarBusqueda
 } = require('../utils/helpers');
 const logger = require('../utils/logger');
+const notificacionService = require('../services/notificacionService');
 
 // Campos permitidos para ordenamiento
 const CAMPOS_ORDENAMIENTO = ['producto', 'sku', 'cantidad', 'ubicacion', 'fecha_vencimiento', 'created_at', 'estado'];
@@ -360,7 +361,10 @@ const alertas = async (req, res) => {
       const agotados = await Inventario.findAll({
         where: {
           ...whereCliente,
-          cantidad: 0
+          cantidad: 0,
+          [Op.and]: [
+            sequelize.literal("(alertas_silenciadas IS NULL OR JSON_EXTRACT(alertas_silenciadas, '$.agotado') IS NULL)")
+          ]
         },
         include: [{
           model: Cliente,
@@ -370,7 +374,7 @@ const alertas = async (req, res) => {
         order: [['updated_at', 'DESC']],
         limit: 50
       });
-      
+
       alertasData = alertasData.concat(agotados.map(item => ({
         id: `agotado-${item.id}`,
         producto_id: item.id,
@@ -393,7 +397,7 @@ const alertas = async (req, res) => {
         created_at: item.updated_at
       })));
     }
-    
+
     // Stock bajo (cantidad <= mínimo pero > 0)
     if (!tipoFiltro || tipoFiltro === 'bajo_stock') {
       const stockBajo = await Inventario.findAll({
@@ -402,7 +406,8 @@ const alertas = async (req, res) => {
           [Op.and]: [
             sequelize.literal('cantidad <= stock_minimo'),
             { stock_minimo: { [Op.gt]: 0 } },
-            { cantidad: { [Op.gt]: 0 } }
+            { cantidad: { [Op.gt]: 0 } },
+            sequelize.literal("(alertas_silenciadas IS NULL OR JSON_EXTRACT(alertas_silenciadas, '$.bajo_stock') IS NULL)")
           ]
         },
         include: [{
@@ -413,7 +418,7 @@ const alertas = async (req, res) => {
         order: [['cantidad', 'ASC']],
         limit: 50
       });
-      
+
       alertasData = alertasData.concat(stockBajo.map(item => ({
         id: `bajo_stock-${item.id}`,
         producto_id: item.id,
@@ -448,7 +453,10 @@ const alertas = async (req, res) => {
           fecha_vencimiento: {
             [Op.between]: [hoy, en30Dias]
           },
-          cantidad: { [Op.gt]: 0 }
+          cantidad: { [Op.gt]: 0 },
+          [Op.and]: [
+            sequelize.literal("(alertas_silenciadas IS NULL OR JSON_EXTRACT(alertas_silenciadas, '$.vencimiento') IS NULL)")
+          ]
         },
         include: [{
           model: Cliente,
@@ -458,7 +466,7 @@ const alertas = async (req, res) => {
         order: [['fecha_vencimiento', 'ASC']],
         limit: 50
       });
-      
+
       alertasData = alertasData.concat(proximosVencer.map(item => {
         const diasRestantes = Math.ceil((new Date(item.fecha_vencimiento) - hoy) / (1000 * 60 * 60 * 24));
         return {
@@ -778,8 +786,24 @@ const actualizar = async (req, res) => {
     itemJSON.stock_actual = parseFloat(itemJSON.cantidad) || 0;
     itemJSON.cliente_nombre = itemJSON.cliente?.razon_social || '';
     
+    // Verificar alertas si se actualizaron límites de stock
+    if (updateData.stock_minimo !== undefined || updateData.stock_maximo !== undefined) {
+      const cantidad = parseFloat(item.cantidad) || 0;
+      const minimo = parseFloat(item.stock_minimo) || 0;
+      const maximo = parseFloat(item.stock_maximo) || 0;
+      const itemData = item.toJSON ? item.toJSON() : item;
+
+      if (cantidad === 0) {
+        notificacionService.notificarProductoAgotado(itemData).catch(() => {});
+      } else if (minimo > 0 && cantidad <= minimo) {
+        notificacionService.notificarStockBajo(itemData).catch(() => {});
+      } else if (maximo > 0 && cantidad >= maximo) {
+        notificacionService.notificarStockSobreMaximo(itemData).catch(() => {});
+      }
+    }
+
     return successMessage(res, 'Item actualizado exitosamente', itemJSON);
-    
+
   } catch (error) {
     await transaction.rollback();
     logger.error('Error al actualizar item:', { message: error.message });
@@ -886,8 +910,8 @@ const ajustarCantidad = async (req, res) => {
         return errorResponse(res, 'Tipo de movimiento no válido', 400);
     }
     
-    // Actualizar cantidad
-    await item.update({ cantidad: cantidadNueva }, { transaction });
+    // Actualizar cantidad y limpiar alertas silenciadas
+    await item.update({ cantidad: cantidadNueva, alertas_silenciadas: null }, { transaction });
     
     // Registrar movimiento
     const movimiento = await MovimientoInventario.registrar({
@@ -919,9 +943,21 @@ const ajustarCantidad = async (req, res) => {
     });
     
     await transaction.commit();
-    
+
     logger.info('Movimiento registrado:', { itemId: id, tipo, cantidad: cantidadMovimiento });
-    
+
+    // Notificaciones automáticas de stock (async, no bloquean respuesta)
+    const itemData = item.toJSON ? item.toJSON() : item;
+    itemData.cantidad = cantidadNueva;
+
+    if (cantidadNueva === 0) {
+      notificacionService.notificarProductoAgotado(itemData).catch(() => {});
+    } else if (parseFloat(item.stock_minimo) > 0 && cantidadNueva <= parseFloat(item.stock_minimo)) {
+      notificacionService.notificarStockBajo(itemData).catch(() => {});
+    } else if (parseFloat(item.stock_maximo) > 0 && cantidadNueva >= parseFloat(item.stock_maximo)) {
+      notificacionService.notificarStockSobreMaximo(itemData).catch(() => {});
+    }
+
     return successMessage(res, 'Movimiento registrado exitosamente', {
       id: item.id,
       movimiento_id: movimiento.id,
@@ -1030,11 +1066,13 @@ const atenderAlerta = async (req, res) => {
   try {
     const { alertaId } = req.params;
     const { observaciones } = req.body;
-    
-    // El alertaId tiene formato "tipo-id" (ej: "bajo_stock-123")
-    const [tipo, productoId] = alertaId.split('-');
-    
-    if (!productoId) {
+
+    // El alertaId tiene formato "tipo-id" (ej: "bajo_stock-123", "agotado-45")
+    const lastDash = alertaId.lastIndexOf('-');
+    const tipo = alertaId.substring(0, lastDash);
+    const productoId = alertaId.substring(lastDash + 1);
+
+    if (!productoId || !tipo) {
       return errorResponse(res, 'ID de alerta inválido', 400);
     }
     
@@ -1042,7 +1080,19 @@ const atenderAlerta = async (req, res) => {
     if (!item) {
       return notFound(res, 'Producto no encontrado');
     }
-    
+
+    // Silenciar la alerta persistentemente
+    const silenciadasActual = item.alertas_silenciadas;
+    const silenciadas = (typeof silenciadasActual === 'string' ? JSON.parse(silenciadasActual) : silenciadasActual) || {};
+    silenciadas[tipo] = new Date().toISOString();
+    await item.update({ alertas_silenciadas: silenciadas });
+
+    logger.info('Alerta atendida - silenciadas guardadas:', {
+      alertaId, tipo, productoId,
+      silenciadasAntes: silenciadasActual,
+      silenciadasDespues: silenciadas,
+    });
+
     // Registrar en auditoría que la alerta fue atendida
     await Auditoria.registrar({
       tabla: 'inventario',
@@ -1054,9 +1104,9 @@ const atenderAlerta = async (req, res) => {
       ip_address: getClientIP(req),
       descripcion: `Alerta de ${tipo} atendida para: ${item.producto}`
     });
-    
+
     logger.info('Alerta atendida:', { alertaId, tipo, productoId, usuario: req.user.id });
-    
+
     return successMessage(res, 'Alerta marcada como atendida');
     
   } catch (error) {
@@ -1072,17 +1122,31 @@ const atenderAlerta = async (req, res) => {
 const descartarAlerta = async (req, res) => {
   try {
     const { alertaId } = req.params;
-    const [tipo, productoId] = alertaId.split('-');
-    
-    if (!productoId) {
+    const lastDash = alertaId.lastIndexOf('-');
+    const tipo = alertaId.substring(0, lastDash);
+    const productoId = alertaId.substring(lastDash + 1);
+
+    if (!productoId || !tipo) {
       return errorResponse(res, 'ID de alerta inválido', 400);
     }
-    
+
     const item = await Inventario.findByPk(productoId);
     if (!item) {
       return notFound(res, 'Producto no encontrado');
     }
-    
+
+    // Silenciar la alerta persistentemente
+    const silenciadasActual = item.alertas_silenciadas;
+    const silenciadas = (typeof silenciadasActual === 'string' ? JSON.parse(silenciadasActual) : silenciadasActual) || {};
+    silenciadas[tipo] = new Date().toISOString();
+    await item.update({ alertas_silenciadas: silenciadas });
+
+    logger.info('Alerta descartada - silenciadas guardadas:', {
+      alertaId, tipo, productoId,
+      silenciadasAntes: silenciadasActual,
+      silenciadasDespues: silenciadas,
+    });
+
     // Registrar en auditoría
     await Auditoria.registrar({
       tabla: 'inventario',
@@ -1090,11 +1154,11 @@ const descartarAlerta = async (req, res) => {
       accion: 'actualizar',
       usuario_id: req.user.id,
       usuario_nombre: req.user.nombre_completo,
-      datos_nuevos: { alerta_descartada: tipo },
+      datos_nuevos: { alerta_descartada: tipo, alertas_silenciadas: silenciadas },
       ip_address: getClientIP(req),
       descripcion: `Alerta de ${tipo} descartada para: ${item.producto}`
     });
-    
+
     return successMessage(res, 'Alerta descartada');
     
   } catch (error) {

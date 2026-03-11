@@ -14,7 +14,7 @@
  * @date Enero 2026
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -37,6 +37,7 @@ import {
   DollarSign,
   Database,
   Package,
+  Camera,
 } from 'lucide-react';
 
 // Layout
@@ -56,6 +57,7 @@ import { useAuth } from '../../context/AuthContext';
 
 // Services
 import inventarioService from '../../api/inventario.service';
+import clientesService from '../../api/clientes.service';
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -124,41 +126,41 @@ const ContactCard = ({ contacto, onEdit, onDelete, canEdit }) => (
   <div className={`
     p-4 rounded-xl border transition-colors
     ${contacto.es_principal
-      ? 'border-orange-200 bg-orange-50'
-      : 'border-gray-100 bg-white hover:bg-slate-50'
+      ? 'border-orange-200 dark:border-orange-800/50 bg-orange-50 dark:bg-orange-900/20'
+      : 'border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50'
     }
   `}>
     <div className="flex items-start justify-between">
       <div className="flex items-center gap-3">
         <div className={`
           w-10 h-10 rounded-full flex items-center justify-center
-          ${contacto.es_principal ? 'bg-orange-200' : 'bg-slate-200'}
+          ${contacto.es_principal ? 'bg-orange-200 dark:bg-orange-900/40' : 'bg-slate-200 dark:bg-slate-700'}
         `}>
-          <User className={`w-5 h-5 ${contacto.es_principal ? 'text-orange-700' : 'text-slate-600'}`} />
+          <User className={`w-5 h-5 ${contacto.es_principal ? 'text-orange-700 dark:text-orange-400' : 'text-slate-600 dark:text-slate-300'}`} />
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <p className="font-medium text-slate-800">{contacto.nombre}</p>
+            <p className="font-medium text-slate-800 dark:text-slate-100">{contacto.nombre}</p>
             {contacto.es_principal && (
-              <span className="text-xs bg-orange-200 text-orange-700 px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-orange-200 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full">
                 Principal
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500">{contacto.cargo || 'Sin cargo'}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{contacto.cargo || 'Sin cargo'}</p>
         </div>
       </div>
       {canEdit && (
         <div className="flex gap-1">
           <button
             onClick={() => onEdit?.(contacto)}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg"
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700 rounded-lg"
           >
             <Pencil className="w-4 h-4" />
           </button>
           <button
             onClick={() => onDelete?.(contacto)}
-            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg"
+            className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -167,14 +169,14 @@ const ContactCard = ({ contacto, onEdit, onDelete, canEdit }) => (
     </div>
     <div className="mt-3 space-y-1.5 text-sm">
       {contacto.telefono && (
-        <div className="flex items-center gap-2 text-slate-600">
-          <Phone className="w-4 h-4 text-slate-400" />
+        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+          <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500" />
           {contacto.telefono}
         </div>
       )}
       {contacto.email && (
-        <div className="flex items-center gap-2 text-slate-600">
-          <Mail className="w-4 h-4 text-slate-400" />
+        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+          <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500" />
           {contacto.email}
         </div>
       )}
@@ -185,38 +187,51 @@ const ContactCard = ({ contacto, onEdit, onDelete, canEdit }) => (
 /**
  * Item de actividad/historial
  */
+const ESTADO_CONFIG = {
+  cerrado: { label: 'Cerrado', bg: 'bg-emerald-100 dark:bg-emerald-900/30', color: 'text-emerald-700 dark:text-emerald-400' },
+  en_proceso: { label: 'En Proceso', bg: 'bg-blue-100 dark:bg-blue-900/30', color: 'text-blue-700 dark:text-blue-400' },
+  anulado: { label: 'Anulado', bg: 'bg-red-100 dark:bg-red-900/30', color: 'text-red-700 dark:text-red-400' },
+  borrador: { label: 'Borrador', bg: 'bg-slate-100 dark:bg-slate-700', color: 'text-slate-700 dark:text-slate-300' },
+};
+
 const ActivityItem = ({ actividad }) => {
   const iconConfig = {
-    operacion: { icon: Truck, bg: 'bg-blue-100', color: 'text-blue-600' },
-    despacho: { icon: Truck, bg: 'bg-blue-100', color: 'text-blue-600' },
-    llamada: { icon: Phone, bg: 'bg-emerald-100', color: 'text-emerald-600' },
-    documento: { icon: FileCheck, bg: 'bg-violet-100', color: 'text-violet-600' },
-    nota: { icon: MessageSquare, bg: 'bg-amber-100', color: 'text-amber-600' },
-    creacion: { icon: Building2, bg: 'bg-slate-100', color: 'text-slate-600' },
-    actualizar: { icon: Pencil, bg: 'bg-orange-100', color: 'text-orange-600' },
-    login: { icon: User, bg: 'bg-green-100', color: 'text-green-600' },
+    operacion: { icon: Truck, bg: 'bg-blue-100 dark:bg-blue-900/30', color: 'text-blue-600 dark:text-blue-400' },
+    despacho: { icon: Truck, bg: 'bg-blue-100 dark:bg-blue-900/30', color: 'text-blue-600 dark:text-blue-400' },
+    llamada: { icon: Phone, bg: 'bg-emerald-100 dark:bg-emerald-900/30', color: 'text-emerald-600 dark:text-emerald-400' },
+    documento: { icon: FileCheck, bg: 'bg-violet-100 dark:bg-violet-900/30', color: 'text-violet-600 dark:text-violet-400' },
+    nota: { icon: MessageSquare, bg: 'bg-amber-100 dark:bg-amber-900/30', color: 'text-amber-600 dark:text-amber-400' },
+    creacion: { icon: Building2, bg: 'bg-slate-100 dark:bg-slate-700', color: 'text-slate-600 dark:text-slate-300' },
+    actualizar: { icon: Pencil, bg: 'bg-orange-100 dark:bg-orange-900/30', color: 'text-orange-600 dark:text-orange-400' },
+    login: { icon: User, bg: 'bg-green-100 dark:bg-green-900/30', color: 'text-green-600 dark:text-green-400' },
   };
 
   const config = iconConfig[actividad.tipo] || iconConfig[actividad.accion] || iconConfig.nota;
   const Icon = config.icon;
+  const estadoConfig = ESTADO_CONFIG[actividad.estado];
 
   return (
     <div className="flex gap-4">
       <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${config.bg}`}>
         <Icon className={`w-5 h-5 ${config.color}`} />
       </div>
-      <div className="flex-1 pb-6 border-b border-gray-100 last:border-0">
+      <div className="flex-1 pb-6 border-b border-gray-100 dark:border-slate-700 last:border-0">
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-medium text-slate-800">
+            <p className="font-medium text-slate-800 dark:text-slate-100">
               {actividad.titulo || actividad.accion || 'Actividad'}
             </p>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               {actividad.descripcion || actividad.detalle || '-'}
             </p>
           </div>
+          {estadoConfig && (
+            <span className={`text-xs px-2 py-1 rounded-full ${estadoConfig.bg} ${estadoConfig.color}`}>
+              {estadoConfig.label}
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+        <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 dark:text-slate-500">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             {new Date(actividad.fecha || actividad.created_at).toLocaleString('es-CO')}
@@ -288,14 +303,14 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Nombre Completo <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={formData.nombre || ''}
             onChange={(e) => handleChange('nombre', e.target.value)}
-            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${errors.nombre ? 'border-red-300' : 'border-slate-200'
+            className={`w-full px-4 py-2.5 border rounded-xl text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${errors.nombre ? 'border-red-300' : 'border-slate-200 dark:border-slate-600'
               }`}
             placeholder="Nombre del contacto"
           />
@@ -303,27 +318,27 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Cargo
           </label>
           <input
             type="text"
             value={formData.cargo || ''}
             onChange={(e) => handleChange('cargo', e.target.value)}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
             placeholder="Cargo en la empresa"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Teléfono <span className="text-red-500">*</span>
           </label>
           <input
             type="tel"
             value={formData.telefono || ''}
             onChange={(e) => handleChange('telefono', e.target.value)}
-            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${errors.telefono ? 'border-red-300' : 'border-slate-200'
+            className={`w-full px-4 py-2.5 border rounded-xl text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${errors.telefono ? 'border-red-300' : 'border-slate-200 dark:border-slate-600'
               }`}
             placeholder="+57 300 123 4567"
           />
@@ -331,14 +346,14 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Email
           </label>
           <input
             type="email"
             value={formData.email || ''}
             onChange={(e) => handleChange('email', e.target.value)}
-            className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${errors.email ? 'border-red-300' : 'border-slate-200'
+            className={`w-full px-4 py-2.5 border rounded-xl text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${errors.email ? 'border-red-300' : 'border-slate-200 dark:border-slate-600'
               }`}
             placeholder="email@empresa.com"
           />
@@ -353,7 +368,7 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
               onChange={(e) => handleChange('es_principal', e.target.checked)}
               className="w-4 h-4 text-orange-500 rounded focus:ring-orange-500"
             />
-            <span className="text-sm text-slate-700">Contacto principal</span>
+            <span className="text-sm text-slate-700 dark:text-slate-300">Contacto principal</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -362,7 +377,7 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
               onChange={(e) => handleChange('recibe_notificaciones', e.target.checked)}
               className="w-4 h-4 text-orange-500 rounded focus:ring-orange-500"
             />
-            <span className="text-sm text-slate-700">Recibe notificaciones</span>
+            <span className="text-sm text-slate-700 dark:text-slate-300">Recibe notificaciones</span>
           </label>
         </div>
       </div>
@@ -429,6 +444,26 @@ const ClienteDetail = () => {
   const canDelete = checkPermission(userRole, 'eliminar');
   const canManageUsers = checkPermission(userRole, 'usuarios'); // ← NUEVO
 
+  // Ref para input file de logo
+  const logoInputRef = useRef(null);
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const response = await clientesService.uploadLogo(id, file);
+      if (response?.success) {
+        success('Logo actualizado correctamente');
+        fetchCliente(id);
+      }
+    } catch (err) {
+      apiError(err.message || 'Error al subir el logo');
+    }
+    // Reset input
+    if (logoInputRef.current) logoInputRef.current.value = '';
+  };
+
   // ──────────────────────────────────────────────────────────────────────────
   // CARGAR DATOS
   // ──────────────────────────────────────────────────────────────────────────
@@ -447,6 +482,24 @@ const ClienteDetail = () => {
       setLoadingContactos(false);
     }
   }, [fetchContactos]);
+
+  // Cargar historial del cliente
+  const loadHistorial = useCallback(async (clienteId) => {
+    setLoadingHistorial(true);
+    try {
+      const response = await clientesService.getHistorial(clienteId, { limit: 50 });
+      if (response?.success) {
+        setHistorial(response.data || []);
+      } else {
+        setHistorial([]);
+      }
+    } catch (err) {
+      console.error('Error cargando historial:', err);
+      setHistorial([]);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  }, []);
 
   // Cargar productos del cliente
   const loadProductosCliente = useCallback(async (clienteId) => {
@@ -471,9 +524,9 @@ const ClienteDetail = () => {
       fetchCliente(id);
       loadContactos(id);
       loadProductosCliente(id);
-      setHistorial([]);
+      loadHistorial(id);
     }
-  }, [id, fetchCliente, loadContactos, loadProductosCliente]);
+  }, [id, fetchCliente, loadContactos, loadProductosCliente, loadHistorial]);
 
   // ──────────────────────────────────────────────────────────────────────────
   // HANDLERS
@@ -545,17 +598,17 @@ const ClienteDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
 
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 rounded w-48" />
+            <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded w-48" />
             <div className="grid grid-cols-4 gap-4">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-32 bg-gray-200 rounded-2xl" />
+                <div key={i} className="h-32 bg-gray-200 dark:bg-slate-700 rounded-2xl" />
               ))}
             </div>
-            <div className="h-96 bg-gray-200 rounded-2xl" />
+            <div className="h-96 bg-gray-200 dark:bg-slate-700 rounded-2xl" />
           </div>
         </main>
       </div>
@@ -568,15 +621,15 @@ const ClienteDetail = () => {
 
   if (error || !cliente) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
 
         <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
           <div className="text-center py-16">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Building2 className="w-8 h-8 text-red-500" />
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Building2 className="w-8 h-8 text-red-500 dark:text-red-400" />
             </div>
-            <h2 className="text-xl font-bold text-slate-800 mb-2">Cliente no encontrado</h2>
-            <p className="text-slate-500 mb-4">{error || 'El cliente solicitado no existe'}</p>
+            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Cliente no encontrado</h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-4">{error || 'El cliente solicitado no existe'}</p>
             <Button variant="primary" onClick={() => navigate('/clientes')}>
               Volver a Clientes
             </Button>
@@ -603,7 +656,7 @@ const ClienteDetail = () => {
   const productosEnBodega = productosCliente.length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
 
 
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
@@ -612,20 +665,48 @@ const ClienteDetail = () => {
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/clientes')}
-              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl transition-colors"
+              className="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center">
-                <Building2 className="w-7 h-7 text-orange-600" />
+              <div className="relative group">
+                {cliente.logo_url ? (
+                  <img
+                    src={`${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:5000'}${cliente.logo_url}`}
+                    alt={cliente.razon_social}
+                    className="w-14 h-14 rounded-2xl object-contain bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600"
+                  />
+                ) : (
+                  <div className="w-14 h-14 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center">
+                    <Building2 className="w-7 h-7 text-orange-600 dark:text-orange-400" />
+                  </div>
+                )}
+                {canEdit && (
+                  <>
+                    <button
+                      onClick={() => logoInputRef.current?.click()}
+                      className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                      title="Cambiar logo"
+                    >
+                      <Camera className="w-5 h-5 text-white" />
+                    </button>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      onChange={handleLogoUpload}
+                    />
+                  </>
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-slate-800">{cliente.razon_social}</h1>
+                  <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{cliente.razon_social}</h1>
                   <StatusChip status={cliente.estado} />
                 </div>
-                <p className="text-slate-500">
+                <p className="text-slate-500 dark:text-slate-400">
                   {cliente.codigo_cliente} • NIT: {cliente.nit}
                 </p>
               </div>
@@ -681,8 +762,8 @@ const ClienteDetail = () => {
         </div>
 
         {/* TABS */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6">
-          <div className="border-b border-gray-100">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 mb-6">
+          <div className="border-b border-gray-100 dark:border-slate-700">
             <nav className="flex px-6">
               {tabs.map((tab) => {
                 const TabIcon = tab.icon;
@@ -693,8 +774,8 @@ const ClienteDetail = () => {
                     className={`
                       py-4 px-4 text-sm font-medium transition-colors relative flex items-center gap-2
                       ${activeTab === tab.id
-                        ? 'text-orange-600'
-                        : 'text-slate-500 hover:text-slate-700'
+                        ? 'text-orange-600 dark:text-orange-400'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                       }
                     `}
                   >
@@ -717,22 +798,22 @@ const ClienteDetail = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Información General */}
                 <div className="space-y-4">
-                  <h4 className="font-semibold text-slate-800">Información General</h4>
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-100">Información General</h4>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 text-sm">
-                      <Building2 className="w-5 h-5 text-slate-400" />
-                      <span className="text-slate-500 w-32">Tipo:</span>
-                      <span className="text-slate-800">{formatTipoCliente(cliente.tipo_cliente)}</span>
+                      <Building2 className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                      <span className="text-slate-500 dark:text-slate-400 w-32">Tipo:</span>
+                      <span className="text-slate-800 dark:text-slate-200">{formatTipoCliente(cliente.tipo_cliente)}</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
-                      <FileText className="w-5 h-5 text-slate-400" />
-                      <span className="text-slate-500 w-32">Sector:</span>
-                      <span className="text-slate-800">{formatSector(cliente.sector)}</span>
+                      <FileText className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                      <span className="text-slate-500 dark:text-slate-400 w-32">Sector:</span>
+                      <span className="text-slate-800 dark:text-slate-200">{formatSector(cliente.sector)}</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
-                      <Calendar className="w-5 h-5 text-slate-400" />
-                      <span className="text-slate-500 w-32">Cliente desde:</span>
-                      <span className="text-slate-800">
+                      <Calendar className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                      <span className="text-slate-500 dark:text-slate-400 w-32">Cliente desde:</span>
+                      <span className="text-slate-800 dark:text-slate-200">
                         {cliente.fecha_inicio_relacion
                           ? new Date(cliente.fecha_inicio_relacion).toLocaleDateString('es-CO')
                           : cliente.created_at
@@ -743,9 +824,9 @@ const ClienteDetail = () => {
                     </div>
                     {cliente.codigo_wms && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Database className="w-5 h-5 text-slate-400" />
-                        <span className="text-slate-500 w-32">Código WMS:</span>
-                        <span className="text-slate-800 font-mono">{cliente.codigo_wms}</span>
+                        <Database className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                        <span className="text-slate-500 dark:text-slate-400 w-32">Código WMS:</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-mono">{cliente.codigo_wms}</span>
                       </div>
                     )}
                   </div>
@@ -753,35 +834,35 @@ const ClienteDetail = () => {
 
                 {/* Información de Contacto */}
                 <div className="space-y-4">
-                  <h4 className="font-semibold text-slate-800">Contacto</h4>
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-100">Contacto</h4>
                   <div className="space-y-3">
                     <div className="flex items-start gap-3 text-sm">
-                      <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
+                      <MapPin className="w-5 h-5 text-slate-400 dark:text-slate-500 mt-0.5" />
                       <div>
-                        <p className="text-slate-800">{cliente.direccion || '-'}</p>
+                        <p className="text-slate-800 dark:text-slate-200">{cliente.direccion || '-'}</p>
                         {(cliente.ciudad || cliente.departamento) && (
-                          <p className="text-slate-500">
+                          <p className="text-slate-500 dark:text-slate-400">
                             {[cliente.ciudad, cliente.departamento].filter(Boolean).join(', ')}
                           </p>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
-                      <Phone className="w-5 h-5 text-slate-400" />
-                      <span className="text-slate-800">{cliente.telefono || '-'}</span>
+                      <Phone className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                      <span className="text-slate-800 dark:text-slate-200">{cliente.telefono || '-'}</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
-                      <Mail className="w-5 h-5 text-slate-400" />
-                      <span className="text-slate-800">{cliente.email || '-'}</span>
+                      <Mail className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                      <span className="text-slate-800 dark:text-slate-200">{cliente.email || '-'}</span>
                     </div>
                     {cliente.sitio_web && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Globe className="w-5 h-5 text-slate-400" />
+                        <Globe className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                         <a
                           href={cliente.sitio_web}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-orange-600 hover:underline"
+                          className="text-orange-600 dark:text-orange-400 hover:underline"
                         >
                           {cliente.sitio_web}
                         </a>
@@ -792,12 +873,12 @@ const ClienteDetail = () => {
 
                 {/* Información Comercial */}
                 <div className="space-y-4">
-                  <h4 className="font-semibold text-slate-800">Información Comercial</h4>
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-100">Información Comercial</h4>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 text-sm">
-                      <DollarSign className="w-5 h-5 text-slate-400" />
-                      <span className="text-slate-500 w-32">Crédito aprobado:</span>
-                      <span className="text-slate-800">{formatCurrency(cliente.credito_aprobado)}</span>
+                      <DollarSign className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                      <span className="text-slate-500 dark:text-slate-400 w-32">Crédito aprobado:</span>
+                      <span className="text-slate-800 dark:text-slate-200">{formatCurrency(cliente.credito_aprobado)}</span>
                     </div>
                   </div>
                 </div>
@@ -805,8 +886,8 @@ const ClienteDetail = () => {
                 {/* Observaciones */}
                 {cliente.notas && (
                   <div className="space-y-4">
-                    <h4 className="font-semibold text-slate-800">Observaciones</h4>
-                    <p className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl whitespace-pre-wrap">
+                    <h4 className="font-semibold text-slate-800 dark:text-slate-100">Observaciones</h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl whitespace-pre-wrap">
                       {cliente.notas}
                     </p>
                   </div>
@@ -835,13 +916,13 @@ const ClienteDetail = () => {
                 {loadingContactos ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[0, 1, 2].map((i) => (
-                      <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+                      <div key={i} className="h-32 bg-gray-100 dark:bg-slate-700 rounded-xl animate-pulse" />
                     ))}
                   </div>
                 ) : contactos.length === 0 ? (
                   <div className="text-center py-12">
-                    <User className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-500 mb-4">No hay contactos registrados</p>
+                    <User className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-500 dark:text-slate-400 mb-4">No hay contactos registrados</p>
                     {canEdit && (
                       <Button
                         variant="primary"
@@ -887,15 +968,15 @@ const ClienteDetail = () => {
                 {loadingHistorial ? (
                   <div className="space-y-4">
                     {[0, 1, 2, 3].map((i) => (
-                      <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+                      <div key={i} className="h-20 bg-gray-100 dark:bg-slate-700 rounded-xl animate-pulse" />
                     ))}
                   </div>
                 ) : historial.length === 0 ? (
                   <div className="text-center py-12">
-                    <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-500">No hay actividad registrada</p>
-                    <p className="text-xs text-slate-400 mt-2">
-                      El historial estará disponible próximamente
+                    <Clock className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-500 dark:text-slate-400">No hay operaciones registradas</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                      Las operaciones de entrada y salida del cliente aparecerán aquí
                     </p>
                   </div>
                 ) : (
@@ -911,7 +992,7 @@ const ClienteDetail = () => {
         </div>
 
         {/* Footer */}
-        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
+        <footer className="text-center py-6 mt-8 text-slate-500 dark:text-slate-400 text-sm border-t border-gray-200 dark:border-slate-700">
           © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
           Centro Logístico Industrial del Norte, Girardota, Antioquia
         </footer>

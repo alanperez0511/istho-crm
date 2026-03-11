@@ -12,12 +12,15 @@ import App from './App';
 import './index.css';
 import { AuthProvider } from './context/AuthContext';
 import { AppThemeProvider } from './context/ThemeContext';
+import { NotificacionesProvider } from './context/NotificacionesContext';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AuthProvider>
       <AppThemeProvider>
-        <App />
+        <NotificacionesProvider>
+          <App />
+        </NotificacionesProvider>
       </AppThemeProvider>
     </AuthProvider>
   </React.StrictMode>,

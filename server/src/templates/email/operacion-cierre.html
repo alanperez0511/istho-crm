@@ -17,6 +17,7 @@
     <tr>
       <th>SKU</th>
       <th>Producto</th>
+      <th>Caja</th>
       <th>Cantidad</th>
       <th>U.M.</th>
       {{#if tieneAverias}}
@@ -29,6 +30,7 @@
     <tr>
       <td>{{this.sku}}</td>
       <td>{{this.producto}}</td>
+      <td>{{this.numero_caja}}</td>
       <td style="text-align: right;">{{this.cantidad}}</td>
       <td>{{this.unidad_medida}}</td>
       {{#if ../tieneAverias}}
@@ -41,7 +43,7 @@
   </tbody>
   <tfoot>
     <tr style="background-color: #e3f2fd;">
-      <td colspan="2"><strong>TOTAL</strong></td>
+      <td colspan="3"><strong>TOTAL</strong></td>
       <td style="text-align: right;"><strong>{{totalUnidades}}</strong></td>
       <td></td>
       {{#if tieneAverias}}

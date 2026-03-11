@@ -138,7 +138,8 @@ module.exports = (sequelize) => {
     tableName: 'operacion_detalle',
     timestamps: true,
     underscored: true,
-    
+    paranoid: true, // Soft delete: permite restaurar líneas eliminadas en auditoría
+
     indexes: [
       { fields: ['operacion_id'] },
       { fields: ['sku'] },

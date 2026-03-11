@@ -15,7 +15,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const jwtConfig = require('../config/jwt');
-const { Usuario, Auditoria } = require('../models');
+const { Usuario, Cliente, Auditoria } = require('../models');
 const {
   success,
   successMessage,
@@ -154,8 +154,26 @@ const login = async (req, res) => {
 
     logger.info('Login exitoso:', { userId: usuario.id, email: usuario.email });
 
+    // Construir datos de respuesta
+    const userData = usuario.toPublicJSON();
+
+    // Si es usuario de cliente, incluir datos del cliente (logo, nombre)
+    if (usuario.rol === 'cliente' && usuario.cliente_id) {
+      const cliente = await Cliente.findByPk(usuario.cliente_id, {
+        attributes: ['id', 'razon_social', 'codigo_cliente', 'logo_url'],
+      });
+      if (cliente) {
+        userData.cliente_info = {
+          id: cliente.id,
+          razon_social: cliente.razon_social,
+          codigo_cliente: cliente.codigo_cliente,
+          logo_url: cliente.logo_url,
+        };
+      }
+    }
+
     return successMessage(res, 'Inicio de sesión exitoso', {
-      user: usuario.toPublicJSON(),
+      user: userData,
       token,
       expiresIn: jwtConfig.expiresIn
     });
@@ -180,7 +198,24 @@ const me = async (req, res) => {
       return notFound(res, 'Usuario no encontrado');
     }
 
-    return success(res, usuario.toPublicJSON());
+    const userData = usuario.toPublicJSON();
+
+    // Si es usuario de cliente, incluir datos del cliente
+    if (usuario.rol === 'cliente' && usuario.cliente_id) {
+      const cliente = await Cliente.findByPk(usuario.cliente_id, {
+        attributes: ['id', 'razon_social', 'codigo_cliente', 'logo_url'],
+      });
+      if (cliente) {
+        userData.cliente_info = {
+          id: cliente.id,
+          razon_social: cliente.razon_social,
+          codigo_cliente: cliente.codigo_cliente,
+          logo_url: cliente.logo_url,
+        };
+      }
+    }
+
+    return success(res, userData);
 
   } catch (error) {
     logger.error('Error en me:', { message: error.message });
@@ -333,6 +368,8 @@ const cambiarPassword = async (req, res) => {
     }
 
     usuario.password_hash = password_nuevo;
+    usuario.requiere_cambio_password = false;
+    usuario.changed('requiere_cambio_password', true);
     await usuario.save();
 
     await registrarAuditoria({

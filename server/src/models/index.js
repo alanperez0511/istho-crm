@@ -23,6 +23,7 @@ const OperacionDocumentoModel = require('./OperacionDocumento');
 const NotificacionEmailModel = require('./NotificacionEmail');
 const MovimientoInventarioModel = require('./MovimientoInventario'); // ← NUEVO
 const CajaInventarioModel = require('./CajaInventario'); // ← NUEVO: Cajas individuales
+const PlantillaEmailModel = require('./PlantillaEmail');
 const Notificacion = require('./Notificacion')(sequelize);
 
 // Inicializar modelos
@@ -38,6 +39,7 @@ const OperacionDocumento = OperacionDocumentoModel(sequelize);
 const NotificacionEmail = NotificacionEmailModel(sequelize);
 const MovimientoInventario = MovimientoInventarioModel(sequelize); // ← NUEVO
 const CajaInventario = CajaInventarioModel(sequelize); // ← NUEVO
+const PlantillaEmail = PlantillaEmailModel(sequelize);
 
 // ============================================
 // DEFINIR ASOCIACIONES
@@ -281,6 +283,7 @@ const db = {
   NotificacionEmail,
   MovimientoInventario,
   CajaInventario,  // ← NUEVO: Cajas individuales
+  PlantillaEmail,
   Notificacion
 };
 

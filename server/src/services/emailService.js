@@ -160,25 +160,54 @@ const enviarCierreOperacion = async (operacion, correosDestino) => {
     // Preparar datos para la plantilla
     const datos = {
       tipoOperacion: operacion.tipo === 'ingreso' ? 'INGRESO DE MERCANCÍA' : 'SALIDA DE MERCANCÍA',
+      esIngreso: operacion.tipo === 'ingreso',
+      esSalida: operacion.tipo === 'salida',
       numeroOperacion: operacion.numero_operacion,
-      documentoWms: operacion.documento_wms,
+      documentoWms: operacion.documento_wms || 'N/A (Manual)',
       fecha: new Date(operacion.fecha_operacion).toLocaleDateString('es-CO', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       }),
-      productos: operacion.detalles || [],
+      fechaCierre: operacion.fecha_cierre
+        ? new Date(operacion.fecha_cierre).toLocaleDateString('es-CO', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+          })
+        : '',
+      clienteNombre: operacion.cliente?.razon_social || '',
+      productos: (operacion.detalles || []).map(d => {
+        const plain = d.toJSON ? d.toJSON() : d;
+        // Asegurar valores numéricos legibles
+        plain.cantidad = parseFloat(plain.cantidad) || 0;
+        plain.cantidad_averia = parseFloat(plain.cantidad_averia) || 0;
+        return plain;
+      }),
+      totalReferencias: operacion.total_referencias || 0,
       totalUnidades: operacion.total_unidades,
       totalAverias: operacion.total_averias,
       tieneAverias: operacion.total_averias > 0,
       origen: operacion.origen || 'No especificado',
       destino: operacion.destino || 'No especificado',
       placa: operacion.vehiculo_placa || 'No especificada',
+      vehiculoTipo: operacion.vehiculo_tipo || '',
       conductor: operacion.conductor_nombre || 'No especificado',
       conductorCedula: operacion.conductor_cedula || 'No especificada',
       conductorTelefono: operacion.conductor_telefono || 'No especificado',
-      observaciones: operacion.observaciones_cierre || operacion.observaciones
+      observaciones: operacion.observaciones_cierre || operacion.observaciones,
+      cerradoPor: operacion.cerrador?.nombre_completo || 'Sistema',
+      // Campos WMS adicionales
+      numeroPicking: operacion.numero_picking || '',
+      tipoDocumentoWms: operacion.tipo_documento_wms || '',
+      sucursalEntrega: operacion.sucursal_entrega || '',
+      ciudadDestino: operacion.ciudad_destino || '',
+      // Detalle de averías
+      averias: (operacion.averias || []).map(a => {
+        const plain = a.toJSON ? a.toJSON() : a;
+        plain.cantidad = parseFloat(plain.cantidad) || 0;
+        return plain;
+      }),
     };
 
     // Preparar adjuntos (documentos de cumplido)
@@ -204,6 +233,68 @@ const enviarCierreOperacion = async (operacion, correosDestino) => {
       return { success: false, error: 'Sin destinatarios' };
     }
 
+    // Intentar usar plantilla personalizada de la BD
+    // Busca primero por subtipo (ingreso/salida), si no hay busca genérica
+    try {
+      const { PlantillaEmail } = require('../models');
+      const subtipo = operacion.tipo; // 'ingreso' o 'salida'
+      let plantillaCustom = await PlantillaEmail.findOne({
+        where: { tipo: 'operacion_cierre', subtipo, es_predeterminada: true, activo: true }
+      });
+      // Fallback: plantilla genérica sin subtipo
+      if (!plantillaCustom) {
+        plantillaCustom = await PlantillaEmail.findOne({
+          where: { tipo: 'operacion_cierre', subtipo: null, es_predeterminada: true, activo: true }
+        });
+      }
+
+      if (plantillaCustom) {
+        const asuntoCompiled = Handlebars.compile(plantillaCustom.asunto_template);
+        const cuerpoCompiled = Handlebars.compile(plantillaCustom.cuerpo_html);
+
+        let cuerpoHtml = cuerpoCompiled(datos);
+        if (plantillaCustom.firma_habilitada) {
+          cuerpoHtml += plantillaCustom.firma_html || PlantillaEmail.FIRMA_DEFAULT;
+        }
+
+        // Usar base template del filesystem
+        const { baseTemplate } = loadTemplate('operacion-cierre');
+        const htmlFinal = baseTemplate({
+          asunto: asuntoCompiled(datos),
+          contenido: cuerpoHtml
+        });
+
+        const transporter = await getTransporter();
+        const mailOptions = {
+          from: `"${defaultFrom.name}" <${defaultFrom.address}>`,
+          to: correos.join(', '),
+          subject: asuntoCompiled(datos),
+          html: htmlFinal,
+          text: `${asuntoCompiled(datos)}\n\nEste correo contiene contenido HTML.`
+        };
+
+        if (adjuntos.length > 0) {
+          mailOptions.attachments = adjuntos.map(adj => ({
+            filename: adj.nombre || path.basename(adj.path),
+            path: adj.path,
+            contentType: adj.tipo
+          }));
+        }
+
+        const info = await transporter.sendMail(mailOptions);
+        logger.info('Correo de cierre enviado (plantilla personalizada):', { messageId: info.messageId });
+
+        return {
+          success: true,
+          messageId: info.messageId,
+          previewUrl: nodemailer.getTestMessageUrl(info)
+        };
+      }
+    } catch (customErr) {
+      logger.warn('Usando plantilla de archivo por defecto:', customErr.message);
+    }
+
+    // Fallback: usar plantilla de archivo
     return await enviarCorreo({
       para: correos,
       asunto: `[ISTHO] ${datos.tipoOperacion} - ${operacion.numero_operacion}`,

@@ -31,6 +31,7 @@ import PrivateRoute, {
 
 // Layout
 import FloatingHeader from './components/layout/FloatingHeader';
+import ForceChangePasswordModal from './components/auth/ForceChangePasswordModal';
 
 // ════════════════════════════════════════════════════════════════════════════
 // LOADING COMPONENT
@@ -84,6 +85,10 @@ const ReporteDespachos = lazy(() => import('./pages/Reportes/ReporteDespachos'))
 const ReporteInventario = lazy(() => import('./pages/Reportes/ReporteInventario'));
 const ReporteClientes = lazy(() => import('./pages/Reportes/ReporteClientes'));
 
+// Plantillas de Email
+const PlantillasEmailList = lazy(() => import('./pages/PlantillasEmail/PlantillasEmailList'));
+const PlantillaEmailEditor = lazy(() => import('./pages/PlantillasEmail/PlantillaEmailEditor'));
+
 // Perfil y Configuración
 const PerfilUsuario = lazy(() => import('./pages/Perfil/PerfilUsuario'));
 const Configuracion = lazy(() => import('./pages/Perfil/Configuracion'));
@@ -111,6 +116,7 @@ const ComingSoon = ({ title }) => (
 const ProtectedLayout = () => (
   <>
     <FloatingHeader />
+    <ForceChangePasswordModal />
     <Outlet />
   </>
 );
@@ -191,6 +197,13 @@ function App() {
                 <Route path="/reportes/kpis" element={<OperadorRoute><ReporteDespachos /></OperadorRoute>} />
                 <Route path="/reportes/financiero" element={<OperadorRoute><ReporteClientes /></OperadorRoute>} />
                 <Route path="/reportes/crear" element={<OperadorRoute><ReportesList /></OperadorRoute>} />
+
+                {/* ────────────────────────────────────────────────────────── */}
+                {/* PLANTILLAS DE EMAIL */}
+                {/* ────────────────────────────────────────────────────────── */}
+                <Route path="/plantillas-email" element={<SupervisorRoute><PlantillasEmailList /></SupervisorRoute>} />
+                <Route path="/plantillas-email/nueva" element={<SupervisorRoute><PlantillaEmailEditor /></SupervisorRoute>} />
+                <Route path="/plantillas-email/:id" element={<SupervisorRoute><PlantillaEmailEditor /></SupervisorRoute>} />
 
                 {/* ────────────────────────────────────────────────────────── */}
                 {/* PERFIL Y CONFIGURACIÓN */}

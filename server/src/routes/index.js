@@ -17,6 +17,7 @@ const auditoriasRoutes = require('./auditorias.routes');
 const reporteRoutes = require('./reporte.routes');
 const notificacionesRoutes = require('./notificacionesRoutes');
 const wmsSyncRoutes = require('./wmsSync.routes');
+const plantillaEmailRoutes = require('./plantillaEmail.routes');
 
 // Info de la API
 router.get('/', (req, res) => {
@@ -46,5 +47,6 @@ router.use('/auditorias', auditoriasRoutes);
 router.use('/reportes', reporteRoutes);
 router.use('/notificaciones', notificacionesRoutes);
 router.use('/wms/sync', wmsSyncRoutes);
+router.use('/plantillas-email', plantillaEmailRoutes);
 
 module.exports = router;

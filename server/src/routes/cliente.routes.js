@@ -18,6 +18,9 @@ const usuarioClienteRoutes = require('./usuarioClienteRoutes');
 const { verificarToken } = require('../middleware/auth');
 const { requiereRolMinimo, noClientes } = require('../middleware/roles');
 
+// Upload
+const { uploadLogo } = require('../config/multer');
+
 // Validadores
 const {
   crearClienteValidator,
@@ -84,6 +87,13 @@ router.put('/:id', noClientes, requiereRolMinimo('operador'), actualizarClienteV
  */
 router.delete('/:id', requiereRolMinimo('supervisor'), idParamValidator, clienteController.eliminar);
 
+/**
+ * @route   POST /clientes/:id/logo
+ * @desc    Subir logo del cliente
+ * @access  Privado (operador o superior)
+ */
+router.post('/:id/logo', noClientes, requiereRolMinimo('operador'), uploadLogo.single('logo'), clienteController.subirLogo);
+
 // =============================================
 // RUTAS DE CONTACTOS (anidadas en clientes)
 // =============================================
@@ -94,6 +104,13 @@ router.delete('/:id', requiereRolMinimo('supervisor'), idParamValidator, cliente
  * @access  Privado
  * @query   incluir_inactivos (true/false)
  */
+/**
+ * @route   GET /clientes/:id/historial
+ * @desc    Obtener historial de operaciones del cliente
+ * @access  Privado
+ */
+router.get('/:id/historial', idParamValidator, clienteController.historial);
+
 router.get('/:id/contactos', idParamValidator, clienteController.listarContactos);
 
 /**

@@ -9,7 +9,8 @@
  */
 
 const { Op } = require('sequelize');
-const { Cliente, Contacto, Auditoria, sequelize } = require('../models');
+const { Cliente, Contacto, Operacion, Usuario, Auditoria, sequelize } = require('../models');
+const notificacionService = require('../services/notificacionService');
 const {
   success,
   successMessage,
@@ -206,12 +207,27 @@ const obtenerPorId = async (req, res) => {
         order: [['es_principal', 'DESC'], ['nombre', 'ASC']]
       }]
     });
-    
+
     if (!cliente) {
       return notFound(res, 'Cliente no encontrado');
     }
-    
-    return success(res, cliente);
+
+    // Calcular operaciones del mes
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+
+    const operacionesMes = await Operacion.count({
+      where: {
+        cliente_id: id,
+        created_at: { [Op.gte]: inicioMes }
+      }
+    });
+
+    const clienteData = cliente.toJSON();
+    clienteData.operaciones_mes = operacionesMes;
+
+    return success(res, clienteData);
     
   } catch (error) {
     logger.error('Error al obtener cliente:', { message: error.message, id: req.params.id });
@@ -268,13 +284,16 @@ const crear = async (req, res) => {
     });
     
     await transaction.commit();
-    
-    logger.info('Cliente creado:', { 
-      clienteId: cliente.id, 
+
+    // Notificar nuevo cliente
+    notificacionService.notificarClienteCreado(cliente, req.user.nombre_completo).catch(() => {});
+
+    logger.info('Cliente creado:', {
+      clienteId: cliente.id,
       codigo: cliente.codigo_cliente,
-      creadoPor: req.user.id 
+      creadoPor: req.user.id
     });
-    
+
     return created(res, 'Cliente creado exitosamente', cliente);
     
   } catch (error) {
@@ -402,12 +421,15 @@ const eliminar = async (req, res) => {
     });
     
     await transaction.commit();
-    
-    logger.info('Cliente eliminado:', { 
-      clienteId: id, 
-      eliminadoPor: req.user.id 
+
+    // Notificar eliminación de cliente
+    notificacionService.notificarClienteEliminado(cliente, req.user.nombre_completo).catch(() => {});
+
+    logger.info('Cliente eliminado:', {
+      clienteId: id,
+      eliminadoPor: req.user.id
     });
-    
+
     return successMessage(res, 'Cliente eliminado exitosamente');
     
   } catch (error) {
@@ -636,6 +658,132 @@ const eliminarContacto = async (req, res) => {
   }
 };
 
+/**
+ * GET /clientes/:id/historial
+ * Obtener historial de operaciones y actividad de un cliente
+ */
+const historial = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    const cliente = await Cliente.findByPk(id);
+    if (!cliente) {
+      return notFound(res, 'Cliente no encontrado');
+    }
+
+    // Operaciones del cliente
+    const { count, rows: operaciones } = await Operacion.findAndCountAll({
+      where: { cliente_id: id },
+      include: [
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre_completo'] },
+        { model: Usuario, as: 'cerrador', attributes: ['id', 'nombre_completo'] },
+      ],
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset,
+    });
+
+    // Transformar a formato historial
+    const items = operaciones.map(op => {
+      const tipo_op = op.tipo === 'entrada' ? 'Entrada' : 'Salida';
+      const doc = op.documento_wms || op.numero_operacion;
+      let titulo, descripcion, tipo;
+
+      if (op.estado === 'cerrado') {
+        titulo = `${tipo_op} cerrada: ${doc}`;
+        descripcion = `Operación cerrada por ${op.cerrador?.nombre_completo || 'Sistema'}${op.observaciones_cierre ? ` - ${op.observaciones_cierre}` : ''}`;
+        tipo = 'operacion';
+      } else if (op.estado === 'anulado') {
+        titulo = `${tipo_op} anulada: ${doc}`;
+        descripcion = `Operación anulada${op.motivo_anulacion ? `: ${op.motivo_anulacion}` : ''}`;
+        tipo = 'operacion';
+      } else {
+        titulo = `${tipo_op} creada: ${doc}`;
+        descripcion = `Operación registrada por ${op.creador?.nombre_completo || 'Sistema'}`;
+        tipo = 'operacion';
+      }
+
+      return {
+        id: `op-${op.id}`,
+        tipo,
+        titulo,
+        descripcion,
+        estado: op.estado,
+        fecha: op.fecha_cierre || op.created_at,
+        usuario: op.cerrador?.nombre_completo || op.creador?.nombre_completo || 'Sistema',
+        referencia_id: op.id,
+        referencia_tipo: 'operacion',
+        metadata: {
+          numero_operacion: op.numero_operacion,
+          tipo_operacion: op.tipo,
+          documento_wms: op.documento_wms,
+          estado: op.estado,
+        },
+      };
+    });
+
+    return paginated(res, items, buildPaginacion(count, parseInt(page), parseInt(limit)));
+
+  } catch (error) {
+    logger.error('Error al obtener historial del cliente:', { message: error.message, clienteId: req.params.id });
+    return serverError(res, 'Error al obtener el historial', error);
+  }
+};
+
+/**
+ * POST /clientes/:id/logo
+ * Subir logo del cliente
+ */
+const subirLogo = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      return errorResponse(res, 'No se proporcionó un archivo de imagen', 400);
+    }
+
+    const cliente = await Cliente.findByPk(id);
+    if (!cliente) {
+      return notFound(res, 'Cliente no encontrado');
+    }
+
+    // Construir URL relativa del logo
+    const logo_url = `/uploads/logos/${req.file.filename}`;
+
+    // Si ya tenía logo, eliminar el anterior
+    if (cliente.logo_url) {
+      const fs = require('fs');
+      const path = require('path');
+      const oldPath = path.join(__dirname, '../../', cliente.logo_url);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    await cliente.update({ logo_url });
+
+    await Auditoria.registrar({
+      tabla: 'clientes',
+      registro_id: id,
+      accion: 'actualizar',
+      usuario_id: req.user.id,
+      usuario_nombre: req.user.nombre_completo,
+      datos_nuevos: { logo_url },
+      ip_address: getClientIP(req),
+      descripcion: `Logo actualizado para cliente: ${cliente.razon_social}`,
+    });
+
+    logger.info('Logo de cliente actualizado:', { clienteId: id });
+
+    return successMessage(res, 'Logo actualizado exitosamente', { logo_url });
+  } catch (error) {
+    logger.error('Error al subir logo:', { message: error.message });
+    return serverError(res, 'Error al subir el logo', error);
+  }
+};
+
 module.exports = {
   // Clientes
   listar,
@@ -644,9 +792,12 @@ module.exports = {
   crear,
   actualizar,
   eliminar,
+  subirLogo,
   // Contactos
   listarContactos,
   crearContacto,
   actualizarContacto,
-  eliminarContacto
+  eliminarContacto,
+  // Historial
+  historial,
 };

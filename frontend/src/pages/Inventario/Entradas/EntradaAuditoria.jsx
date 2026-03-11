@@ -33,14 +33,27 @@ import {
   MapPin,
   MessageSquare,
   AlertCircle,
+  AlertTriangle,
+  ChevronDown,
   ChevronRight,
   Download,
   Eye,
+  Plus,
   Shield,
 } from 'lucide-react';
 
 import auditoriasService from '../../../api/auditorias.service';
 import { useAlert } from '../../../context/AlertContext';
+
+// URL base del servidor para archivos estáticos (sin /api/v1)
+const SERVER_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
+
+/** Convierte URL relativa de archivo a URL absoluta del servidor */
+const resolveFileUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `${SERVER_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // STATUS STEPPER
@@ -111,6 +124,7 @@ const StatusStepper = ({ currentStatus }) => {
 const SECTION_COLORS = {
   emerald: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-600 dark:text-emerald-400' },
   blue:    { bg: 'bg-blue-100 dark:bg-blue-900/30',    text: 'text-blue-600 dark:text-blue-400' },
+  amber:   { bg: 'bg-amber-100 dark:bg-amber-900/30',   text: 'text-amber-600 dark:text-amber-400' },
   violet:  { bg: 'bg-violet-100 dark:bg-violet-900/30',  text: 'text-violet-600 dark:text-violet-400' },
   slate:   { bg: 'bg-slate-100 dark:bg-slate-900/30',   text: 'text-slate-600 dark:text-slate-400' },
 };
@@ -204,17 +218,29 @@ const FilePreviewGallery = ({ files, onRemoveFile, readOnly = false }) => {
   const [lightboxIdx, setLightboxIdx] = useState(null);
 
   const previews = useMemo(() =>
-    files.map((file) => ({
-      file,
-      url: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
-      isImage: file.type.startsWith('image/'),
-      isPdf: file.type === 'application/pdf',
-    })),
+    files.map((file) => {
+      const type = file.type || '';
+      const isImage = type.startsWith('image/');
+      const isPdf = type === 'application/pdf';
+      // Determinar el objeto nativo File (puede estar en el propio file o en _nativeFile)
+      const nativeFile = file instanceof File ? file : file._nativeFile;
+      let url = null;
+      let isBlob = false;
+      if (nativeFile && isImage) {
+        // Archivo local con blob URL (preview inmediato)
+        url = URL.createObjectURL(nativeFile);
+        isBlob = true;
+      } else if (file.isUploaded && file.url) {
+        // Archivo del servidor (al recargar página)
+        url = file.url;
+      }
+      return { file, url, isImage, isPdf, isBlob };
+    }),
   [files]);
 
-  // Cleanup object URLs
+  // Cleanup solo object URLs creados localmente (no URLs del servidor)
   useEffect(() => {
-    return () => previews.forEach((p) => p.url && URL.revokeObjectURL(p.url));
+    return () => previews.forEach((p) => p.isBlob && p.url && URL.revokeObjectURL(p.url));
   }, [previews]);
 
   const pdfFiles = previews.filter((p) => p.isPdf);
@@ -252,7 +278,7 @@ const FilePreviewGallery = ({ files, onRemoveFile, readOnly = false }) => {
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => window.open(URL.createObjectURL(p.file), '_blank')}
+                  onClick={() => { const native = p.file instanceof File ? p.file : p.file._nativeFile; const pdfUrl = native ? URL.createObjectURL(native) : p.file.url; window.open(pdfUrl, '_blank'); }}
                   className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                   title="Ver PDF"
                 >
@@ -503,6 +529,17 @@ const EntradaAuditoria = () => {
   const [files, setFiles] = useState([]);
   const [closing, setClosing] = useState(false);
 
+  // Averías
+  const [averias, setAverias] = useState([]);
+  const [averiaForm, setAveriaForm] = useState({ detalle_id: '', tipo_averia: '', descripcion_custom: '' });
+  const [savingAveria, setSavingAveria] = useState(false);
+
+  // Control de guardado intermedio
+  const [savingLogistica, setSavingLogistica] = useState(false);
+  const [logisticaSaved, setLogisticaSaved] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const logisticaTimerRef = useRef(null);
+
   // Cargar datos desde API
   useEffect(() => {
     const fetchEntrada = async () => {
@@ -528,12 +565,18 @@ const EntradaAuditoria = () => {
             setFiles(data.evidencias.map(ev => ({
               id: ev.id,
               name: ev.nombre,
-              url: ev.url,
+              url: resolveFileUrl(ev.url),
               type: ev.tipo,
               size: ev.tamanio,
               isUploaded: true
             })));
           }
+
+          // Cargar averías existentes
+          try {
+            const averiasRes = await auditoriasService.getAverias(id);
+            if (averiasRes?.success) setAverias(averiasRes.data || []);
+          } catch { /* silencioso */ }
         }
       } catch {
         setPageError('No se pudo cargar la auditoría. Verifique que el servidor esté activo e intente nuevamente.');
@@ -548,9 +591,64 @@ const EntradaAuditoria = () => {
   // HANDLERS
   // ──────────────────────────────────────────────────────────────────────────
 
+  const guardarLogisticaRef = useRef(null);
+  guardarLogisticaRef.current = async () => {
+    if (estado === 'cerrado') return;
+    setSavingLogistica(true);
+    try {
+      await auditoriasService.guardarDatosLogisticos(id, formData);
+      setLogisticaSaved(true);
+      if (estado === 'pendiente') setEstado('en_proceso');
+    } catch {
+      // Silencioso: se reintentará en el siguiente cambio o al cerrar
+    } finally {
+      setSavingLogistica(false);
+    }
+  };
+
   const handleFieldChange = (field) => (e) => {
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+    setLogisticaSaved(false);
+
+    // Auto-save con debounce de 2 segundos
+    if (logisticaTimerRef.current) clearTimeout(logisticaTimerRef.current);
+    logisticaTimerRef.current = setTimeout(() => {
+      guardarLogisticaRef.current?.();
+    }, 2000);
   };
+
+  // Subir evidencias inmediatamente al agregarlas
+  const handleUploadEvidencias = async (newFiles) => {
+    // Agregar al estado local inmediatamente (mantener Files nativos para preview)
+    setFiles((prev) => [...prev, ...newFiles]);
+    if (estado === 'pendiente') setEstado('en_proceso');
+
+    // Subir al servidor en background
+    setUploadingFiles(true);
+    try {
+      await auditoriasService.subirEvidencias(id, newFiles);
+      // Marcar los archivos locales como subidos (sin recargar del servidor)
+      // Así conservamos los blob URLs para preview durante esta sesión
+      setFiles((prev) => prev.map(f => f instanceof File ? { ...f, isUploaded: true, type: f.type, name: f.name, size: f.size, _nativeFile: f } : f));
+    } catch {
+      showAlert({
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudieron subir las evidencias. Intente nuevamente.'
+      });
+      // Revertir solo los archivos que acabamos de agregar
+      setFiles((prev) => prev.filter(f => !(newFiles.includes(f))));
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  // Limpiar timer al desmontar
+  useEffect(() => {
+    return () => {
+      if (logisticaTimerRef.current) clearTimeout(logisticaTimerRef.current);
+    };
+  }, []);
 
   const handleVerificarLinea = async (lineaId) => {
     const linea = lineas.find((l) => l.id === lineaId);
@@ -596,12 +694,74 @@ const EntradaAuditoria = () => {
   };
 
   const handleAddFiles = useCallback((newFiles) => {
-    setFiles((prev) => [...prev, ...newFiles]);
-    if (estado === 'pendiente') setEstado('en_proceso');
-  }, [estado]);
+    handleUploadEvidencias(newFiles);
+  }, [id, estado]);
 
-  const handleRemoveFile = (idx) => {
+  const handleRemoveFile = async (idx) => {
+    const file = files[idx];
     setFiles((prev) => prev.filter((_, i) => i !== idx));
+
+    // Si el archivo ya estaba subido, eliminarlo del servidor
+    if (file?.id && file?.isUploaded) {
+      try {
+        await auditoriasService.eliminarEvidencia(id, file.id);
+      } catch {
+        // Silencioso
+      }
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // AVERÍAS
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const TIPOS_AVERIA = [
+    'Producto golpeado',
+    'Producto mojado',
+    'Producto roto',
+    'Producto vencido',
+    'Empaque dañado',
+    'Producto faltante',
+    'Producto sobrante',
+    'Contaminación',
+    'Etiqueta ilegible',
+    'Otra',
+  ];
+
+  const handleRegistrarAveria = async () => {
+    const { detalle_id, tipo_averia, descripcion_custom } = averiaForm;
+    if (!detalle_id || !tipo_averia) {
+      showAlert({ type: 'warning', title: 'Campos requeridos', message: 'Seleccione el producto y el tipo de avería.' });
+      return;
+    }
+
+    const linea = lineas.find(l => String(l.id) === String(detalle_id));
+    const tipoFinal = tipo_averia === 'Otra' ? descripcion_custom.trim() : tipo_averia;
+
+    if (tipo_averia === 'Otra' && !tipoFinal) {
+      showAlert({ type: 'warning', title: 'Descripción requerida', message: 'Escriba el motivo de la avería.' });
+      return;
+    }
+
+    setSavingAveria(true);
+    try {
+      const res = await auditoriasService.registrarAveria(id, {
+        detalle_id,
+        sku: linea?.sku || '',
+        cantidad: 1,
+        tipo_averia: tipoFinal,
+      });
+      if (res?.success) {
+        setAverias(prev => [res.data, ...prev]);
+        setAveriaForm({ detalle_id: '', tipo_averia: '', descripcion_custom: '' });
+        showAlert({ type: 'success', title: 'Avería registrada', message: 'La avería fue registrada correctamente.' });
+        if (estado === 'pendiente') setEstado('en_proceso');
+      }
+    } catch (err) {
+      showAlert({ type: 'error', title: 'Error', message: err.message || 'No se pudo registrar la avería.' });
+    } finally {
+      setSavingAveria(false);
+    }
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -641,26 +801,21 @@ const EntradaAuditoria = () => {
     setClosing(true);
 
     try {
-      // 1. Guardar datos logísticos
+      // Guardar logística una última vez por seguridad
+      if (logisticaTimerRef.current) clearTimeout(logisticaTimerRef.current);
       await auditoriasService.guardarDatosLogisticos(id, formData);
 
-      // 2. Subir evidencias si hay archivos
-      if (files.length > 0) {
-        try {
-          await auditoriasService.subirEvidencias(id, files);
-        } catch (uploadError) {
-          console.error('Error al subir evidencias:', uploadError);
-          showAlert({
-            type: 'warning',
-            title: 'Atención',
-            message: 'Hubo un problema al subir las fotos/PDF, pero intentaremos cerrar la auditoría.'
-          });
-        }
-      }
-
-      // 3. Cerrar auditoría
-      await auditoriasService.cerrar(id, { enviar_correo: true });
+      // Cerrar auditoría (evidencias ya están subidas) + enviar correo
+      const result = await auditoriasService.cerrar(id, { enviar_correo: true });
       setEstado('cerrado');
+
+      // Feedback sobre el correo
+      const correoEnviado = result?.data?.correo_enviado || result?.correo_enviado;
+      if (correoEnviado) {
+        showAlert({ type: 'success', title: 'Auditoría Cerrada', message: 'Correo de notificación enviado exitosamente.' });
+      } else {
+        showAlert({ type: 'success', title: 'Auditoría Cerrada', message: 'No se envió correo (sin destinatarios configurados).' });
+      }
     } catch (error) {
       console.error('Error al cerrar auditoría:', error);
       showAlert({
@@ -751,9 +906,11 @@ const EntradaAuditoria = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-                  {entradaData.documento}
+                  {entradaData.documento_wms || entradaData.documento}
                 </h1>
                 <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  <span className="font-mono text-xs">{entradaData.documento}</span>
+                  <span>•</span>
                   <span className="flex items-center gap-1">
                     <Building2 className="w-4 h-4" />
                     {entradaData.cliente}
@@ -897,13 +1054,17 @@ const EntradaAuditoria = () => {
             icon={Truck}
             color="blue"
             badge={
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                formProgress === 100
-                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                  : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-              }`}>
-                {filledFields.length}/{requiredFields.length} campos
-              </span>
+              <div className="flex items-center gap-2">
+                {savingLogistica && <Loader2 className="w-3 h-3 animate-spin text-blue-500" />}
+                {logisticaSaved && !savingLogistica && <Check className="w-3 h-3 text-emerald-500" />}
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  formProgress === 100
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                }`}>
+                  {filledFields.length}/{requiredFields.length} campos
+                </span>
+              </div>
             }
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -976,20 +1137,179 @@ const EntradaAuditoria = () => {
           </Section>
 
           {/* ════════════════════════════════════════════════════════════════ */}
-          {/* SECTION 3: EVIDENCIAS Y SOPORTES */}
+          {/* SECTION 3: AVERÍAS / NOVEDADES */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          <Section
+            title="Averías / Novedades"
+            icon={AlertTriangle}
+            color="amber"
+            badge={
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                averias.length > 0
+                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+                  : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+              }`}>
+                {averias.length} avería{averias.length !== 1 ? 's' : ''}
+              </span>
+            }
+          >
+            {/* Formulario para registrar avería */}
+            {!isCerrado && (
+              <div className="space-y-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Selector de producto */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Package className="w-3.5 h-3.5 text-amber-500" />
+                        Producto afectado <span className="text-red-500">*</span>
+                      </div>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={averiaForm.detalle_id}
+                        onChange={(e) => setAveriaForm(prev => ({ ...prev, detalle_id: e.target.value }))}
+                        className="w-full appearance-none pl-4 pr-10 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all cursor-pointer hover:border-amber-400 dark:hover:border-amber-500/50"
+                      >
+                        <option value="">-- Seleccionar producto --</option>
+                        {lineas.filter(l => !l.eliminado).map(l => (
+                          <option key={l.id} value={l.id}>
+                            {l.sku} — {l.producto} {l.caja ? `(${l.caja})` : ''} ({l.cantidad_esperada} {l.unidad || 'UND'})
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    </div>
+                    {/* Preview del producto seleccionado */}
+                    {averiaForm.detalle_id && (() => {
+                      const sel = lineas.find(l => String(l.id) === String(averiaForm.detalle_id));
+                      return sel ? (
+                        <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/15 border border-amber-200/60 dark:border-amber-700/30 rounded-lg">
+                          <Package className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                          <span className="text-xs font-mono font-semibold text-amber-700 dark:text-amber-300">{sel.sku}</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{sel.producto}</span>
+                          {sel.caja && <span className="text-[10px] px-1.5 py-0.5 bg-amber-200/50 dark:bg-amber-800/30 text-amber-700 dark:text-amber-300 rounded font-medium">{sel.caja}</span>}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+
+                  {/* Selector de tipo de avería */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                        Causa de la avería <span className="text-red-500">*</span>
+                      </div>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={averiaForm.tipo_averia}
+                        onChange={(e) => setAveriaForm(prev => ({ ...prev, tipo_averia: e.target.value, descripcion_custom: '' }))}
+                        className="w-full appearance-none pl-4 pr-10 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all cursor-pointer hover:border-amber-400 dark:hover:border-amber-500/50"
+                      >
+                        <option value="">-- Seleccionar causa --</option>
+                        {TIPOS_AVERIA.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    </div>
+                    {/* Indicador de tipo seleccionado */}
+                    {averiaForm.tipo_averia && averiaForm.tipo_averia !== 'Otra' && (
+                      <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/15 border border-amber-200/60 dark:border-amber-700/30 rounded-lg">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                        <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">{averiaForm.tipo_averia}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Campo personalizado cuando selecciona "Otra" */}
+                {averiaForm.tipo_averia === 'Otra' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <MessageSquare className="w-3.5 h-3.5 text-amber-500" />
+                          Describa el motivo <span className="text-red-500">*</span>
+                        </div>
+                        <span className={`text-xs font-mono ${averiaForm.descripcion_custom.length >= 50 ? 'text-red-400' : 'text-slate-400'}`}>
+                          {averiaForm.descripcion_custom.length}/55
+                        </span>
+                      </div>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={55}
+                      value={averiaForm.descripcion_custom}
+                      onChange={(e) => setAveriaForm(prev => ({ ...prev, descripcion_custom: e.target.value }))}
+                      placeholder="Escriba el motivo de la avería..."
+                      className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all hover:border-amber-400 dark:hover:border-amber-500/50"
+                    />
+                  </div>
+                )}
+
+                <button
+                  onClick={handleRegistrarAveria}
+                  disabled={savingAveria || !averiaForm.detalle_id || !averiaForm.tipo_averia}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-amber-500/20 hover:shadow-amber-500/30"
+                >
+                  {savingAveria ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Registrar Avería
+                </button>
+              </div>
+            )}
+
+            {/* Lista de averías registradas */}
+            {averias.length > 0 ? (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-3">Averías registradas</h4>
+                {averias.map((av, idx) => {
+                  const lineaRef = lineas.find(l => String(l.id) === String(av.detalle_id));
+                  return (
+                    <div key={av.id || idx} className="flex items-center gap-3 p-3 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl">
+                      <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                          {lineaRef ? `${lineaRef.sku} — ${lineaRef.producto}` : av.sku || 'Producto'}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {av.tipo_averia}{av.descripcion ? ` — ${av.descripcion}` : ''}
+                        </p>
+                      </div>
+                      <span className="text-xs text-slate-400 flex-shrink-0">
+                        Cant: {av.cantidad}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-4">
+                {isCerrado ? 'No se registraron averías en esta operación.' : 'No hay averías registradas aún.'}
+              </p>
+            )}
+          </Section>
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* SECTION 4: EVIDENCIAS Y SOPORTES */}
           {/* ════════════════════════════════════════════════════════════════ */}
           <Section
             title="Evidencias y Soportes"
             icon={Upload}
             color="violet"
             badge={
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                evidenceProgress === 100
-                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                  : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-              }`}>
-                {files.length} archivo{files.length !== 1 && 's'}
-              </span>
+              <div className="flex items-center gap-2">
+                {uploadingFiles && <Loader2 className="w-3 h-3 animate-spin text-violet-500" />}
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  evidenceProgress === 100
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                }`}>
+                  {uploadingFiles ? 'Subiendo...' : `${files.length} archivo${files.length !== 1 ? 's' : ''}`}
+                </span>
+              </div>
             }
           >
             {isCerrado ? (

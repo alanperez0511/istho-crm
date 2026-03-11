@@ -165,6 +165,14 @@ module.exports = (sequelize) => {
     notas: {
       type: DataTypes.TEXT,
       allowNull: true
+    },
+
+    // Control de alertas silenciadas/descartadas
+    alertas_silenciadas: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Tipos de alerta silenciados: { "agotado": "2026-03-11", "bajo_stock": "2026-03-11" }'
     }
   }, {
     tableName: 'inventario',

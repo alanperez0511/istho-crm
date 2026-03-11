@@ -9,10 +9,14 @@
  */
 
 const { Op } = require('sequelize');
+const notificacionService = require('../services/notificacionService');
+const emailService = require('../services/emailService');
 const {
   Operacion,
   OperacionDetalle,
+  OperacionAveria,
   Cliente,
+  Contacto,
   Usuario,
   Auditoria,
   OperacionDocumento,
@@ -80,12 +84,13 @@ const listarEntradas = async (req, res) => {
     const entradas = rows.map(op => ({
       id: op.id,
       documento: op.numero_operacion,
+      documento_wms: op.documento_wms || null,
       cliente: op.cliente?.razon_social || 'Sin cliente',
       tipo_documento: 'Recepción',
       fecha_ingreso: op.fecha_operacion || op.created_at,
       estado: op.estado,
       lineas: op.detalles?.length || 0,
-      verificadas: (op.detalles || []).filter(d => d.verificado).length,
+      lineas_verificadas: (op.detalles || []).filter(d => d.verificado).length,
     }));
 
     return paginated(res, entradas, { total: count, page, limit });
@@ -114,7 +119,8 @@ const obtenerEntradaPorId = async (req, res) => {
         {
           model: OperacionDetalle,
           as: 'detalles',
-          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'lote', 'fecha_vencimiento', 'verificado', 'numero_caja']
+          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'lote', 'fecha_vencimiento', 'verificado', 'numero_caja', 'deleted_at'],
+          paranoid: false // Incluir líneas eliminadas para permitir restauración
         },
         {
           model: OperacionDocumento,
@@ -131,6 +137,7 @@ const obtenerEntradaPorId = async (req, res) => {
     const data = {
       id: operacion.id,
       documento: operacion.numero_operacion,
+      documento_wms: operacion.documento_wms || null,
       cliente: operacion.cliente?.razon_social || 'Sin cliente',
       tipo_documento: 'Recepción',
       fecha_ingreso: operacion.fecha_operacion || operacion.created_at,
@@ -146,6 +153,7 @@ const obtenerEntradaPorId = async (req, res) => {
         fecha_vencimiento: d.fecha_vencimiento || null,
         verificado: !!d.verificado,
         caja: d.numero_caja || '',
+        eliminado: !!d.deleted_at,
       })),
       logistica: {
         conductor: operacion.conductor_nombre || '',
@@ -223,12 +231,13 @@ const listarSalidas = async (req, res) => {
     const salidas = rows.map(op => ({
       id: op.id,
       documento: op.numero_operacion,
+      documento_wms: op.documento_wms || null,
       cliente: op.cliente?.razon_social || 'Sin cliente',
       tipo_documento: 'Despacho',
       fecha_salida: op.fecha_operacion || op.created_at,
       estado: op.estado,
       lineas: op.detalles?.length || 0,
-      verificadas: (op.detalles || []).filter(d => d.verificado).length,
+      lineas_verificadas: (op.detalles || []).filter(d => d.verificado).length,
     }));
 
     return paginated(res, salidas, { total: count, page, limit });
@@ -257,7 +266,8 @@ const obtenerSalidaPorId = async (req, res) => {
         {
           model: OperacionDetalle,
           as: 'detalles',
-          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'lote', 'fecha_vencimiento', 'verificado', 'numero_caja']
+          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'lote', 'fecha_vencimiento', 'verificado', 'numero_caja', 'deleted_at'],
+          paranoid: false // Incluir líneas eliminadas para permitir restauración
         },
         {
           model: OperacionDocumento,
@@ -274,6 +284,7 @@ const obtenerSalidaPorId = async (req, res) => {
     const data = {
       id: operacion.id,
       documento: operacion.numero_operacion,
+      documento_wms: operacion.documento_wms || null,
       cliente: operacion.cliente?.razon_social || 'Sin cliente',
       tipo_documento: 'Despacho',
       fecha_salida: operacion.fecha_operacion || operacion.created_at,
@@ -289,6 +300,7 @@ const obtenerSalidaPorId = async (req, res) => {
         fecha_vencimiento: d.fecha_vencimiento || null,
         verificado: !!d.verificado,
         caja: d.numero_caja || '',
+        eliminado: !!d.deleted_at,
       })),
       logistica: {
         conductor: operacion.conductor_nombre || '',
@@ -550,6 +562,51 @@ const subirEvidencias = async (req, res) => {
   }
 };
 
+/**
+ * Eliminar una evidencia
+ * DELETE /auditorias/:id/evidencias/:evidenciaId
+ */
+const eliminarEvidencia = async (req, res) => {
+  try {
+    const { id, evidenciaId } = req.params;
+
+    const documento = await OperacionDocumento.findOne({
+      where: { id: evidenciaId, operacion_id: id }
+    });
+
+    if (!documento) {
+      return notFound(res, 'Evidencia no encontrada');
+    }
+
+    // Eliminar archivo físico si existe
+    const fs = require('fs');
+    const path = require('path');
+    if (documento.archivo_url) {
+      const filePath = path.join(__dirname, '../..', documento.archivo_url);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    await documento.destroy();
+
+    await Auditoria.registrar({
+      tabla: 'operacion_documentos',
+      registro_id: parseInt(evidenciaId),
+      accion: 'eliminar',
+      usuario_id: req.user?.id,
+      usuario_nombre: req.user?.nombre_completo,
+      descripcion: `Evidencia eliminada: ${documento.archivo_nombre}`,
+      ip_address: getClientIP(req)
+    });
+
+    return successMessage(res, 'Evidencia eliminada correctamente');
+  } catch (err) {
+    logger.error('[AUDITORIAS] Error al eliminar evidencia:', err);
+    return serverError(res, 'Error al eliminar evidencia', err);
+  }
+};
+
 // ════════════════════════════════════════════════════════════════════════════
 // CIERRE DE AUDITORÍA
 // ════════════════════════════════════════════════════════════════════════════
@@ -557,12 +614,18 @@ const subirEvidencias = async (req, res) => {
 /**
  * Cerrar una auditoría
  * POST /auditorias/:id/cerrar
+ *
+ * Cierra la auditoría, envía notificación in-app y correo electrónico
+ * a los contactos del cliente que tengan recibe_notificaciones = true.
  */
 const cerrarAuditoria = async (req, res) => {
   try {
     const { id } = req.params;
+    const { enviar_correo, correos_destino } = req.body;
 
-    const operacion = await Operacion.findByPk(id);
+    const operacion = await Operacion.findByPk(id, {
+      include: [{ model: Cliente, as: 'cliente' }]
+    });
     if (!operacion) {
       return notFound(res, 'Operación no encontrada');
     }
@@ -571,9 +634,32 @@ const cerrarAuditoria = async (req, res) => {
       return errorResponse(res, 'La auditoría ya se encuentra cerrada', 409);
     }
 
+    // ════════════════════════════════════════════════════════════════════
+    // OBTENER CORREOS DE DESTINO (contactos con recibe_notificaciones)
+    // ════════════════════════════════════════════════════════════════════
+
+    let correosEnvio = correos_destino;
+    if (!correosEnvio && enviar_correo !== false) {
+      const contactos = await Contacto.findAll({
+        where: {
+          cliente_id: operacion.cliente_id,
+          recibe_notificaciones: true,
+          activo: true,
+          email: { [Op.ne]: null }
+        }
+      });
+      correosEnvio = contactos.map(c => c.email).join(', ');
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // ACTUALIZAR OPERACIÓN
+    // ════════════════════════════════════════════════════════════════════
+
     await operacion.update({
       estado: 'cerrado',
-      fecha_cierre: new Date()
+      fecha_cierre: new Date(),
+      cerrado_por: req.user?.id,
+      correos_destino: correosEnvio || null
     });
 
     await Auditoria.registrar({
@@ -586,7 +672,53 @@ const cerrarAuditoria = async (req, res) => {
       ip_address: getClientIP(req)
     });
 
-    return successMessage(res, 'Auditoría cerrada correctamente');
+    // Notificar in-app a usuarios del cliente + admins
+    notificacionService.notificarOperacionCerrada(operacion, req.user?.nombre_completo || 'Sistema').catch(err => {
+      logger.error('[AUDITORIAS] Error al enviar notificación de cierre:', { message: err.message });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
+    // ENVIAR CORREO ELECTRÓNICO
+    // ════════════════════════════════════════════════════════════════════
+
+    let resultadoCorreo = { success: false };
+    if (enviar_correo !== false && correosEnvio) {
+      try {
+        // Recargar operación con todas las relaciones para el email
+        await operacion.reload({
+          include: [
+            { model: Cliente, as: 'cliente' },
+            { model: OperacionDetalle, as: 'detalles' },
+            { model: OperacionDocumento, as: 'documentos' },
+            { model: OperacionAveria, as: 'averias' },
+            { model: Usuario, as: 'cerrador', attributes: ['id', 'nombre_completo'] }
+          ]
+        });
+
+        resultadoCorreo = await emailService.enviarCierreOperacion(operacion, correosEnvio);
+
+        await operacion.update({
+          correo_enviado: resultadoCorreo.success,
+          fecha_correo_enviado: resultadoCorreo.success ? new Date() : null
+        });
+
+        logger.info('[AUDITORIAS] Correo de cierre enviado:', {
+          operacion_id: operacion.id,
+          numero: operacion.numero_operacion,
+          destinatarios: correosEnvio,
+          success: resultadoCorreo.success
+        });
+      } catch (emailErr) {
+        logger.error('[AUDITORIAS] Error al enviar correo de cierre:', { message: emailErr.message });
+      }
+    }
+
+    return successMessage(res, 'Auditoría cerrada correctamente', {
+      numero_operacion: operacion.numero_operacion,
+      correo_enviado: resultadoCorreo.success,
+      correos_destino: correosEnvio || null,
+      preview_url: resultadoCorreo.previewUrl
+    });
   } catch (err) {
     logger.error('[AUDITORIAS] Error al cerrar auditoría:', err);
     return serverError(res, 'Error al cerrar auditoría', err);
@@ -692,6 +824,7 @@ module.exports = {
   restaurarLinea,
   guardarDatosLogisticos,
   subirEvidencias,
+  eliminarEvidencia,
   cerrarAuditoria,
   estadisticas,
   recientes,

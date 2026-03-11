@@ -220,6 +220,7 @@ const EntradasList = () => {
     const matchSearch =
       !searchTerm ||
       e.documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.documento_wms?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.cliente?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchEstado = estadoFilter === 'todos' || e.estado === estadoFilter;
     return matchSearch && matchEstado;
@@ -393,10 +394,10 @@ const EntradasList = () => {
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                              {entrada.documento}
+                              {entrada.documento_wms || entrada.documento}
                             </p>
                             <p className="text-xs text-slate-400 dark:text-slate-500 font-mono">
-                              {entrada.id}
+                              {entrada.documento}
                             </p>
                           </div>
                         </div>

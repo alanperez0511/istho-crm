@@ -16,6 +16,8 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuth } from '../../context/AuthContext';
+import logoNegro from '../../assets/logo-negro.png';
+import logoBlanco from '../../assets/logo-blanco.png';
 
 // ============================================================================
 // ICONOS SVG (inline para evitar dependencias)
@@ -154,41 +156,48 @@ const LoginPage = () => {
     // Mostrar loading si está verificando autenticación
     if (authLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900">
                 <SpinnerIcon className="w-10 h-10 text-[#E65100]" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen flex">
+        <div className="min-h-screen flex relative">
             {/* ════════════════════════════════════════════════════════════════════ */}
             {/* LADO IZQUIERDO - Formulario */}
             {/* ════════════════════════════════════════════════════════════════════ */}
-            <div className="flex-1 flex items-center justify-center p-8 bg-white">
+            <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-slate-900">
                 <div className="w-full max-w-md">
                     {/* Logo y Título */}
                     <div className="text-center mb-8">
-                        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#E65100] to-[#FF6D00] rounded-2xl shadow-lg mb-4">
-                            <span className="text-white font-bold text-2xl">I</span>
-                        </div>
-                        <h1 className="text-2xl font-bold text-gray-900">
+                        <img
+                            src={logoNegro}
+                            alt="ISTHO"
+                            className="w-16 h-16 rounded-2xl shadow-lg mb-4 mx-auto dark:hidden"
+                        />
+                        <img
+                            src={logoBlanco}
+                            alt="ISTHO"
+                            className="w-16 h-16 rounded-2xl shadow-lg mb-4 mx-auto hidden dark:block"
+                        />
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                             Bienvenido al CRM
                         </h1>
-                        <p className="text-gray-500 mt-2">
+                        <p className="text-gray-500 dark:text-slate-400 mt-2">
                             Ingresa tus credenciales para continuar
                         </p>
                     </div>
 
                     {/* Mensaje de error */}
                     {authError && (
-                        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                            <AlertIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl flex items-start gap-3">
+                            <AlertIcon className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
                             <div>
-                                <p className="text-sm font-medium text-red-800">
+                                <p className="text-sm font-medium text-red-800 dark:text-red-300">
                                     Error de autenticación
                                 </p>
-                                <p className="text-sm text-red-600 mt-1">
+                                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
                                     {authError}
                                 </p>
                             </div>
@@ -201,13 +210,13 @@ const LoginPage = () => {
                         <div>
                             <label
                                 htmlFor="email"
-                                className="block text-sm font-medium text-gray-700 mb-2"
+                                className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
                             >
                                 Correo electrónico
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <MailIcon className="w-5 h-5 text-gray-400" />
+                                    <MailIcon className="w-5 h-5 text-gray-400 dark:text-slate-500" />
                                 </div>
                                 <input
                                     id="email"
@@ -216,12 +225,12 @@ const LoginPage = () => {
                                     placeholder="usuario@istho.com.co"
                                     {...register('email')}
                                     className={`
-                    w-full pl-12 pr-4 py-3 rounded-xl border bg-gray-50
-                    focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#E65100]/20 focus:border-[#E65100]
+                    w-full pl-12 pr-4 py-3 rounded-xl border bg-gray-50 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500
+                    focus:bg-white dark:focus:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-[#E65100]/20 focus:border-[#E65100]
                     transition-all duration-200
                     ${errors.email
-                                            ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
-                                            : 'border-gray-200'
+                                            ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500/20'
+                                            : 'border-gray-200 dark:border-slate-700'
                                         }
                   `}
                                 />
@@ -238,13 +247,13 @@ const LoginPage = () => {
                         <div>
                             <label
                                 htmlFor="password"
-                                className="block text-sm font-medium text-gray-700 mb-2"
+                                className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
                             >
                                 Contraseña
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <LockIcon className="w-5 h-5 text-gray-400" />
+                                    <LockIcon className="w-5 h-5 text-gray-400 dark:text-slate-500" />
                                 </div>
                                 <input
                                     id="password"
@@ -253,19 +262,19 @@ const LoginPage = () => {
                                     placeholder="••••••••"
                                     {...register('password')}
                                     className={`
-                    w-full pl-12 pr-12 py-3 rounded-xl border bg-gray-50
-                    focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#E65100]/20 focus:border-[#E65100]
+                    w-full pl-12 pr-12 py-3 rounded-xl border bg-gray-50 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500
+                    focus:bg-white dark:focus:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-[#E65100]/20 focus:border-[#E65100]
                     transition-all duration-200
                     ${errors.password
-                                            ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
-                                            : 'border-gray-200'
+                                            ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500/20'
+                                            : 'border-gray-200 dark:border-slate-700'
                                         }
                   `}
                                 />
                                 <button
                                     type="button"
                                     onClick={togglePassword}
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
                                 >
                                     {showPassword ? (
                                         <EyeOffIcon className="w-5 h-5" />
@@ -287,9 +296,9 @@ const LoginPage = () => {
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
                                     type="checkbox"
-                                    className="w-4 h-4 rounded border-gray-300 text-[#E65100] focus:ring-[#E65100]"
+                                    className="w-4 h-4 rounded border-gray-300 dark:border-slate-600 text-[#E65100] focus:ring-[#E65100] dark:bg-slate-700"
                                 />
-                                <span className="text-sm text-gray-600">Recordarme</span>
+                                <span className="text-sm text-gray-600 dark:text-slate-400">Recordarme</span>
                             </label>
                             <Link
                                 to="/forgot-password"
@@ -327,11 +336,11 @@ const LoginPage = () => {
 
                     {/* Footer */}
                     <div className="mt-8 text-center">
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 dark:text-slate-500">
                             ¿Problemas para acceder?{' '}
                             <a
                                 href="mailto:soporte@istho.com.co"
-                                className="text-[#E65100] hover:text-[#BF360C] font-medium"
+                                className="text-[#E65100] hover:text-[#BF360C] dark:text-orange-400 dark:hover:text-orange-300 font-medium"
                             >
                                 Contactar soporte
                             </a>
@@ -343,7 +352,7 @@ const LoginPage = () => {
             {/* ════════════════════════════════════════════════════════════════════ */}
             {/* LADO DERECHO - Branding */}
             {/* ════════════════════════════════════════════════════════════════════ */}
-            <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-[#E65100] via-[#FF6D00] to-[#FF8F00] relative overflow-hidden">
+            <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-[#E65100] via-[#FF6D00] to-[#FF8F00] dark:from-slate-800 dark:via-slate-900 dark:to-slate-950 relative overflow-hidden">
                 {/* Patrón de fondo */}
                 <div className="absolute inset-0 opacity-10">
                     <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -364,9 +373,16 @@ const LoginPage = () => {
                 <div className="relative z-10 flex flex-col items-center justify-center p-12 text-white">
                     {/* Logo grande */}
                     <div className="mb-8">
-                        <div className="w-32 h-32 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center shadow-2xl">
-                            <span className="text-white font-bold text-6xl">ISTHO</span>
-                        </div>
+                        <img
+                            src={logoNegro}
+                            alt="ISTHO"
+                            className="w-32 h-32 rounded-3xl shadow-2xl dark:hidden"
+                        />
+                        <img
+                            src={logoBlanco}
+                            alt="ISTHO"
+                            className="w-32 h-32 rounded-3xl shadow-2xl hidden dark:block dark:ring-1 dark:ring-slate-700"
+                        />
                     </div>
 
                     <h2 className="text-4xl font-bold mb-4 text-center">
@@ -378,7 +394,7 @@ const LoginPage = () => {
                     </p>
 
                     {/* Features */}
-                    <div className="grid grid-cols-2 gap-4 w-full max-w-md">
+                    <div className="grid grid-cols-2 gap-4 w-full max-w-md ">
                         {[
                             { icon: '📊', text: 'Dashboard en tiempo real' },
                             { icon: '👥', text: 'Gestión de clientes' },
@@ -387,7 +403,7 @@ const LoginPage = () => {
                         ].map((feature, index) => (
                             <div
                                 key={index}
-                                className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl p-4"
+                                className="flex items-center gap-3 bg-white/10 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 dark:border dark:border-slate-700/50"
                             >
                                 <span className="text-2xl">{feature.icon}</span>
                                 <span className="text-sm font-medium">{feature.text}</span>
@@ -395,16 +411,17 @@ const LoginPage = () => {
                         ))}
                     </div>
 
-                    {/* Footer */}
-                    <div className="absolute bottom-8 text-center">
-                        <p className="text-white/60 text-sm">
-                            ISTHO S.A.S. © 2026 - Centro Logístico Industrial del Norte
-                        </p>
-                        <p className="text-white/40 text-xs mt-1">
-                            Girardota, Antioquia • ISO 9001:2015
-                        </p>
-                    </div>
                 </div>
+            </div>
+
+            {/* Footer centrado entre las dos secciones */}
+            <div className="absolute bottom-0 left-0 right-0 z-10 text-center py-4">
+                <p className="text-black-600 dark:text-slate-500 text-xs">
+                    ISTHO S.A.S. © 2026 - Centro Logístico Industrial del Norte
+                </p>
+                <p className="text-black-600 dark:text-slate-600 text-[11px] mt-0.5">
+                    Girardota, Antioquia • ISO 9001:2015
+                </p>
             </div>
         </div>
     );

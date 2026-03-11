@@ -24,9 +24,14 @@ import {
   Package,
   Warehouse,
   AlertCircle,
+  AlertTriangle,
   Truck,
   Calendar,
-
+  FileText,
+  Info,
+  Check,
+  CheckCheck,
+  ExternalLink,
   ClipboardList,
   BarChart3,
   LogOut,
@@ -38,10 +43,29 @@ import {
   Sun,
   Moon,
   Keyboard,
+  Mail,
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
 import useNotification from '../../hooks/useNotification';
+import { useNotificaciones } from '../../context/NotificacionesContext';
+
+// ════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════════════
+
+const getTimeAgo = (dateStr) => {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Ahora';
+  if (mins < 60) return `Hace ${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `Hace ${days}d`;
+  return new Date(dateStr).toLocaleDateString('es-CO');
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN DEL MENÚ
@@ -64,9 +88,8 @@ const allMenuConfig = [
     shortcut: 'C',
     soloInternos: true, // No visible para rol cliente
     items: [
-      { icon: Users, label: 'Lista de Clientes', href: '/clientes', shortcut: 'G C' },
-      { icon: Building2, label: 'Por Sector', href: '/clientes?filter=sector' },
-      { icon: History, label: 'Actividad Reciente', href: '/clientes?filter=reciente' },
+      { icon: Users, label: 'Lista de Clientes', href: '/clientes', shortcut: 'G C' },  
+      { icon: Mail, label: 'Plantillas de Email', href: '/plantillas-email', shortcut: 'G P' },
     ],
   },
   {
@@ -98,6 +121,8 @@ const getMenuForRole = (rol) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useThemeContext } from '../../context/ThemeContext';
+import logoNegro from '../../assets/logo-negro.png';
+import logoBlanco from '../../assets/logo-blanco.png';
 
 /**
  * Hook para atajos de teclado
@@ -594,6 +619,27 @@ const MobileMenu = ({ isOpen, onClose, user, onNavigate, onLogout, currentPath, 
               </span>
             </div>
           </div>
+
+          {/* Portal Cliente Badge (móvil) */}
+          {user?.rol === 'cliente' && user?.cliente_info && (
+            <div className="flex items-center gap-3 mt-3 p-3 bg-violet-50 dark:bg-violet-900/20 rounded-xl border border-violet-200 dark:border-violet-800">
+              {user.cliente_info.logo_url ? (
+                <img
+                  src={`${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:5000'}${user.cliente_info.logo_url}`}
+                  alt={user.cliente_info.razon_social}
+                  className="w-10 h-10 rounded-lg object-contain bg-white border border-slate-200 dark:border-slate-600"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-violet-100 dark:bg-violet-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-violet-600 dark:text-violet-400">Portal Cliente</p>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{user.cliente_info.razon_social}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
@@ -690,6 +736,119 @@ MobileMenu.propTypes = {
 };
 
 /**
+ * Avatar con Dropdown de usuario
+ */
+const AvatarDropdown = ({ user, onNavigate, onLogout }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useClickOutside(dropdownRef, () => setIsOpen(false));
+  useEscapeKey(() => setIsOpen(false));
+
+  const getInitials = (u) => {
+    if (u?.nombre && u?.apellido) return `${u.nombre[0]}${u.apellido[0]}`.toUpperCase();
+    if (u?.nombre_completo) {
+      const parts = u.nombre_completo.trim().split(/\s+/);
+      return parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : parts[0][0].toUpperCase();
+    }
+    return (u?.username || 'U')[0].toUpperCase();
+  };
+
+  const roleLabels = {
+    admin: 'Administrador',
+    supervisor: 'Supervisor',
+    operador: 'Operador',
+    cliente: 'Portal Cliente',
+  };
+
+  const handleNavigate = (path) => {
+    onNavigate(path);
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={dropdownRef} className="hidden sm:flex items-center ml-2 relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-3 p-1 pr-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all"
+      >
+        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-medium shadow-md text-sm">
+          {getInitials(user)}
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 overflow-hidden z-50 animate-fadeIn">
+          {/* User Info */}
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
+                {getInitials(user)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                  {user?.nombre_completo || user?.username || 'Usuario'}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
+                <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full">
+                  {roleLabels[user?.rol] || user?.rol}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Menu Items */}
+          <div className="py-1">
+            <button
+              onClick={() => handleNavigate('/perfil')}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              <UserCircle className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+              Ver Perfil
+            </button>
+
+            {user?.rol === 'admin' && (
+              <button
+                onClick={() => handleNavigate('/configuracion')}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <Settings className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                Configuración
+              </button>
+            )}
+
+            <button
+              onClick={() => handleNavigate('/notificaciones')}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              <Bell className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+              Notificaciones
+            </button>
+          </div>
+
+          {/* Logout */}
+          <div className="border-t border-gray-100 dark:border-slate-700 py-1">
+            <button
+              onClick={() => { setIsOpen(false); onLogout(); }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar Sesión
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+AvatarDropdown.propTypes = {
+  user: PropTypes.object,
+  onNavigate: PropTypes.func.isRequired,
+  onLogout: PropTypes.func.isRequired,
+};
+
+/**
  * Header Flotante Principal
  */
 const FloatingHeader = () => {
@@ -706,8 +865,26 @@ const FloatingHeader = () => {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
 
-  // Mock de notificaciones
-  const notificationCount = 0;
+  // Notificaciones reales
+  const { unreadCount: notificationCount, notificaciones, fetchRecientes, marcarLeida, marcarTodasLeidas, loading: loadingNotifs } = useNotificaciones();
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const notifRef = useRef(null);
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setIsNotifOpen(false);
+      }
+    };
+    if (isNotifOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isNotifOpen]);
+
+  const handleBellClick = () => {
+    if (!isNotifOpen) fetchRecientes();
+    setIsNotifOpen(prev => !prev);
+  };
 
   // Configurar atajos
   const shortcuts = [
@@ -762,13 +939,45 @@ const FloatingHeader = () => {
                 className="flex items-center gap-2 cursor-pointer"
                 onClick={() => navigate('/dashboard')}
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center shadow-lg shadow-orange-500/20">
-                  <span className="text-white font-bold text-lg">IS</span>
-                </div>
+                <img
+                  src={logoNegro}
+                  alt="ISTHO"
+                  className="w-10 h-10 rounded-lg shadow-lg shadow-orange-500/20 dark:hidden"
+                />
+                <img
+                  src={logoBlanco}
+                  alt="ISTHO"
+                  className="w-10 h-10 rounded-lg shadow-lg shadow-orange-500/20 hidden dark:block"
+                />
                 <span className="hidden sm:block text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-300">
                   CRM
                 </span>
               </div>
+
+              {/* Portal Cliente - Logo y nombre del cliente */}
+              {user?.rol === 'cliente' && user?.cliente_info && (
+                <div className="hidden sm:flex items-center gap-2 ml-2 pl-3 border-l border-slate-200 dark:border-slate-700">
+                  {user.cliente_info.logo_url ? (
+                    <img
+                      src={`${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:5000'}${user.cliente_info.logo_url}`}
+                      alt={user.cliente_info.razon_social}
+                      className="w-7 h-7 rounded-lg object-contain bg-white border border-slate-200 dark:border-slate-600"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 bg-violet-100 dark:bg-violet-900/30 rounded-lg flex items-center justify-center">
+                      <Building2 className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 leading-tight">
+                      Portal Cliente
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight truncate max-w-[140px]">
+                      {user.cliente_info.razon_social}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Desktop Navigation */}
@@ -814,23 +1023,114 @@ const FloatingHeader = () => {
                   {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                 </button>
 
-                <button
-                  className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors relative"
-                >
-                  <Bell className="w-5 h-5" />
-                  <NotificationBadge count={notificationCount} />
-                </button>
-
-                <div className="hidden sm:flex items-center ml-2">
+                <div ref={notifRef} className="relative">
                   <button
-                    className="flex items-center gap-3 p-1 pr-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all"
-                    onClick={() => navigate('/perfil')}
+                    onClick={handleBellClick}
+                    className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors relative"
                   >
-                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-medium shadow-md">
-                      {user?.nombre_completo?.charAt(0) || 'U'}
-                    </div>
+                    <Bell className="w-5 h-5" />
+                    <NotificationBadge count={notificationCount} />
                   </button>
+
+                  {/* Dropdown de notificaciones */}
+                  {isNotifOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-96 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 overflow-hidden z-50">
+                      {/* Header */}
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+                        <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Notificaciones</h3>
+                        <div className="flex items-center gap-2">
+                          {notificationCount > 0 && (
+                            <button
+                              onClick={() => marcarTodasLeidas()}
+                              className="text-xs text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
+                            >
+                              <CheckCheck className="w-3.5 h-3.5" />
+                              Marcar todas
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Lista */}
+                      <div className="max-h-80 overflow-y-auto">
+                        {loadingNotifs ? (
+                          <div className="p-4 space-y-3">
+                            {[0, 1, 2].map(i => (
+                              <div key={i} className="h-14 bg-gray-100 dark:bg-slate-700 rounded-lg animate-pulse" />
+                            ))}
+                          </div>
+                        ) : notificaciones.length === 0 ? (
+                          <div className="py-10 text-center">
+                            <Bell className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                            <p className="text-sm text-slate-500 dark:text-slate-400">No hay notificaciones</p>
+                          </div>
+                        ) : (
+                          notificaciones.map((notif) => {
+                            const typeConfig = {
+                              despacho: { icon: Truck, bg: 'bg-blue-100 dark:bg-blue-900/30', color: 'text-blue-600' },
+                              alerta: { icon: AlertTriangle, bg: 'bg-amber-100 dark:bg-amber-900/30', color: 'text-amber-600' },
+                              cliente: { icon: Users, bg: 'bg-violet-100 dark:bg-violet-900/30', color: 'text-violet-600' },
+                              reporte: { icon: FileText, bg: 'bg-emerald-100 dark:bg-emerald-900/30', color: 'text-emerald-600' },
+                              sistema: { icon: Info, bg: 'bg-slate-100 dark:bg-slate-700', color: 'text-slate-600 dark:text-slate-300' },
+                              inventario: { icon: Package, bg: 'bg-orange-100 dark:bg-orange-900/30', color: 'text-orange-600' },
+                            };
+                            const cfg = typeConfig[notif.tipo] || typeConfig.sistema;
+                            const Icon = cfg.icon;
+                            const timeAgo = getTimeAgo(notif.created_at);
+
+                            return (
+                              <button
+                                key={notif.id}
+                                onClick={() => {
+                                  if (!notif.leida) marcarLeida(notif.id);
+                                  if (notif.accion_url) {
+                                    navigate(notif.accion_url);
+                                    setIsNotifOpen(false);
+                                  }
+                                }}
+                                className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border-b border-gray-50 dark:border-slate-700/50 last:border-0 ${!notif.leida ? 'bg-orange-50/50 dark:bg-orange-900/10' : ''}`}
+                              >
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${cfg.bg}`}>
+                                  <Icon className={`w-4 h-4 ${cfg.color}`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className={`text-sm truncate ${!notif.leida ? 'font-semibold text-slate-800 dark:text-slate-100' : 'font-medium text-slate-600 dark:text-slate-300'}`}>
+                                      {notif.titulo}
+                                    </p>
+                                    {!notif.leida && (
+                                      <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{notif.mensaje}</p>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{timeAgo}</p>
+                                </div>
+                                {notif.accion_url && (
+                                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-1" />
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="border-t border-gray-100 dark:border-slate-700 p-2">
+                        <button
+                          onClick={() => {
+                            navigate('/notificaciones');
+                            setIsNotifOpen(false);
+                          }}
+                          className="w-full text-center text-sm text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 py-2 rounded-lg transition-colors font-medium"
+                        >
+                          Ver todas las notificaciones
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                <AvatarDropdown user={user} onNavigate={navigate} onLogout={handleLogout} />
               </div>
             </div>
           </div>

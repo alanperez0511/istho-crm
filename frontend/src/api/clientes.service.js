@@ -322,6 +322,30 @@ const clientesService = {
   getActivos: async () => {
     return clientesService.getAll({ estado: 'activo', limit: 100 });
   },
+
+  /**
+   * Obtener historial de operaciones de un cliente
+   * @param {number} clienteId
+   * @param {Object} params - { page, limit }
+   * @returns {Promise<Object>}
+   */
+  getHistorial: async (clienteId, params = {}) => {
+    return apiClient.get(CLIENTES_ENDPOINTS.HISTORIAL(clienteId), { params });
+  },
+
+  /**
+   * Subir logo del cliente
+   * @param {number} clienteId
+   * @param {File} file - Archivo de imagen
+   * @returns {Promise<Object>}
+   */
+  uploadLogo: async (clienteId, file) => {
+    const formData = new FormData();
+    formData.append('logo', file);
+    return apiClient.post(CLIENTES_ENDPOINTS.LOGO(clienteId), formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 // ============================================================================

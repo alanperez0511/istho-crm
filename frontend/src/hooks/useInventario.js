@@ -16,7 +16,7 @@
  * @date Enero 2026
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import inventarioService from '../api/inventario.service';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -99,19 +99,20 @@ const useInventario = (options = {}) => {
   const [statsState, setStatsState] = useState(INITIAL_STATS_STATE);
   const [estadisticasState, setEstadisticasState] = useState(INITIAL_ESTADISTICAS_STATE);
   const [filters, setFilters] = useState(initialFilters);
+  const filtersRef = useRef(initialFilters);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // ──────────────────────────────────────────────────────────────────────────
   // FETCH LISTA DE PRODUCTOS
   // ──────────────────────────────────────────────────────────────────────────
-  
+
   const fetchInventario = useCallback(async (params = {}) => {
     setListState(prev => ({ ...prev, loading: true, error: null }));
-    
+
     try {
-      const mergedParams = { ...filters, ...params };
+      const mergedParams = { ...filtersRef.current, ...params };
       const response = await inventarioService.getAll(mergedParams);
-      
+
       if (response.success) {
         setListState({
           data: response.data || [],
@@ -122,7 +123,7 @@ const useInventario = (options = {}) => {
       } else {
         throw new Error(response.message);
       }
-      
+
       return response;
     } catch (error) {
       const errorMessage = error.message || 'Error al cargar inventario';
@@ -133,7 +134,7 @@ const useInventario = (options = {}) => {
       }));
       throw error;
     }
-  }, [filters]);
+  }, []);
   
   // ──────────────────────────────────────────────────────────────────────────
   // FETCH PRODUCTO POR ID
@@ -466,14 +467,10 @@ const useInventario = (options = {}) => {
       const response = await inventarioService.atenderAlerta(alertaId, { observaciones });
       
       if (response.success) {
-        // Actualizar estado de la alerta en el listado
+        // Remover alerta del listado (ya fue silenciada en el backend)
         setAlertasState(prev => ({
           ...prev,
-          data: prev.data.map(alerta => 
-            alerta.id === alertaId 
-              ? { ...alerta, estado: 'atendida' }
-              : alerta
-          ),
+          data: prev.data.filter(alerta => alerta.id !== alertaId),
         }));
       } else {
         throw new Error(response.message);
@@ -522,11 +519,13 @@ const useInventario = (options = {}) => {
   // ──────────────────────────────────────────────────────────────────────────
   
   const applyFilters = useCallback((newFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
+    filtersRef.current = newFilters;
+    setFilters(newFilters);
     fetchInventario({ ...newFilters, page: 1 });
   }, [fetchInventario]);
-  
+
   const clearFilters = useCallback(() => {
+    filtersRef.current = {};
     setFilters({});
     fetchInventario({ page: 1 });
   }, [fetchInventario]);

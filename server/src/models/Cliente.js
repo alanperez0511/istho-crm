@@ -119,7 +119,13 @@ module.exports = (sequelize) => {
       type: DataTypes.TEXT,
       allowNull: true
     },
-    
+
+    logo_url: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      comment: 'URL del logo del cliente'
+    },
+
     // Campos para integración WMS
     codigo_wms: {
       type: DataTypes.STRING(50),
