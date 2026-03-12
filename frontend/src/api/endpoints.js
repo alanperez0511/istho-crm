@@ -90,6 +90,7 @@ export const OPERACIONES_ENDPOINTS = {
   AVERIAS: (id) => `/operaciones/${id}/averias`,
   DOCUMENTOS: (id) => `/operaciones/${id}/documentos`,
   CERRAR: (id) => `/operaciones/${id}/cerrar`,
+  REENVIAR_CORREO: (id) => `/operaciones/${id}/reenviar-correo`,
   TRANSPORTE: (id) => `/operaciones/${id}/transporte`,
 };
 
@@ -200,6 +201,24 @@ export const PLANTILLAS_EMAIL_ENDPOINTS = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// ADMINISTRACIÓN
+// ════════════════════════════════════════════════════════════════════════════
+
+export const ADMIN_ENDPOINTS = {
+  // Usuarios
+  USUARIOS: '/admin/usuarios',
+  USUARIO_BY_ID: (id) => `/admin/usuarios/${id}`,
+  USUARIO_RESET_PASSWORD: (id) => `/admin/usuarios/${id}/resetear-password`,
+
+  // Roles
+  ROLES: '/admin/roles',
+  ROL_BY_ID: (id) => `/admin/roles/${id}`,
+
+  // Permisos
+  PERMISOS: '/admin/permisos',
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // EXPORT UNIFICADO
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -216,6 +235,7 @@ export const ENDPOINTS = {
   USUARIOS: USUARIOS_ENDPOINTS,
   DASHBOARD: DASHBOARD_ENDPOINTS,
   PLANTILLAS_EMAIL: PLANTILLAS_EMAIL_ENDPOINTS,
+  ADMIN: ADMIN_ENDPOINTS,
 };
 
 export default ENDPOINTS;

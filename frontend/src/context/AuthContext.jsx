@@ -385,10 +385,27 @@ export const AuthProvider = ({ children }) => {
    */
   const hasPermission = useCallback((modulo, accion) => {
     if (!state.user) return false;
-    
+
+    // Admin siempre tiene todos los permisos
+    if (state.user.permisos?.esAdmin) return true;
+
+    // Intentar primero con permisos dinámicos del backend
+    const backendPermisos = state.user.permisos?.permisos;
+    if (backendPermisos && typeof backendPermisos === 'object') {
+      // Formato backend: { modulo: ['accion1', 'accion2'] } o { modulo: { accion: true } }
+      const moduloPermisos = backendPermisos[modulo];
+      if (Array.isArray(moduloPermisos)) {
+        return moduloPermisos.includes(accion);
+      }
+      if (moduloPermisos && typeof moduloPermisos === 'object') {
+        return moduloPermisos[accion] === true;
+      }
+    }
+
+    // Fallback a permisos hardcodeados por rol
     const rol = state.user.rol || 'cliente';
     const permisos = PERMISOS_POR_ROL[rol] || PERMISOS_POR_ROL.cliente;
-    
+
     return permisos[modulo]?.includes(accion) || false;
   }, [state.user]);
   
@@ -400,6 +417,22 @@ export const AuthProvider = ({ children }) => {
   const canAccess = useCallback((modulo) => {
     return hasPermission(modulo, 'ver');
   }, [hasPermission]);
+
+  /**
+   * Verificar permiso y mostrar toast si no tiene acceso
+   * @param {string} modulo - Módulo
+   * @param {string} accion - Acción
+   * @returns {boolean} true si tiene permiso, false si no (y muestra toast)
+   */
+  const checkPermission = useCallback((modulo, accion) => {
+    const allowed = hasPermission(modulo, accion);
+    if (!allowed) {
+      window.dispatchEvent(new CustomEvent('istho:permission-denied', {
+        detail: { message: `No tienes permiso para ${accion} en ${modulo}` }
+      }));
+    }
+    return allowed;
+  }, [hasPermission]);
   
   /**
    * Obtener todos los permisos del usuario actual
@@ -407,7 +440,13 @@ export const AuthProvider = ({ children }) => {
    */
   const getPermisos = useCallback(() => {
     if (!state.user) return {};
-    
+
+    // Si hay permisos dinámicos del backend, usarlos
+    if (state.user.permisos?.permisos) {
+      return state.user.permisos.permisos;
+    }
+
+    // Fallback
     const rol = state.user.rol || 'cliente';
     return PERMISOS_POR_ROL[rol] || PERMISOS_POR_ROL.cliente;
   }, [state.user]);
@@ -439,6 +478,7 @@ export const AuthProvider = ({ children }) => {
     
     // ✅ NUEVO: Verificaciones de permisos
     hasPermission,
+    checkPermission,
     canAccess,
     getPermisos,
   }), [
@@ -454,6 +494,7 @@ export const AuthProvider = ({ children }) => {
     isOperadorOrAbove,
     isCliente,
     hasPermission,
+    checkPermission,
     canAccess,
     getPermisos,
   ]);

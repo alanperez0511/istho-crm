@@ -5,13 +5,14 @@
  * Provee estado global de notificaciones con polling automático.
  * Usado por la campana del header y la página de notificaciones.
  *
- * CORRECCIÓN v1.1.0:
- * - Retry automático en fetch inicial si falla
- * - Parseo robusto de respuestas del servicio
- * - Logging de errores (no silenciados completamente)
+ * CORRECCIÓN v1.2.0:
+ * - Polling ahora también actualiza notificaciones recientes (no solo count)
+ * - Fetch inicial incluye count + recientes para que el badge y dropdown
+ *   estén listos desde el primer render
+ * - Retry más agresivo en la carga inicial
  *
  * @author Coordinación TI ISTHO
- * @version 1.1.0
+ * @version 1.2.0
  * @date Marzo 2026
  */
 
@@ -22,7 +23,7 @@ import notificacionesService from '../api/notificacionesService';
 const NotificacionesContext = createContext();
 
 const POLLING_INTERVAL = 30000; // 30 segundos
-const INITIAL_RETRY_DELAY = 3000; // 3 segundos para retry inicial
+const INITIAL_RETRY_DELAY = 2000; // 2 segundos para retry inicial
 
 export const useNotificaciones = () => {
   const context = useContext(NotificacionesContext);
@@ -39,17 +40,56 @@ export const NotificacionesProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const intervalRef = useRef(null);
   const retryRef = useRef(null);
+  const mountedRef = useRef(true);
 
-  // Obtener conteo de no leídas
+  // Fetch combinado: count + recientes en una sola función
+  const fetchAll = useCallback(async () => {
+    if (!user || !isAuthenticated) return;
+    try {
+      // Ejecutar ambas peticiones en paralelo
+      const [countResult, listResult] = await Promise.allSettled([
+        notificacionesService.getCount(),
+        notificacionesService.getAll({ page: 1, limit: 5 }),
+      ]);
+
+      if (!mountedRef.current) return;
+
+      // Actualizar conteo
+      if (countResult.status === 'fulfilled') {
+        const count = countResult.value;
+        if (typeof count === 'number') {
+          setUnreadCount(count);
+        }
+      }
+
+      // Actualizar lista reciente
+      if (listResult.status === 'fulfilled') {
+        const result = listResult.value;
+        const data = Array.isArray(result?.data) ? result.data : [];
+        setNotificaciones(data);
+
+        // Si el count falló, intentar derivarlo de la lista
+        if (countResult.status !== 'fulfilled' && data.length > 0) {
+          const unread = data.filter(n => !n.leida).length;
+          setUnreadCount(prev => Math.max(prev, unread));
+        }
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn('[NotificacionesContext] Error en fetchAll:', err);
+      }
+    }
+  }, [user, isAuthenticated]);
+
+  // Obtener conteo de no leídas (ligero, para polling rápido)
   const fetchCount = useCallback(async () => {
     if (!user || !isAuthenticated) return;
     try {
       const count = await notificacionesService.getCount();
-      if (typeof count === 'number') {
+      if (mountedRef.current && typeof count === 'number') {
         setUnreadCount(count);
       }
     } catch (err) {
-      // Log en desarrollo para debugging
       if (import.meta.env.DEV) {
         console.warn('[NotificacionesContext] Error en fetchCount:', err);
       }
@@ -62,12 +102,19 @@ export const NotificacionesProvider = ({ children }) => {
     setLoading(true);
     try {
       const result = await notificacionesService.getAll({ page: 1, limit: 5 });
-      const data = result?.data || [];
-      setNotificaciones(data);
+      const data = Array.isArray(result?.data) ? result.data : [];
+      if (mountedRef.current) {
+        setNotificaciones(data);
+      }
       // También actualizar el conteo
-      await notificacionesService.getCount().then(count => {
-        if (typeof count === 'number') setUnreadCount(count);
-      }).catch(() => {});
+      try {
+        const count = await notificacionesService.getCount();
+        if (mountedRef.current && typeof count === 'number') {
+          setUnreadCount(count);
+        }
+      } catch {
+        // Silenciar error de count si la lista ya se cargó
+      }
       return data;
     } catch (err) {
       if (import.meta.env.DEV) {
@@ -75,7 +122,9 @@ export const NotificacionesProvider = ({ children }) => {
       }
       return [];
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [user, isAuthenticated]);
 
@@ -107,11 +156,13 @@ export const NotificacionesProvider = ({ children }) => {
 
   // Refrescar todo (conteo + lista)
   const refresh = useCallback(async () => {
-    await Promise.all([fetchCount(), fetchRecientes()]);
-  }, [fetchCount, fetchRecientes]);
+    await fetchAll();
+  }, [fetchAll]);
 
-  // Polling automático del conteo
+  // Polling automático: count + recientes al inicio, count en polling regular
   useEffect(() => {
+    mountedRef.current = true;
+
     if (!user || !isAuthenticated) {
       setUnreadCount(0);
       setNotificaciones([]);
@@ -120,22 +171,33 @@ export const NotificacionesProvider = ({ children }) => {
       return;
     }
 
-    // Fetch inicial
-    fetchCount();
+    // Fetch inicial completo (count + recientes)
+    fetchAll();
 
-    // Retry después de un delay corto (por si el token no estaba listo)
+    // Retry agresivo para captar notificaciones tras login
     retryRef.current = setTimeout(() => {
-      fetchCount();
+      fetchAll();
     }, INITIAL_RETRY_DELAY);
 
-    // Polling regular
-    intervalRef.current = setInterval(fetchCount, POLLING_INTERVAL);
+    // Polling regular: alterna entre fetchCount (ligero) y fetchAll (completo)
+    let pollCycle = 0;
+    intervalRef.current = setInterval(() => {
+      pollCycle++;
+      if (pollCycle % 3 === 0) {
+        // Cada 3 ciclos (~90s), refrescar también la lista
+        fetchAll();
+      } else {
+        // Ciclos normales: solo count
+        fetchCount();
+      }
+    }, POLLING_INTERVAL);
 
     return () => {
+      mountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (retryRef.current) clearTimeout(retryRef.current);
     };
-  }, [user, isAuthenticated, fetchCount]);
+  }, [user, isAuthenticated, fetchAll, fetchCount]);
 
   return (
     <NotificacionesContext.Provider

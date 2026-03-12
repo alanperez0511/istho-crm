@@ -1,6 +1,6 @@
 /**
  * ISTHO CRM - ReporteInventario Page
- * Reporte de inventario con datos reales del backend
+ * Reporte de inventario con datos reales del backend y filtros
  *
  * @author Coordinación TI ISTHO
  * @date Marzo 2026
@@ -16,40 +16,35 @@ import {
   DollarSign,
   FileSpreadsheet,
   RefreshCw,
-  Calendar,
-  Printer,
 } from 'lucide-react';
 
 // Components
-import { Button } from '../../components/common';
+import { Button, KpiCard, ReportFilters } from '../../components/common';
 
 // API
 import reportesService from '../../api/reportes.service';
 import inventarioService from '../../api/inventario.service';
-
-// ============================================
-// STAT CARD
-// ============================================
-const StatCard = ({ title, value, subtitle, icon: Icon, iconBg, iconColor }) => (
-  <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700">
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{title}</p>
-        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
-        {subtitle && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{subtitle}</p>}
-      </div>
-      <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center`}>
-        <Icon className={`w-6 h-6 ${iconColor}`} />
-      </div>
-    </div>
-  </div>
-);
+import { useAuth } from '../../context/AuthContext';
 
 // ============================================
 // ALERTA ITEM
 // ============================================
 const AlertaItem = ({ alerta }) => {
   const isVencimiento = alerta.tipo === 'vencimiento';
+
+  // Generar titulo y mensaje desde los campos reales del backend
+  const titulo = alerta.titulo || alerta.producto_nombre || alerta.nombre || 'Producto';
+  let mensaje = alerta.mensaje;
+  if (!mensaje) {
+    if (alerta.tipo === 'agotado') {
+      mensaje = `SKU: ${alerta.codigo || alerta.producto_codigo || '-'} — Stock agotado`;
+    } else if (alerta.tipo === 'bajo_stock') {
+      mensaje = `Stock: ${alerta.stock_actual ?? alerta.stockActual ?? 0} / Mín: ${alerta.stock_minimo ?? alerta.stockMinimo ?? 0}`;
+    } else if (isVencimiento) {
+      mensaje = `Vence en ${alerta.dias_restantes ?? '?'} días — Lote: ${alerta.lote || '-'}`;
+    }
+  }
+
   return (
     <div className={`flex items-center gap-3 p-3 rounded-xl border ${
       isVencimiento
@@ -59,9 +54,9 @@ const AlertaItem = ({ alerta }) => {
       <AlertTriangle className={`w-5 h-5 ${isVencimiento ? 'text-orange-600 dark:text-orange-400' : 'text-amber-600 dark:text-amber-400'}`} />
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-medium truncate ${isVencimiento ? 'text-orange-700 dark:text-orange-300' : 'text-amber-700 dark:text-amber-300'}`}>
-          {alerta.titulo}
+          {titulo}
         </p>
-        <p className="text-xs text-slate-500 dark:text-slate-400">{alerta.mensaje}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{mensaje}</p>
       </div>
     </div>
   );
@@ -72,10 +67,13 @@ const AlertaItem = ({ alerta }) => {
 // ============================================
 const ReporteInventario = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canDownload = hasPermission('reportes', 'exportar') || hasPermission('reportes', 'descargar');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [alertas, setAlertas] = useState([]);
   const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({ fecha_desde: '', fecha_hasta: '', cliente_id: '' });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -104,13 +102,23 @@ const ReporteInventario = () => {
     fetchData();
   }, [fetchData]);
 
+  // Construir query string con filtros
+  const buildFilterParams = () => {
+    const params = new URLSearchParams();
+    const token = localStorage.getItem('istho_token');
+    if (token) params.set('token', token);
+    if (filters.fecha_desde) params.set('fecha_desde', filters.fecha_desde);
+    if (filters.fecha_hasta) params.set('fecha_hasta', filters.fecha_hasta);
+    if (filters.cliente_id) params.set('cliente_id', filters.cliente_id);
+    return params.toString();
+  };
+
   const handleExport = (format) => {
     const baseUrl = import.meta.env.VITE_API_URL || '/api/v1';
-    const token = localStorage.getItem('istho_token');
-    const url = format === 'excel'
-      ? `${baseUrl}/reportes/inventario/excel`
-      : `${baseUrl}/reportes/inventario/pdf`;
-    window.open(`${url}?token=${token}`, '_blank');
+    const endpoint = format === 'excel'
+      ? '/reportes/inventario/excel'
+      : '/reportes/inventario/pdf';
+    window.open(`${baseUrl}${endpoint}?${buildFilterParams()}`, '_blank');
   };
 
   const formatCurrency = (value) => {
@@ -166,12 +174,16 @@ const ReporteInventario = () => {
             <Button variant="outline" icon={RefreshCw} onClick={fetchData}>
               Actualizar
             </Button>
-            <Button variant="outline" icon={FileSpreadsheet} onClick={() => handleExport('excel')}>
-              Excel
-            </Button>
-            <Button variant="primary" icon={Download} onClick={() => handleExport('pdf')}>
-              PDF
-            </Button>
+            {canDownload && (
+              <>
+                <Button variant="outline" icon={FileSpreadsheet} onClick={() => handleExport('excel')}>
+                  Excel
+                </Button>
+                <Button variant="primary" icon={Download} onClick={() => handleExport('pdf')}>
+                  PDF
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -181,9 +193,12 @@ const ReporteInventario = () => {
           </div>
         )}
 
+        {/* Filtros */}
+        <ReportFilters filters={filters} onChange={setFilters} />
+
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard
+          <KpiCard
             title="Total Productos"
             value={inv.totalItems || 0}
             subtitle="SKUs registrados"
@@ -191,7 +206,7 @@ const ReporteInventario = () => {
             iconBg="bg-blue-100 dark:bg-blue-900/30"
             iconColor="text-blue-600 dark:text-blue-400"
           />
-          <StatCard
+          <KpiCard
             title="Total Unidades"
             value={(inv.totalUnidades || 0).toLocaleString()}
             subtitle="Unidades en stock"
@@ -199,7 +214,7 @@ const ReporteInventario = () => {
             iconBg="bg-emerald-100 dark:bg-emerald-900/30"
             iconColor="text-emerald-600 dark:text-emerald-400"
           />
-          <StatCard
+          <KpiCard
             title="Valor del Inventario"
             value={formatCurrency(inv.valorTotal)}
             subtitle="Costo total"
@@ -207,7 +222,7 @@ const ReporteInventario = () => {
             iconBg="bg-violet-100 dark:bg-violet-900/30"
             iconColor="text-violet-600 dark:text-violet-400"
           />
-          <StatCard
+          <KpiCard
             title="Alertas Activas"
             value={(inv.alertas?.stockBajo || 0) + (inv.alertas?.porVencer || 0)}
             subtitle={`${inv.alertas?.stockBajo || 0} stock bajo, ${inv.alertas?.porVencer || 0} por vencer`}
@@ -234,12 +249,13 @@ const ReporteInventario = () => {
           </div>
         )}
 
-        {/* Info */}
+        {/* Info - Solo mostrar sección de exportar si tiene permiso */}
+        {canDownload && (
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
           <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-3">Exportar Inventario Completo</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
             Descarga el listado completo de inventario con cantidades, costos, lotes y fechas de vencimiento.
-            Puedes filtrar por cliente o estado usando los parámetros de exportación.
+            Los filtros seleccionados arriba se aplicarán a la exportación.
           </p>
           <div className="flex items-center gap-3">
             <Button variant="outline" icon={FileSpreadsheet} onClick={() => handleExport('excel')}>
@@ -250,6 +266,7 @@ const ReporteInventario = () => {
             </Button>
           </div>
         </div>
+        )}
       </main>
     </div>
   );

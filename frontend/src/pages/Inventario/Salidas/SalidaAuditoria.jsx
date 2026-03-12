@@ -38,6 +38,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Plus,
+  Mail,
 } from 'lucide-react';
 
 import auditoriasService from '../../../api/auditorias.service';
@@ -730,12 +731,12 @@ const SalidaAuditoria = () => {
       const result = await auditoriasService.cerrar(id, { enviar_correo: true });
       setEstado('cerrado');
 
-      // Feedback sobre el correo
-      const correoEnviado = result?.data?.correo_enviado || result?.correo_enviado;
-      if (correoEnviado) {
-        showAlert({ type: 'success', title: 'Despacho Completado', message: 'Correo de notificación enviado exitosamente.' });
+      // Feedback: correo se envía en background
+      const correoEstado = result?.data?.correo_enviado || result?.correo_enviado;
+      if (correoEstado === 'enviando' || correoEstado === true) {
+        showAlert({ type: 'success', title: 'Despacho Completado', message: 'El correo de notificación se está enviando en segundo plano.' });
       } else {
-        showAlert({ type: 'success', title: 'Despacho Completado', message: 'No se envió correo (sin destinatarios configurados).' });
+        showAlert({ type: 'success', title: 'Despacho Completado', message: 'Operación cerrada. No se envió correo (sin destinatarios configurados).' });
       }
     } catch (error) {
       console.error('Error al cerrar auditoría:', error);
@@ -746,6 +747,39 @@ const SalidaAuditoria = () => {
       });
     } finally {
       setClosing(false);
+    }
+  };
+
+  // ── REENVIAR CORREO ──
+  const [reenviando, setReenviando] = useState(false);
+
+  const handleReenviarCorreo = async () => {
+    if (reenviando) return;
+
+    const confirmed = await showConfirm({
+      type: 'info',
+      title: 'Reenviar correo de cierre',
+      message: 'Se reenviará el correo de notificación a los contactos configurados del cliente.',
+      confirmText: 'Reenviar',
+      cancelText: 'Cancelar'
+    });
+
+    if (!confirmed) return;
+
+    setReenviando(true);
+    try {
+      const result = await auditoriasService.reenviarCorreo(id);
+      const success = result?.data?.correo_enviado || result?.correo_enviado;
+      if (success) {
+        showAlert({ type: 'success', title: 'Correo Reenviado', message: 'El correo fue reenviado exitosamente.' });
+      } else {
+        showAlert({ type: 'warning', title: 'Sin destinatarios', message: 'No hay contactos con notificaciones activas para este cliente.' });
+      }
+    } catch (error) {
+      console.error('Error al reenviar correo:', error);
+      showAlert({ type: 'error', title: 'Error', message: error.message || 'No se pudo reenviar el correo.' });
+    } finally {
+      setReenviando(false);
     }
   };
 
@@ -1185,9 +1219,19 @@ const SalidaAuditoria = () => {
 
       {isCerrado && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-blue-500 text-white px-4 py-4">
-          <div className="max-w-5xl mx-auto flex items-center justify-center gap-3">
-            <CheckCircle2 className="w-5 h-5" />
-            <span className="font-semibold">Auditoría de despacho completada y cerrada</span>
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5" />
+              <span className="font-semibold">Auditoría de despacho completada y cerrada</span>
+            </div>
+            <button
+              onClick={handleReenviarCorreo}
+              disabled={reenviando}
+              className="flex items-center gap-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
+            >
+              {reenviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+              {reenviando ? 'Enviando...' : 'Reenviar correo'}
+            </button>
           </div>
         </div>
       )}

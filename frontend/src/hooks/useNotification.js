@@ -165,22 +165,30 @@ const useNotification = () => {
    * @param {Error} err - Error de la API
    */
   const apiError = useCallback((err) => {
-    // Extraer mensaje del error
+    // Extraer mensaje y status del error
     let message = 'Error de conexión con el servidor';
-    
+    let status = err?.response?.status || err?.status;
+
     if (err?.response?.data) {
       message = err.response.data.message || err.response.data.error || message;
     } else if (err?.message) {
       message = err.message;
     }
-    
+
+    // 403 - Permiso denegado: mostrar como warning con estilo especial
+    if (status === 403) {
+      return warning(`🔒 ${message}`, {
+        autoHideDuration: 4000,
+      });
+    }
+
     // Persistir errores 500
-    const shouldPersist = err?.response?.status === 500;
-    
-    return error(`✕ ${message}`, { 
+    const shouldPersist = status === 500;
+
+    return error(`✕ ${message}`, {
       persist: shouldPersist,
     });
-  }, [error]);
+  }, [error, warning]);
   
   /**
    * Notificación de sincronización WMS

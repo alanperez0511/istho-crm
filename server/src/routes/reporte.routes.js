@@ -27,8 +27,8 @@ router.get('/dashboard', reporteController.getDashboard);
 // =============================================
 
 // Exportar listado de operaciones
-router.get('/operaciones/excel', requiereRolMinimo('operador'), reporteController.exportarOperacionesExcel);
-router.get('/operaciones/pdf', requiereRolMinimo('operador'), reporteController.exportarOperacionesPDF);
+router.get('/operaciones/excel', reporteController.exportarOperacionesExcel);
+router.get('/operaciones/pdf', reporteController.exportarOperacionesPDF);
 
 // Exportar detalle de una operación
 router.get('/operaciones/:id/excel', reporteController.exportarDetalleOperacionExcel);
@@ -38,8 +38,8 @@ router.get('/operaciones/:id/pdf', reporteController.exportarDetalleOperacionPDF
 // REPORTES DE INVENTARIO
 // =============================================
 
-router.get('/inventario/excel', requiereRolMinimo('operador'), reporteController.exportarInventarioExcel);
-router.get('/inventario/pdf', requiereRolMinimo('operador'), reporteController.exportarInventarioPDF);
+router.get('/inventario/excel', reporteController.exportarInventarioExcel);
+router.get('/inventario/pdf', reporteController.exportarInventarioPDF);
 
 // =============================================
 // REPORTES DE CLIENTES

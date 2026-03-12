@@ -185,7 +185,7 @@ const notificarStockSobreMaximo = async (producto) => {
  * Solo notifica a usuarios del cliente de la operación + admins/supervisores
  */
 const notificarOperacionCerrada = async (operacion, usuario_nombre) => {
-  const tipo_op = operacion.tipo === 'entrada' ? 'Entrada' : 'Salida';
+  const tipo_op = operacion.tipo === 'ingreso' ? 'Entrada' : 'Salida';
   const doc = operacion.documento_wms || operacion.numero_operacion;
 
   logger.info('[NotificacionService] notificarOperacionCerrada:', {

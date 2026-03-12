@@ -24,6 +24,9 @@ const NotificacionEmailModel = require('./NotificacionEmail');
 const MovimientoInventarioModel = require('./MovimientoInventario'); // ← NUEVO
 const CajaInventarioModel = require('./CajaInventario'); // ← NUEVO: Cajas individuales
 const PlantillaEmailModel = require('./PlantillaEmail');
+const RolModel = require('./Rol');
+const PermisoModel = require('./Permiso');
+const RolPermisoModel = require('./RolPermiso');
 const Notificacion = require('./Notificacion')(sequelize);
 
 // Inicializar modelos
@@ -40,6 +43,9 @@ const NotificacionEmail = NotificacionEmailModel(sequelize);
 const MovimientoInventario = MovimientoInventarioModel(sequelize); // ← NUEVO
 const CajaInventario = CajaInventarioModel(sequelize); // ← NUEVO
 const PlantillaEmail = PlantillaEmailModel(sequelize);
+const Rol = RolModel(sequelize);
+const Permiso = PermisoModel(sequelize);
+const RolPermiso = RolPermisoModel(sequelize);
 
 // ============================================
 // DEFINIR ASOCIACIONES
@@ -263,6 +269,34 @@ Usuario.belongsTo(Cliente, {
 });
 
 // ============================================
+// ASOCIACIONES - Roles y Permisos
+// ============================================
+
+// Rol <-> Permiso (N:M a través de RolPermiso)
+Rol.belongsToMany(Permiso, {
+  through: RolPermiso,
+  foreignKey: 'rol_id',
+  otherKey: 'permiso_id',
+  as: 'permisos'
+});
+Permiso.belongsToMany(Rol, {
+  through: RolPermiso,
+  foreignKey: 'permiso_id',
+  otherKey: 'rol_id',
+  as: 'roles'
+});
+
+// Usuario <-> Rol (N:1)
+Usuario.belongsTo(Rol, {
+  foreignKey: 'rol_id',
+  as: 'rolInfo'
+});
+Rol.hasMany(Usuario, {
+  foreignKey: 'rol_id',
+  as: 'usuarios'
+});
+
+// ============================================
 // EXPORTAR MODELOS
 // ============================================
 
@@ -284,7 +318,10 @@ const db = {
   MovimientoInventario,
   CajaInventario,  // ← NUEVO: Cajas individuales
   PlantillaEmail,
-  Notificacion
+  Notificacion,
+  Rol,
+  Permiso,
+  RolPermiso
 };
 
 /**

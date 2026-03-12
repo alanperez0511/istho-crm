@@ -383,6 +383,29 @@ const auditoriasService = {
     }
   },
 
+  /**
+   * Reenviar correo de cierre de una operación
+   * @param {string} operacionId - ID de la operación
+   * @param {Object} [data] - { correos_destino } opcional
+   * @returns {Promise<Object>}
+   */
+  reenviarCorreo: async (operacionId, data = {}) => {
+    try {
+      const response = await apiClient.post(
+        `/operaciones/${operacionId}/reenviar-correo`,
+        data
+      );
+      return response;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.message || 'Error al reenviar correo',
+        errors: error.errors || [],
+        code: 'REENVIAR_CORREO_ERROR',
+      };
+    }
+  },
+
   // ══════════════════════════════════════════════════════════════════════════
   // ESTADISTICAS Y KPIs
   // ══════════════════════════════════════════════════════════════════════════

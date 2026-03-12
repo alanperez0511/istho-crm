@@ -416,10 +416,10 @@ const LoginPage = () => {
 
             {/* Footer centrado entre las dos secciones */}
             <div className="absolute bottom-0 left-0 right-0 z-10 text-center py-4">
-                <p className="text-black-600 dark:text-slate-500 text-xs">
+                <p className="text-black-600 dark:text-white text-xs">
                     ISTHO S.A.S. © 2026 - Centro Logístico Industrial del Norte
                 </p>
-                <p className="text-black-600 dark:text-slate-600 text-[11px] mt-0.5">
+                <p className="text-black-600 dark:text-slate-100 text-[11px] mt-0.5">
                     Girardota, Antioquia • ISO 9001:2015
                 </p>
             </div>

@@ -300,6 +300,52 @@ ClienteRoute.propTypes = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// PORTAL PERMISSION ROUTE
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Ruta protegida por permisos de portal para usuarios tipo cliente.
+ * Usuarios internos siempre pasan. Usuarios portal necesitan el permiso.
+ *
+ * @param {Object} props
+ * @param {React.ReactNode} props.children - Contenido a renderizar
+ * @param {string} props.module - Módulo del permiso (inventario, reportes, etc.)
+ * @param {string} props.action - Acción del permiso (ver, exportar, etc.)
+ *
+ * @example
+ * <PortalPermissionRoute module="inventario" action="ver">
+ *   <InventarioList />
+ * </PortalPermissionRoute>
+ */
+export function PortalPermissionRoute(props) {
+  var children = props.children;
+  var module = props.module;
+  var action = props.action;
+
+  var auth = useAuth();
+  var user = auth.user;
+  var hasPermission = auth.hasPermission;
+
+  // Internal users always pass
+  if (user && user.rol !== 'cliente') {
+    return children;
+  }
+
+  // Portal clients check permission
+  if (hasPermission && hasPermission(module, action)) {
+    return children;
+  }
+
+  return <Navigate to="/dashboard" replace />;
+}
+
+PortalPermissionRoute.propTypes = {
+  children: PropTypes.node.isRequired,
+  module: PropTypes.string.isRequired,
+  action: PropTypes.string.isRequired,
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // EXPORTS
 // ════════════════════════════════════════════════════════════════════════════
 

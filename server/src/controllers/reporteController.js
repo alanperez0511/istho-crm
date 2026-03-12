@@ -75,11 +75,7 @@ const exportarOperacionesExcel = async (req, res) => {
       order: [['fecha_operacion', 'DESC']]
     });
     
-    const buffer = await excelService.exportarOperaciones(operaciones, {
-      periodo: req.query.fecha_desde && req.query.fecha_hasta 
-        ? `${req.query.fecha_desde} a ${req.query.fecha_hasta}` 
-        : null
-    });
+    const buffer = await excelService.exportarOperaciones(operaciones, req.query);
     
     const filename = `operaciones_${new Date().toISOString().split('T')[0]}.xlsx`;
     
@@ -200,19 +196,29 @@ const exportarDetalleOperacionPDF = async (req, res) => {
 const exportarInventarioExcel = async (req, res) => {
   try {
     const where = {};
-    
+
     if (req.query.cliente_id) {
       where.cliente_id = req.query.cliente_id;
     }
-    
+
     if (req.query.estado && req.query.estado !== 'todos') {
       where.estado = req.query.estado;
     }
-    
+
     if (req.query.zona) {
       where.zona = req.query.zona;
     }
-    
+
+    // Filtro por rango de fechas (updated_at del inventario)
+    if (req.query.fecha_desde) {
+      where.updated_at = where.updated_at || {};
+      where.updated_at[Op.gte] = req.query.fecha_desde;
+    }
+    if (req.query.fecha_hasta) {
+      where.updated_at = where.updated_at || {};
+      where.updated_at[Op.lte] = req.query.fecha_hasta + ' 23:59:59';
+    }
+
     const inventario = await Inventario.findAll({
       where,
       include: [
@@ -242,15 +248,25 @@ const exportarInventarioExcel = async (req, res) => {
 const exportarInventarioPDF = async (req, res) => {
   try {
     const where = {};
-    
+
     if (req.query.cliente_id) {
       where.cliente_id = req.query.cliente_id;
     }
-    
+
     if (req.query.estado && req.query.estado !== 'todos') {
       where.estado = req.query.estado;
     }
-    
+
+    // Filtro por rango de fechas (updated_at del inventario)
+    if (req.query.fecha_desde) {
+      where.updated_at = where.updated_at || {};
+      where.updated_at[Op.gte] = req.query.fecha_desde;
+    }
+    if (req.query.fecha_hasta) {
+      where.updated_at = where.updated_at || {};
+      where.updated_at[Op.lte] = req.query.fecha_hasta + ' 23:59:59';
+    }
+
     const inventario = await Inventario.findAll({
       where,
       include: [
@@ -284,15 +300,25 @@ const exportarInventarioPDF = async (req, res) => {
 const exportarClientesExcel = async (req, res) => {
   try {
     const where = {};
-    
+
     if (req.query.estado && req.query.estado !== 'todos') {
       where.estado = req.query.estado;
     }
-    
+
     if (req.query.tipo_cliente) {
       where.tipo_cliente = req.query.tipo_cliente;
     }
-    
+
+    // Filtro por rango de fechas (created_at del cliente)
+    if (req.query.fecha_desde) {
+      where.created_at = where.created_at || {};
+      where.created_at[Op.gte] = req.query.fecha_desde;
+    }
+    if (req.query.fecha_hasta) {
+      where.created_at = where.created_at || {};
+      where.created_at[Op.lte] = req.query.fecha_hasta + ' 23:59:59';
+    }
+
     const clientes = await Cliente.findAll({
       where,
       include: [
@@ -358,7 +384,7 @@ const getDashboard = async (req, res) => {
       Operacion.count({ where: { ...clienteFilter, estado: { [Op.in]: ['pendiente', 'en_proceso'] } } }),
       Operacion.findAll({
         attributes: ['tipo', [sequelize.fn('COUNT', sequelize.col('id')), 'cantidad']],
-        where: { ...clienteFilter },
+        where: { ...clienteFilter, created_at: { [Op.gte]: inicioMes } },
         group: ['tipo'],
         raw: true
       }),
@@ -468,7 +494,7 @@ const getDashboard = async (req, res) => {
         order: [['created_at', 'DESC']],
         include: [
           { model: Cliente, as: 'cliente', attributes: ['razon_social'] },
-          { model: OperacionDetalle, as: 'detalles', attributes: ['id'] }
+          { model: OperacionDetalle, as: 'detalles', attributes: ['id', 'verificado'] }
         ],
         attributes: ['id', 'numero_operacion', 'documento_wms', 'tipo', 'estado', 'total_unidades', 'total_referencias', 'created_at']
       }),
@@ -478,21 +504,26 @@ const getDashboard = async (req, res) => {
         order: [['created_at', 'DESC']],
         include: [
           { model: Cliente, as: 'cliente', attributes: ['razon_social'] },
-          { model: OperacionDetalle, as: 'detalles', attributes: ['id'] }
+          { model: OperacionDetalle, as: 'detalles', attributes: ['id', 'verificado'] }
         ],
         attributes: ['id', 'numero_operacion', 'documento_wms', 'tipo', 'estado', 'total_unidades', 'total_referencias', 'created_at']
       }),
     ]);
 
-    const formatOp = (op) => ({
-      id: op.id,
-      documento: op.documento_wms || op.numero_operacion,
-      cliente: op.cliente?.razon_social || 'N/A',
-      tipo: op.tipo,
-      lineas: op.detalles?.length || 0,
-      verificadas: 0,
-      estado: op.estado,
-    });
+    const formatOp = (op) => {
+      const detalles = op.detalles || [];
+      const lineas = op.total_referencias || detalles.length || 0;
+      const verificadas = detalles.filter(d => d.verificado).length;
+      return {
+        id: op.id,
+        documento: op.documento_wms || op.numero_operacion,
+        cliente: op.cliente?.razon_social || 'N/A',
+        tipo: op.tipo,
+        lineas,
+        verificadas,
+        estado: op.estado,
+      };
+    };
     
     // ═══════════════════════════════════════════════════════════════════════
     // RESPUESTA

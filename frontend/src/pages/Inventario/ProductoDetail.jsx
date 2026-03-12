@@ -85,15 +85,6 @@ const MESES_ES = {
 // HELPER DE PERMISOS
 // ════════════════════════════════════════════════════════════════════════════
 
-const checkPermission = (userRole, action) => {
-  const permissions = {
-    admin: ['ver', 'crear', 'editar', 'eliminar', 'exportar', 'importar'],
-    supervisor: ['ver', 'crear', 'editar', 'exportar'],
-    operador: ['ver', 'crear', 'editar'],
-    cliente: ['ver'],
-  };
-  return permissions[userRole]?.includes(action) || false;
-};
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPER DE FORMATO DE NÚMEROS
@@ -348,7 +339,7 @@ const MovimientoItem = ({ movimiento }) => {
 const ProductoDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { success, error: notifyError, saved, deleted } = useNotification();
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -383,10 +374,10 @@ const ProductoDetail = () => {
   const [cajas, setCajas] = useState([]);
   const [loadingCajas, setLoadingCajas] = useState(false);
 
-  // Permisos (restringidos si el producto es gestionado por WMS)
+  // Permisos dinámicos (restringidos si el producto es gestionado por WMS)
   const esWMS = !!(currentProducto?.codigo_wms);
-  const canEdit = checkPermission(user?.rol, 'editar') && !esWMS;
-  const canDelete = checkPermission(user?.rol, 'eliminar') && !esWMS;
+  const canEdit = hasPermission('inventario', 'editar') && !esWMS;
+  const canDelete = hasPermission('inventario', 'eliminar') && !esWMS;
 
   // ──────────────────────────────────────────────────────────────────────────
   // VARIABLES DERIVADAS
@@ -731,7 +722,7 @@ const ProductoDetail = () => {
               minimo={stockMinimo}
               maximo={stockMaximo}
               onUpdateLimits={handleUpdateLimits}
-              canEdit={checkPermission(user?.rol, 'editar')}
+              canEdit={hasPermission('inventario', 'editar')}
             />
 
             {producto.estado === 'bajo_stock' && (

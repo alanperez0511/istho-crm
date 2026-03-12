@@ -22,3 +22,4 @@ export { default as SearchBar } from './SearchBar';
 export { default as FilterDropdown } from './FilterDropdown';
 export { default as Pagination } from './Pagination';
 export { default as Input } from './Input/Input';
+export { default as ReportFilters } from './ReportFilters';

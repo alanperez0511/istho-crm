@@ -14,7 +14,7 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 
 // Middleware
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, verificarPermisoCliente } = require('../middleware/auth');
 const { soloAdmin } = require('../middleware/roles');
 
 // Validadores
@@ -67,7 +67,7 @@ router.get('/me', verificarToken, authController.me);
  * @desc    Actualizar perfil del usuario actual
  * @access  Privado
  */
-router.put('/me', verificarToken, authController.actualizarPerfil);
+router.put('/me', verificarToken, verificarPermisoCliente('perfil', 'editar'), authController.actualizarPerfil);
 
 /**
  * @route   POST /auth/logout
@@ -81,7 +81,7 @@ router.post('/logout', verificarToken, authController.logout);
  * @desc    Cambiar contraseña del usuario actual
  * @access  Privado
  */
-router.put('/cambiar-password', verificarToken, cambiarPasswordValidator, authController.cambiarPassword);
+router.put('/cambiar-password', verificarToken, verificarPermisoCliente('perfil', 'cambiar_password'), cambiarPasswordValidator, authController.cambiarPassword);
 
 /**
  * @route   POST /auth/refresh

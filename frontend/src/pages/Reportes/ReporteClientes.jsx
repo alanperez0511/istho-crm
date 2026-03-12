@@ -1,6 +1,6 @@
 /**
  * ISTHO CRM - ReporteClientes Page
- * Reporte de clientes con datos reales del backend
+ * Reporte de clientes con datos reales del backend y filtros
  *
  * @author Coordinación TI ISTHO
  * @date Marzo 2026
@@ -11,7 +11,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Users,
-  Download,
   Building2,
   UserPlus,
   FileSpreadsheet,
@@ -21,29 +20,11 @@ import {
 } from 'lucide-react';
 
 // Components
-import { Button } from '../../components/common';
+import { Button, KpiCard, ReportFilters } from '../../components/common';
 
 // API
 import reportesService from '../../api/reportes.service';
 import clientesService from '../../api/clientes.service';
-
-// ============================================
-// STAT CARD
-// ============================================
-const StatCard = ({ title, value, subtitle, icon: Icon, iconBg, iconColor }) => (
-  <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700">
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{title}</p>
-        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
-        {subtitle && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{subtitle}</p>}
-      </div>
-      <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center`}>
-        <Icon className={`w-6 h-6 ${iconColor}`} />
-      </div>
-    </div>
-  </div>
-);
 
 // ============================================
 // MAIN COMPONENT
@@ -54,6 +35,7 @@ const ReporteClientes = () => {
   const [stats, setStats] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({ fecha_desde: '', fecha_hasta: '', cliente_id: '' });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -90,10 +72,19 @@ const ReporteClientes = () => {
     fetchData();
   }, [fetchData]);
 
+  // Construir query string con filtros
+  const buildFilterParams = () => {
+    const params = new URLSearchParams();
+    const token = localStorage.getItem('istho_token');
+    if (token) params.set('token', token);
+    if (filters.fecha_desde) params.set('fecha_desde', filters.fecha_desde);
+    if (filters.fecha_hasta) params.set('fecha_hasta', filters.fecha_hasta);
+    return params.toString();
+  };
+
   const handleExport = () => {
     const baseUrl = import.meta.env.VITE_API_URL || '/api/v1';
-    const token = localStorage.getItem('istho_token');
-    window.open(`${baseUrl}/reportes/clientes/excel?token=${token}`, '_blank');
+    window.open(`${baseUrl}/reportes/clientes/excel?${buildFilterParams()}`, '_blank');
   };
 
   if (loading) {
@@ -154,9 +145,12 @@ const ReporteClientes = () => {
           </div>
         )}
 
+        {/* Filtros - sin selector de cliente (no aplica para reporte de clientes) */}
+        <ReportFilters filters={filters} onChange={setFilters} showCliente={false} />
+
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <StatCard
+          <KpiCard
             title="Total Clientes"
             value={cl.total || 0}
             subtitle={`${cl.activos || 0} activos`}
@@ -164,7 +158,7 @@ const ReporteClientes = () => {
             iconBg="bg-blue-100 dark:bg-blue-900/30"
             iconColor="text-blue-600 dark:text-blue-400"
           />
-          <StatCard
+          <KpiCard
             title="Clientes Activos"
             value={cl.activos || 0}
             subtitle={cl.total ? `${Math.round((cl.activos / cl.total) * 100)}% del total` : '0%'}
@@ -172,7 +166,7 @@ const ReporteClientes = () => {
             iconBg="bg-emerald-100 dark:bg-emerald-900/30"
             iconColor="text-emerald-600 dark:text-emerald-400"
           />
-          <StatCard
+          <KpiCard
             title="Nuevos este Mes"
             value={cl.nuevosMes || 0}
             subtitle="Registrados recientemente"
@@ -263,7 +257,8 @@ const ReporteClientes = () => {
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
           <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-3">Exportar Listado Completo</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            Descarga el listado completo de clientes con sus contactos, estado y datos comerciales en formato Excel.
+            Descarga el listado completo de clientes con sus contactos, estado y datos comerciales.
+            Los filtros de fecha seleccionados se aplicarán a la exportación.
           </p>
           <Button variant="outline" icon={FileSpreadsheet} onClick={handleExport}>
             Descargar Excel

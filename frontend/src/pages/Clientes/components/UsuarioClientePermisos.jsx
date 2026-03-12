@@ -173,11 +173,11 @@ const ModuloPermisos = ({
   const Icon = modulo.icon;
   
   const colorClasses = {
-    blue: 'bg-blue-100 text-blue-600',
-    emerald: 'bg-emerald-100 text-emerald-600',
-    violet: 'bg-violet-100 text-violet-600',
-    amber: 'bg-amber-100 text-amber-600',
-    slate: 'bg-slate-100 text-slate-600'
+    blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
+    emerald: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
+    violet: 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400',
+    amber: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
+    slate: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
   };
   
   const permisosActivos = Object.values(permisos || {}).filter(v => v).length;
@@ -199,10 +199,10 @@ const ModuloPermisos = ({
   };
   
   return (
-    <div className="border border-gray-100 rounded-xl overflow-hidden">
+    <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
       {/* Header del módulo */}
-      <div 
-        className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100"
+      <div
+        className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700"
         onClick={onToggleExpand}
       >
         <div className="flex items-center gap-3">
@@ -210,8 +210,8 @@ const ModuloPermisos = ({
             <Icon className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-medium text-slate-800">{modulo.nombre}</h4>
-            <p className="text-xs text-slate-500">{modulo.descripcion}</p>
+            <h4 className="font-medium text-slate-800 dark:text-slate-100">{modulo.nombre}</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{modulo.descripcion}</p>
           </div>
         </div>
         
@@ -241,24 +241,24 @@ const ModuloPermisos = ({
       
       {/* Lista de permisos (expandible) */}
       {expanded && (
-        <div className="p-4 space-y-2 bg-white">
+        <div className="p-4 space-y-2 bg-white dark:bg-slate-800/50">
           {modulo.permisos.map((permiso) => {
             const PermisoIcon = permiso.icon;
             const activo = permisos?.[permiso.codigo] || false;
-            
+
             return (
-              <label 
+              <label
                 key={permiso.codigo}
                 className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                  activo 
-                    ? 'bg-emerald-50 border border-emerald-200' 
-                    : 'bg-slate-50 border border-slate-100 hover:border-slate-200'
+                  activo
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800'
+                    : 'bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600'
                 }`}
               >
                 <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-colors ${
-                  activo 
-                    ? 'bg-emerald-500 border-emerald-500' 
-                    : 'bg-white border-slate-300'
+                  activo
+                    ? 'bg-emerald-500 border-emerald-500'
+                    : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500'
                 }`}>
                   {activo && <Check className="w-3 h-3 text-white" />}
                 </div>
@@ -273,10 +273,10 @@ const ModuloPermisos = ({
                 <PermisoIcon className={`w-4 h-4 ${activo ? 'text-emerald-600' : 'text-slate-400'}`} />
                 
                 <div className="flex-1">
-                  <p className={`text-sm font-medium ${activo ? 'text-slate-800' : 'text-slate-600'}`}>
+                  <p className={`text-sm font-medium ${activo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-600 dark:text-slate-300'}`}>
                     {permiso.nombre}
                   </p>
-                  <p className="text-xs text-slate-400">{permiso.descripcion}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{permiso.descripcion}</p>
                 </div>
               </label>
             );
@@ -308,7 +308,21 @@ const UsuarioClientePermisos = ({
   
   useEffect(() => {
     if (isOpen && usuario) {
-      setPermisos(usuario.permisos_cliente || PERMISOS_DEFAULT);
+      // Normalizar permisos: solo incluir módulos/acciones del catálogo
+      // MySQL puede devolver JSON como string, parsear si es necesario
+      let rawValue = usuario.permisos_cliente;
+      if (typeof rawValue === 'string') {
+        try { rawValue = JSON.parse(rawValue); } catch { rawValue = null; }
+      }
+      const raw = rawValue || PERMISOS_DEFAULT;
+      const normalized = {};
+      Object.entries(CATALOGO_PERMISOS).forEach(([moduloKey, modulo]) => {
+        normalized[moduloKey] = {};
+        modulo.permisos.forEach(p => {
+          normalized[moduloKey][p.codigo] = raw[moduloKey]?.[p.codigo] === true;
+        });
+      });
+      setPermisos(normalized);
       // Expandir todos los módulos por defecto
       const expanded = {};
       Object.keys(CATALOGO_PERMISOS).forEach(key => {
@@ -373,9 +387,11 @@ const UsuarioClientePermisos = ({
   const totalPermisos = Object.values(CATALOGO_PERMISOS).reduce(
     (sum, m) => sum + m.permisos.length, 0
   );
-  
-  const permisosActivos = Object.values(permisos).reduce((sum, modulo) => {
-    return sum + Object.values(modulo || {}).filter(v => v).length;
+
+  // Solo contar permisos que existen en el catálogo (evita contar keys extra de la BD)
+  const permisosActivos = Object.entries(CATALOGO_PERMISOS).reduce((sum, [moduloKey, modulo]) => {
+    const moduloPermisos = permisos[moduloKey] || {};
+    return sum + modulo.permisos.filter(p => moduloPermisos[p.codigo] === true).length;
   }, 0);
   
   // ──────────────────────────────────────────────────────────────────────────
@@ -396,19 +412,19 @@ const UsuarioClientePermisos = ({
         {/* HEADER INFO */}
         {/* ════════════════════════════════════════════════════════════════ */}
         
-        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+        <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-semibold">
               {usuario.nombre_completo?.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h3 className="font-medium text-slate-800">{usuario.nombre_completo}</h3>
-              <p className="text-sm text-slate-500">{usuario.email}</p>
+              <h3 className="font-medium text-slate-800 dark:text-slate-100">{usuario.nombre_completo}</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{usuario.email}</p>
             </div>
           </div>
-          
+
           <div className="text-right">
-            <p className="text-sm text-slate-500">Permisos activos</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Permisos activos</p>
             <p className={`text-xl font-bold ${
               permisosActivos === totalPermisos ? 'text-emerald-600' : 
               permisosActivos > totalPermisos / 2 ? 'text-amber-600' : 'text-slate-600'
@@ -423,7 +439,7 @@ const UsuarioClientePermisos = ({
         {/* ════════════════════════════════════════════════════════════════ */}
         
         <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-500 flex items-center gap-2">
+          <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
             <Shield className="w-4 h-4" />
             Configura los permisos de acceso al portal
           </p>
@@ -467,12 +483,12 @@ const UsuarioClientePermisos = ({
         {/* NOTA INFORMATIVA */}
         {/* ════════════════════════════════════════════════════════════════ */}
         
-        <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl">
+        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl">
           <div className="flex gap-3">
             <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-amber-700">
+            <div className="text-sm text-amber-700 dark:text-amber-300">
               <p className="font-medium">Nota importante</p>
-              <p className="mt-1 text-amber-600">
+              <p className="mt-1 text-amber-600 dark:text-amber-400">
                 Los cambios en los permisos se aplicarán inmediatamente. 
                 El usuario verá los cambios en su próxima carga de página.
               </p>
@@ -484,7 +500,7 @@ const UsuarioClientePermisos = ({
         {/* ACCIONES */}
         {/* ════════════════════════════════════════════════════════════════ */}
         
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-700">
           <Button
             variant="outline"
             onClick={onClose}

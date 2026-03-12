@@ -14,8 +14,9 @@
  */
 
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { SnackbarProvider } from 'notistack';
+import useNotification from './hooks/useNotification';
 
 // ════════════════════════════════════════════════════════════════════════════
 // PROVIDERS Y COMPONENTES DE AUTH
@@ -26,7 +27,8 @@ import PrivateRoute, {
   AdminRoute,
   SupervisorRoute,
   OperadorRoute,
-  ClienteRoute
+  ClienteRoute,
+  PortalPermissionRoute
 } from './components/auth/PrivateRoute';
 
 // Layout
@@ -58,6 +60,7 @@ const PageLoader = () => (
 const Login = lazy(() => import('./pages/Auth/Login'));
 const ForgotPassword = lazy(() => import('./pages/Auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/Auth/ResetPassword'));
+const Unauthorized = lazy(() => import('./pages/Auth/Unauthorized'));
 
 // Dashboard
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -93,6 +96,9 @@ const PlantillaEmailEditor = lazy(() => import('./pages/PlantillasEmail/Plantill
 const PerfilUsuario = lazy(() => import('./pages/Perfil/PerfilUsuario'));
 const Configuracion = lazy(() => import('./pages/Perfil/Configuracion'));
 const Notificaciones = lazy(() => import('./pages/Perfil/Notificaciones'));
+
+// Administración
+const Administracion = lazy(() => import('./pages/Administracion'));
 
 // ════════════════════════════════════════════════════════════════════════════
 // PLACEHOLDER PARA PÁGINAS EN DESARROLLO
@@ -136,6 +142,25 @@ const snackbarConfig = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// LISTENER GLOBAL DE PERMISOS DENEGADOS (403)
+// ════════════════════════════════════════════════════════════════════════════
+const PermissionDeniedListener = () => {
+  const { warning } = useNotification();
+
+  useEffect(() => {
+    const handler = (e) => {
+      warning(`🔒 ${e.detail?.message || 'No tienes permiso para realizar esta acción'}`, {
+        autoHideDuration: 4000,
+      });
+    };
+    window.addEventListener('istho:permission-denied', handler);
+    return () => window.removeEventListener('istho:permission-denied', handler);
+  }, [warning]);
+
+  return null;
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // APP PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 function App() {
@@ -143,6 +168,8 @@ function App() {
     <BrowserRouter>
       {/* Provider de notificaciones toast */}
       <SnackbarProvider {...snackbarConfig}>
+        {/* Listener global para 403 - Permission Denied */}
+        <PermissionDeniedListener />
         {/* Provider de alertas personalizadas */}
         <AlertProvider>
           {/* Provider de autenticación */}
@@ -174,24 +201,24 @@ function App() {
                 <Route path="/clientes/:id" element={<OperadorRoute><ClienteDetail /></OperadorRoute>} />
 
                 {/* ────────────────────────────────────────────────────────── */}
-                {/* INVENTARIO */}
+                {/* INVENTARIO - Portal users need inventario.ver */}
                 {/* ────────────────────────────────────────────────────────── */}
-                <Route path="/inventario" element={<InventarioList />} />
-                <Route path="/inventario/productos/:id" element={<ProductoDetail />} />
-                <Route path="/inventario/alertas" element={<AlertasInventario />} />
-                
-                <Route path="/inventario/entradas" element={<EntradasList />} />
-                <Route path="/inventario/entradas/:id" element={<EntradaAuditoria />} />
+                <Route path="/inventario" element={<PortalPermissionRoute module="inventario" action="ver"><InventarioList /></PortalPermissionRoute>} />
+                <Route path="/inventario/productos/:id" element={<PortalPermissionRoute module="inventario" action="ver"><ProductoDetail /></PortalPermissionRoute>} />
+                <Route path="/inventario/alertas" element={<PortalPermissionRoute module="inventario" action="alertas"><AlertasInventario /></PortalPermissionRoute>} />
 
-                <Route path="/inventario/salidas" element={<SalidasList />} />
-                <Route path="/inventario/salidas/:id" element={<SalidaAuditoria />} />
+                <Route path="/inventario/entradas" element={<PortalPermissionRoute module="inventario" action="ver"><EntradasList /></PortalPermissionRoute>} />
+                <Route path="/inventario/entradas/:id" element={<PortalPermissionRoute module="inventario" action="ver"><EntradaAuditoria /></PortalPermissionRoute>} />
+
+                <Route path="/inventario/salidas" element={<PortalPermissionRoute module="inventario" action="ver"><SalidasList /></PortalPermissionRoute>} />
+                <Route path="/inventario/salidas/:id" element={<PortalPermissionRoute module="inventario" action="ver"><SalidaAuditoria /></PortalPermissionRoute>} />
 
                 {/* ────────────────────────────────────────────────────────── */}
-                {/* REPORTES */}
+                {/* REPORTES - Portal users need reportes.ver */}
                 {/* ────────────────────────────────────────────────────────── */}
-                <Route path="/reportes" element={<ReportesList />} />
-                <Route path="/reportes/despachos" element={<ReporteDespachos />} />
-                <Route path="/reportes/inventario" element={<ReporteInventario />} />
+                <Route path="/reportes" element={<PortalPermissionRoute module="reportes" action="ver"><ReportesList /></PortalPermissionRoute>} />
+                <Route path="/reportes/despachos" element={<PortalPermissionRoute module="reportes" action="ver"><ReporteDespachos /></PortalPermissionRoute>} />
+                <Route path="/reportes/inventario" element={<PortalPermissionRoute module="reportes" action="ver"><ReporteInventario /></PortalPermissionRoute>} />
                 <Route path="/reportes/clientes" element={<OperadorRoute><ReporteClientes /></OperadorRoute>} />
                 <Route path="/reportes/operativo" element={<ReporteDespachos />} />
                 <Route path="/reportes/kpis" element={<OperadorRoute><ReporteDespachos /></OperadorRoute>} />
@@ -204,6 +231,11 @@ function App() {
                 <Route path="/plantillas-email" element={<SupervisorRoute><PlantillasEmailList /></SupervisorRoute>} />
                 <Route path="/plantillas-email/nueva" element={<SupervisorRoute><PlantillaEmailEditor /></SupervisorRoute>} />
                 <Route path="/plantillas-email/:id" element={<SupervisorRoute><PlantillaEmailEditor /></SupervisorRoute>} />
+
+                {/* ────────────────────────────────────────────────────────── */}
+                {/* ADMINISTRACIÓN - Solo admin */}
+                {/* ────────────────────────────────────────────────────────── */}
+                <Route path="/administracion" element={<AdminRoute><Administracion /></AdminRoute>} />
 
                 {/* ────────────────────────────────────────────────────────── */}
                 {/* PERFIL Y CONFIGURACIÓN */}
@@ -220,6 +252,9 @@ function App() {
 
               {/* Raíz redirige a login */}
               <Route path="/" element={<Navigate to="/login" replace />} />
+
+              {/* Acceso no autorizado */}
+              <Route path="/unauthorized" element={<Unauthorized />} />
 
               {/* 404 - Página no encontrada */}
               <Route path="*" element={<ComingSoon title="Página no encontrada" />} />

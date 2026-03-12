@@ -76,6 +76,9 @@ const PlantillaEmailEditor = () => {
   const navigate = useNavigate();
   const { success, error: notifyError } = useNotification();
   const editorRef = useRef(null);
+  const asuntoRef = useRef(null);
+  const activeFieldRef = useRef('cuerpo_html'); // 'asunto_template' | 'cuerpo_html'
+  const [activeField, setActiveField] = useState('cuerpo_html');
   const isEdit = !!id;
 
   const [formData, setFormData] = useState({
@@ -156,22 +159,29 @@ const PlantillaEmailEditor = () => {
     }
   };
 
-  const handleInsertVariable = (variable) => {
-    const textarea = editorRef.current;
-    if (textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = formData.cuerpo_html;
-      const newText = text.substring(0, start) + variable + text.substring(end);
-      setFormData(prev => ({ ...prev, cuerpo_html: newText }));
+  const handleFieldFocus = (fieldName) => {
+    activeFieldRef.current = fieldName;
+    setActiveField(fieldName);
+  };
 
-      // Restore cursor position
+  const handleInsertVariable = (variable) => {
+    const field = activeFieldRef.current;
+    const isAsunto = field === 'asunto_template';
+    const inputEl = isAsunto ? asuntoRef.current : editorRef.current;
+
+    if (inputEl) {
+      const start = inputEl.selectionStart;
+      const end = inputEl.selectionEnd;
+      const text = isAsunto ? formData.asunto_template : formData.cuerpo_html;
+      const newText = text.substring(0, start) + variable + text.substring(end);
+      setFormData(prev => ({ ...prev, [field]: newText }));
+
       setTimeout(() => {
-        textarea.focus();
-        textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+        inputEl.focus();
+        inputEl.selectionStart = inputEl.selectionEnd = start + variable.length;
       }, 0);
     } else {
-      setFormData(prev => ({ ...prev, cuerpo_html: prev.cuerpo_html + variable }));
+      setFormData(prev => ({ ...prev, [field]: prev[field] + variable }));
     }
   };
 
@@ -327,16 +337,23 @@ const PlantillaEmailEditor = () => {
               )}
 
               <div>
-                <label className={labelClass}>Asunto del Correo *</label>
+                <label className={labelClass}>
+                  Asunto del Correo *
+                  {activeField === 'asunto_template' && (
+                    <span className="ml-2 text-xs font-normal text-orange-500">← variables se insertarán aquí</span>
+                  )}
+                </label>
                 <input
+                  ref={asuntoRef}
                   type="text"
                   value={formData.asunto_template}
                   onChange={(e) => handleChange('asunto_template', e.target.value)}
-                  className={inputClass}
+                  onFocus={() => handleFieldFocus('asunto_template')}
+                  className={`${inputClass} ${activeField === 'asunto_template' ? 'ring-2 ring-orange-500/30 border-orange-400' : ''}`}
                   placeholder="Ej: [ISTHO] {{tipoOperacion}} - {{numeroOperacion}}"
                 />
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                  Puedes usar variables como {'{{variable}}'} en el asunto
+                  Haz clic aquí y luego en una variable del panel derecho para insertarla en el asunto
                 </p>
               </div>
 
@@ -367,7 +384,12 @@ const PlantillaEmailEditor = () => {
             {/* Cuerpo del email */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-100">Cuerpo del Correo (HTML)</h3>
+                <h3 className="font-semibold text-slate-800 dark:text-slate-100">
+                  Cuerpo del Correo (HTML)
+                  {activeField === 'cuerpo_html' && (
+                    <span className="ml-2 text-xs font-normal text-orange-500">← variables se insertarán aquí</span>
+                  )}
+                </h3>
                 <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">Handlebars + HTML</span>
               </div>
 
@@ -375,7 +397,8 @@ const PlantillaEmailEditor = () => {
                 ref={editorRef}
                 value={formData.cuerpo_html}
                 onChange={(e) => handleChange('cuerpo_html', e.target.value)}
-                className="w-full h-80 px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-mono bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 resize-y"
+                onFocus={() => handleFieldFocus('cuerpo_html')}
+                className={`w-full h-80 px-4 py-3 border rounded-xl text-sm font-mono bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 resize-y ${activeField === 'cuerpo_html' ? 'border-orange-400 dark:border-orange-600' : 'border-slate-200 dark:border-slate-600'}`}
                 placeholder={`<h2>{{tipoOperacion}} Completado</h2>\n\n<p>Estimado(a) cliente,</p>\n\n<p>Le informamos que la operación <strong>{{numeroOperacion}}</strong> fue cerrada por {{cerradoPor}}.</p>\n\n{{#if observaciones}}\n<p><strong>Observaciones:</strong> {{observaciones}}</p>\n{{/if}}`}
               />
 
@@ -457,9 +480,12 @@ const PlantillaEmailEditor = () => {
           <div className="space-y-6">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-5 sticky top-32">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-1">Variables Disponibles</h3>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
-                Haz clic para insertar en el editor
+              <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
+                Haz clic para insertar en el campo activo
               </p>
+              <div className={`text-xs px-3 py-1.5 rounded-lg mb-4 font-medium ${activeField === 'asunto_template' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                Insertando en: {activeField === 'asunto_template' ? 'Asunto' : 'Cuerpo HTML'}
+              </div>
 
               <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
                 {campos.length === 0 ? (

@@ -54,6 +54,9 @@ router.post('/:id/documentos', noClientes, requiereRolMinimo('operador'), upload
 // Cerrar operación
 router.post('/:id/cerrar', noClientes, requiereRolMinimo('operador'), cerrarOperacionValidator, operacionController.cerrar);
 
+// Reenviar correo de cierre
+router.post('/:id/reenviar-correo', noClientes, requiereRolMinimo('operador'), operacionController.reenviarCorreo);
+
 // Anular operación
 router.delete('/:id', requiereRolMinimo('supervisor'), idParamValidator, operacionController.anular);
 

@@ -238,8 +238,25 @@ const AlertaCard = ({ alerta, onView, onAtender, onDescartar, canAtender }) => {
 
 const AlertasInventario = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission: authHasPermission, isCliente } = useAuth();
   const { success, error: notifyError, warning } = useNotification();
+
+  // Portal clients need inventario.alertas permission
+  const isPortalUser = isCliente() || user?.rol === 'cliente';
+  if (isPortalUser && !authHasPermission('inventario', 'alertas')) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-8 h-8 text-slate-400" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Acceso restringido</h2>
+          <p className="text-slate-500 dark:text-slate-400 mb-4">No tienes permiso para ver las alertas de inventario</p>
+          <Button variant="primary" onClick={() => navigate('/inventario')}>Volver a Inventario</Button>
+        </div>
+      </div>
+    );
+  }
 
   const {
     alertas,

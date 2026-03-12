@@ -149,6 +149,32 @@ const EditProfileModal = ({ isOpen, onClose, usuario, onSave, loading }) => {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// INPUT DE CONTRASEÑA (fuera del modal para evitar re-mount en cada render)
+// ════════════════════════════════════════════════════════════════════════════
+const passwordInputClasses = 'w-full px-4 py-2.5 pr-10 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500';
+
+const PasswordInput = ({ label, field, value, show, onChange, onToggleShow }) => (
+  <div>
+    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{label}</label>
+    <div className="relative">
+      <input
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={(e) => onChange(field, e.target.value)}
+        className={passwordInputClasses}
+      />
+      <button
+        type="button"
+        onClick={onToggleShow}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+      >
+        {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  </div>
+);
+
+// ════════════════════════════════════════════════════════════════════════════
 // MODAL CAMBIAR CONTRASEÑA
 // ════════════════════════════════════════════════════════════════════════════
 const ChangePasswordModal = ({ isOpen, onClose, onSubmit, loading }) => {
@@ -197,29 +223,6 @@ const ChangePasswordModal = ({ isOpen, onClose, onSubmit, loading }) => {
     }
   }, [isOpen]);
 
-  const inputClasses = 'w-full px-4 py-2.5 pr-10 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500';
-
-  const PasswordInput = ({ label, field, value, showKey }) => (
-    <div>
-      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{label}</label>
-      <div className="relative">
-        <input
-          type={showPasswords[showKey] ? 'text' : 'password'}
-          value={value}
-          onChange={(e) => handleChange(field, e.target.value)}
-          className={inputClasses}
-        />
-        <button
-          type="button"
-          onClick={() => toggleShow(showKey)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-        >
-          {showPasswords[showKey] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <Modal
       isOpen={isOpen}
@@ -236,9 +239,9 @@ const ChangePasswordModal = ({ isOpen, onClose, onSubmit, loading }) => {
       }
     >
       <div className="space-y-4">
-        <PasswordInput label="Contraseña Actual" field="currentPassword" value={formData.currentPassword} showKey="current" />
-        <PasswordInput label="Nueva Contraseña" field="newPassword" value={formData.newPassword} showKey="new" />
-        <PasswordInput label="Confirmar Contraseña" field="confirmPassword" value={formData.confirmPassword} showKey="confirm" />
+        <PasswordInput label="Contraseña Actual" field="currentPassword" value={formData.currentPassword} show={showPasswords.current} onChange={handleChange} onToggleShow={() => toggleShow('current')} />
+        <PasswordInput label="Nueva Contraseña" field="newPassword" value={formData.newPassword} show={showPasswords.new} onChange={handleChange} onToggleShow={() => toggleShow('new')} />
+        <PasswordInput label="Confirmar Contraseña" field="confirmPassword" value={formData.confirmPassword} show={showPasswords.confirm} onChange={handleChange} onToggleShow={() => toggleShow('confirm')} />
 
         {error && (
           <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400">
@@ -349,7 +352,7 @@ const calcularAntiguedad = (fecha) => {
 // ════════════════════════════════════════════════════════════════════════════
 const PerfilUsuario = () => {
   const navigate = useNavigate();
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, updateUser, hasPermission, isCliente, checkPermission } = useAuth();
   const { success, error: apiError } = useNotification();
 
   // Estados
@@ -457,21 +460,56 @@ const PerfilUsuario = () => {
   const displayName = getDisplayName(user);
   const initials = getInitials(user);
 
+  // Permisos de perfil (usuarios internos siempre pueden, clientes dependen de permisos_cliente)
+  const canChangePassword = isPortalUser ? hasPermission('perfil', 'cambiar_password') : true;
+  const canEditProfile = isPortalUser ? hasPermission('perfil', 'editar') : true;
+
   const tabs = [
     { id: 'info', label: 'Información' },
     { id: 'permisos', label: 'Permisos' },
   ];
 
-  const permisosTabla = permisos?.permisos
-    ? Object.entries(permisos.permisos).map(([modulo, acciones]) => ({
-        modulo: modulo.charAt(0).toUpperCase() + modulo.slice(1),
-        ver: acciones.includes('ver'),
-        crear: acciones.includes('crear'),
-        editar: acciones.includes('editar'),
-        eliminar: acciones.includes('eliminar'),
-        exportar: acciones.includes('exportar'),
-      }))
-    : [];
+  // Construir tabla de permisos según tipo de usuario
+  const permisosTabla = (() => {
+    // Portal: usar permisos_cliente del user en AuthContext
+    if (isPortalUser) {
+      const portalPermisos = user.permisos?.permisos;
+      if (!portalPermisos || typeof portalPermisos !== 'object') return [];
+      return Object.entries(portalPermisos).map(([modulo, acciones]) => ({
+        modulo,
+        acciones: typeof acciones === 'object' ? acciones : {},
+      }));
+    }
+    // Interno: usar permisos del servicio (array format)
+    if (!permisos?.permisos) return [];
+    return Object.entries(permisos.permisos).map(([modulo, acciones]) => ({
+      modulo,
+      acciones: Array.isArray(acciones)
+        ? acciones.reduce((acc, a) => ({ ...acc, [a]: true }), {})
+        : (typeof acciones === 'object' ? acciones : {}),
+    }));
+  })();
+
+  // Catálogo de labels para portal
+  const PORTAL_MODULO_LABELS = {
+    inventario: 'Inventario',
+    despachos: 'Despachos',
+    reportes: 'Reportes',
+    facturacion: 'Facturación',
+    perfil: 'Perfil',
+  };
+  const PORTAL_ACCION_LABELS = {
+    ver: 'Ver',
+    exportar: 'Exportar',
+    alertas: 'Alertas',
+    crear_solicitud: 'Crear Solicitud',
+    descargar_documentos: 'Descargar Documentos',
+    descargar: 'Descargar',
+    editar: 'Editar',
+    cambiar_password: 'Cambiar Contraseña',
+    crear: 'Crear',
+    eliminar: 'Eliminar',
+  };
 
   const diasActivo = Math.floor(
     (new Date() - new Date(user.created_at || Date.now())) / (1000 * 60 * 60 * 24)
@@ -544,12 +582,16 @@ const PerfilUsuario = () => {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
-              <Button variant="outline" icon={Key} onClick={() => setPasswordModal(true)}>
-                Cambiar Contraseña
-              </Button>
-              <Button variant="primary" icon={Pencil} onClick={() => setEditModal(true)}>
-                Editar Perfil
-              </Button>
+              {canChangePassword && (
+                <Button variant="outline" icon={Key} onClick={() => setPasswordModal(true)}>
+                  Cambiar Contraseña
+                </Button>
+              )}
+              {canEditProfile && (
+                <Button variant="primary" icon={Pencil} onClick={() => setEditModal(true)}>
+                  Editar Perfil
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -711,38 +753,71 @@ const PerfilUsuario = () => {
                     </div>
 
                     {permisosTabla.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-700/50">
-                              <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Módulo</th>
-                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Ver</th>
-                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Crear</th>
-                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Editar</th>
-                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Eliminar</th>
-                              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Exportar</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {permisosTabla.map((permiso, idx) => (
-                              <tr key={idx} className="border-b border-gray-50 dark:border-slate-700">
-                                <td className="py-3 px-4 text-sm font-medium text-slate-800 dark:text-slate-200">
-                                  {permiso.modulo}
-                                </td>
-                                {['ver', 'crear', 'editar', 'eliminar', 'exportar'].map((accion) => (
-                                  <td key={accion} className="py-3 px-4 text-center">
-                                    {permiso[accion] ? (
-                                      <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                      isPortalUser ? (
+                        /* Portal: mostrar cada módulo con sus acciones específicas */
+                        <div className="space-y-3">
+                          {permisosTabla.map((permiso, idx) => (
+                            <div key={idx} className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-4">
+                              <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                                {PORTAL_MODULO_LABELS[permiso.modulo] || permiso.modulo}
+                              </h4>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(permiso.acciones).map(([accion, habilitado]) => (
+                                  <span
+                                    key={accion}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                                      habilitado
+                                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                                        : 'bg-slate-200 dark:bg-slate-600/30 text-slate-400 dark:text-slate-500 line-through'
+                                    }`}
+                                  >
+                                    {habilitado ? (
+                                      <CheckCircle className="w-3.5 h-3.5" />
                                     ) : (
-                                      <X className="w-5 h-5 text-slate-300 dark:text-slate-600 mx-auto" />
+                                      <X className="w-3.5 h-3.5" />
                                     )}
-                                  </td>
+                                    {PORTAL_ACCION_LABELS[accion] || accion}
+                                  </span>
                                 ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        /* Interno: tabla clásica con columnas fijas */
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="bg-slate-50 dark:bg-slate-700/50">
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Módulo</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Ver</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Crear</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Editar</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Eliminar</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Exportar</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                            </thead>
+                            <tbody>
+                              {permisosTabla.map((permiso, idx) => (
+                                <tr key={idx} className="border-b border-gray-50 dark:border-slate-700">
+                                  <td className="py-3 px-4 text-sm font-medium text-slate-800 dark:text-slate-200 capitalize">
+                                    {permiso.modulo}
+                                  </td>
+                                  {['ver', 'crear', 'editar', 'eliminar', 'exportar'].map((accion) => (
+                                    <td key={accion} className="py-3 px-4 text-center">
+                                      {permiso.acciones[accion] ? (
+                                        <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" />
+                                      ) : (
+                                        <X className="w-5 h-5 text-slate-300 dark:text-slate-600 mx-auto" />
+                                      )}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
                     ) : (
                       <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                         <Shield className="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
@@ -806,15 +881,17 @@ const PerfilUsuario = () => {
                 >
                   Ver Notificaciones
                 </Button>
-                <Button
-                  variant="ghost"
-                  icon={Key}
-                  fullWidth
-                  className="justify-start"
-                  onClick={() => setPasswordModal(true)}
-                >
-                  Cambiar Contraseña
-                </Button>
+                {canChangePassword && (
+                  <Button
+                    variant="ghost"
+                    icon={Key}
+                    fullWidth
+                    className="justify-start"
+                    onClick={() => setPasswordModal(true)}
+                  >
+                    Cambiar Contraseña
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   icon={Shield}

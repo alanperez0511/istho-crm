@@ -217,18 +217,6 @@ const StockIndicator = ({ actual, minimo }) => {
   );
 };
 
-/**
- * Helper para verificar permisos
- */
-const checkPermission = (userRole, action) => {
-  const permissions = {
-    admin: ['ver', 'crear', 'editar', 'eliminar', 'exportar', 'importar'],
-    supervisor: ['ver', 'crear', 'editar', 'exportar'],
-    operador: ['ver', 'crear', 'editar'],
-    cliente: ['ver'],
-  };
-  return permissions[userRole]?.includes(action) || false;
-};
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
@@ -237,7 +225,7 @@ const checkPermission = (userRole, action) => {
 const InventarioList = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { success, error: notifyError, saved, deleted, stockAlert } = useNotification();
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -283,12 +271,12 @@ const InventarioList = () => {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, producto: null });
   const [formLoading, setFormLoading] = useState(false);
 
-  // Permisos usando helper local
-  const canCreate = checkPermission(user?.rol, 'crear');
-  const canEdit = checkPermission(user?.rol, 'editar');
-  const canDelete = checkPermission(user?.rol, 'eliminar');
-  const canExport = checkPermission(user?.rol, 'exportar');
-  const canImport = checkPermission(user?.rol, 'importar');
+  // Permisos dinámicos desde la BD
+  const canCreate = hasPermission('inventario', 'crear');
+  const canEdit = hasPermission('inventario', 'editar');
+  const canDelete = hasPermission('inventario', 'eliminar');
+  const canExport = hasPermission('inventario', 'exportar');
+  const canImport = hasPermission('inventario', 'importar');
 
   // ──────────────────────────────────────────────────────────────────────────
   // APLICAR FILTRO DE URL

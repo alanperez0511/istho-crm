@@ -180,8 +180,11 @@ apiClient.interceptors.response.use(
         break;
         
       case 403:
-        // Sin permisos para la acción
+        // Sin permisos para la acción - emitir evento global para toast
         console.warn('⚠️ [API] Sin permisos para esta acción');
+        window.dispatchEvent(new CustomEvent('istho:permission-denied', {
+          detail: { message: data?.message || 'No tienes permiso para realizar esta acción' }
+        }));
         break;
         
       case 404:

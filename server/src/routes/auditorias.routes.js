@@ -11,12 +11,13 @@ const express = require('express');
 const router = express.Router();
 
 const auditoriaWmsController = require('../controllers/auditoriaWmsController');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, filtrarPorCliente } = require('../middleware/auth');
 const { requiereRolMinimo } = require('../middleware/roles');
 const { uploadCumplido } = require('../config/multer');
 
-// Todas las rutas requieren autenticación
+// Todas las rutas requieren autenticación y filtrado por cliente portal
 router.use(verificarToken);
+router.use(filtrarPorCliente);
 
 // =============================================
 // ESTADÍSTICAS Y RECIENTES

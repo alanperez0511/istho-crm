@@ -153,8 +153,15 @@ module.exports = (sequelize) => {
     // ═══════════════════════════════════════════════════════════════════════
     
     rol: {
-      type: DataTypes.ENUM('admin', 'supervisor', 'operador', 'cliente'),
-      defaultValue: 'operador'
+      type: DataTypes.STRING(30),
+      defaultValue: 'operador',
+      comment: 'Código del rol (legacy, se mantiene por compatibilidad)'
+    },
+
+    rol_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'FK a tabla roles (sistema dinámico de roles)'
     },
     
     activo: {
@@ -175,7 +182,15 @@ module.exports = (sequelize) => {
     permisos_cliente: {
       type: DataTypes.JSON,
       allowNull: true,
-      comment: 'Permisos específicos para usuarios tipo cliente'
+      comment: 'Permisos específicos para usuarios tipo cliente',
+      get() {
+        const val = this.getDataValue('permisos_cliente');
+        if (!val) return null;
+        if (typeof val === 'string') {
+          try { return JSON.parse(val); } catch { return null; }
+        }
+        return val;
+      }
     },
     
     requiere_cambio_password: {
@@ -235,7 +250,8 @@ module.exports = (sequelize) => {
       { fields: ['rol'] },
       { fields: ['activo'] },
       { fields: ['cliente_id'] },
-      { fields: ['rol', 'cliente_id'] }
+      { fields: ['rol', 'cliente_id'] },
+      { fields: ['rol_id'] }
     ],
     
     hooks: {
@@ -339,18 +355,28 @@ module.exports = (sequelize) => {
    * @param {string} accion - Acción (ver, crear, editar, eliminar)
    * @returns {boolean}
    */
-  Usuario.prototype.tienePermiso = function(modulo, accion) {
+  /**
+   * @param {string} modulo
+   * @param {string} accion
+   * @param {Object} [permisosDB] - Permisos dinámicos del cache { modulo: ['accion1', ...] }
+   */
+  Usuario.prototype.tienePermiso = function(modulo, accion, permisosDB) {
     // Admin tiene todos los permisos
     if (this.rol === 'admin') return true;
-    
+
     // Usuario cliente: verificar permisos_cliente
     if (this.esCliente()) {
       const permisos = this.permisos_cliente || PERMISOS_CLIENTE_DEFAULT;
       if (!permisos[modulo]) return false;
       return permisos[modulo][accion] === true;
     }
-    
-    // Usuario interno: verificar por rol
+
+    // Usuario interno: usar permisos dinámicos de BD si están disponibles
+    if (permisosDB) {
+      return permisosDB[modulo]?.includes(accion) || false;
+    }
+
+    // Fallback a permisos hardcodeados (compatibilidad)
     const permisosRol = PERMISOS_ROL[this.rol];
     if (!permisosRol) return false;
     return permisosRol[modulo]?.includes(accion) || false;
@@ -360,7 +386,10 @@ module.exports = (sequelize) => {
    * Obtener permisos del usuario (para enviar al frontend)
    * @returns {Object}
    */
-  Usuario.prototype.getPermisos = function() {
+  /**
+   * @param {Object} [permisosDB] - Permisos dinámicos del cache { modulo: ['accion1', ...] }
+   */
+  Usuario.prototype.getPermisos = function(permisosDB) {
     if (this.rol === 'admin') {
       return {
         esAdmin: true,
@@ -368,7 +397,7 @@ module.exports = (sequelize) => {
         acciones: ['*']
       };
     }
-    
+
     if (this.esCliente()) {
       return {
         esAdmin: false,
@@ -377,13 +406,13 @@ module.exports = (sequelize) => {
         permisos: this.permisos_cliente || PERMISOS_CLIENTE_DEFAULT
       };
     }
-    
-    // Usuario interno
+
+    // Usuario interno: usar permisos dinámicos si están disponibles
     return {
       esAdmin: false,
       esCliente: false,
       rol: this.rol,
-      permisos: PERMISOS_ROL[this.rol] || {}
+      permisos: permisosDB || PERMISOS_ROL[this.rol] || {}
     };
   };
   
@@ -398,7 +427,10 @@ module.exports = (sequelize) => {
    * Obtener datos públicos (sin password ni tokens)
    * ÚNICO PUNTO DE VERDAD para datos de usuario
    */
-  Usuario.prototype.toPublicJSON = function() {
+  /**
+   * @param {Object} [permisosDB] - Permisos dinámicos del cache
+   */
+  Usuario.prototype.toPublicJSON = function(permisosDB) {
     return {
       id: this.id,
       username: this.username,
@@ -411,13 +443,14 @@ module.exports = (sequelize) => {
       departamento: this.departamento || 'Operaciones',
       avatar_url: this.avatar_url || null,
       rol: this.rol,
+      rol_id: this.rol_id || null,
       activo: this.activo,
       estado: this.activo ? 'activo' : 'inactivo',
       ultimo_acceso: this.ultimo_acceso,
       created_at: this.created_at,
       // Campos de cliente (solo si aplica)
       cliente_id: this.cliente_id || null,
-      permisos: this.getPermisos(),
+      permisos: this.getPermisos(permisosDB),
       requiere_cambio_password: this.requiere_cambio_password || false
     };
   };

@@ -299,6 +299,12 @@ const UsuariosCliente = ({ clienteId, clienteNombre }) => {
       await usuarioClienteService.actualizar(clienteId, permisosModal.usuario.id, {
         permisos_cliente: permisos
       });
+      // Actualizar estado local inmediatamente (optimistic update)
+      setUsuarios(prev => prev.map(u =>
+        u.id === permisosModal.usuario.id
+          ? { ...u, permisos_cliente: permisos }
+          : u
+      ));
       success('Permisos actualizados correctamente');
       setPermisosModal({ open: false, usuario: null });
       fetchUsuarios();

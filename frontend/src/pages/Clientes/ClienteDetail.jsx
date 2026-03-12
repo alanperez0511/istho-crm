@@ -97,23 +97,6 @@ const formatCurrency = (value) => {
   }).format(value);
 };
 
-/**
- * Verificar permisos basado en rol
- * @param {string} userRole - Rol del usuario
- * @param {string} action - Acción a verificar
- * @returns {boolean}
- */
-const checkPermission = (userRole, action) => {
-  const permissions = {
-    admin: ['ver', 'crear', 'editar', 'eliminar', 'exportar', 'importar', 'usuarios'],
-    supervisor: ['ver', 'crear', 'editar', 'exportar', 'usuarios'],
-    operador: ['ver'],
-    cliente: ['ver'],
-  };
-
-  const rolePermissions = permissions[userRole] || permissions.operador;
-  return rolePermissions.includes(action);
-};
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTES INTERNOS
@@ -392,11 +375,8 @@ const ContactoFormModal = ({ isOpen, onClose, onSubmit, contacto, loading }) => 
 const ClienteDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { success, apiError, deleted } = useNotification();
-
-  // Obtener rol del usuario
-  const userRole = user?.rol || user?.role || 'operador';
 
   // ──────────────────────────────────────────────────────────────────────────
   // HOOK DE CLIENTES
@@ -440,9 +420,9 @@ const ClienteDetail = () => {
   // PERMISOS
   // ──────────────────────────────────────────────────────────────────────────
 
-  const canEdit = checkPermission(userRole, 'editar');
-  const canDelete = checkPermission(userRole, 'eliminar');
-  const canManageUsers = checkPermission(userRole, 'usuarios'); // ← NUEVO
+  const canEdit = hasPermission('clientes', 'editar');
+  const canDelete = hasPermission('clientes', 'eliminar');
+  const canManageUsers = hasPermission('usuarios', 'ver');
 
   // Ref para input file de logo
   const logoInputRef = useRef(null);

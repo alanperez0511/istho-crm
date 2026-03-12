@@ -104,16 +104,58 @@ const allMenuConfig = [
       { icon: AlertCircle, label: 'Alertas de Stock', href: '/inventario/alertas' },
     ],
   },
+  {
+    id: 'admin',
+    label: 'Administración',
+    basePath: '/administracion',
+    shortcut: 'A',
+    soloAdmin: true,
+    items: [
+      { icon: Settings, label: 'Usuarios y Roles', href: '/administracion' },
+    ],
+  },
 ];
 
 /**
- * Filtra menús según el rol del usuario
+ * Filtra menús según el rol del usuario y permisos de portal
+ * @param {string} rol - Rol del usuario
+ * @param {Function} hasPermission - Función para verificar permisos de portal
  */
-const getMenuForRole = (rol) => {
+const getMenuForRole = (rol, hasPermission) => {
   if (rol === 'cliente') {
-    return allMenuConfig.filter(menu => !menu.soloInternos);
+    return allMenuConfig
+      .filter(menu => !menu.soloInternos && !menu.soloAdmin)
+      .filter(menu => {
+        // Verificar permisos de portal por módulo
+        if (menu.id === 'inventario') return hasPermission('inventario', 'ver');
+        if (menu.id === 'dashboard') return true;
+        return true;
+      })
+      .map(menu => {
+        if (menu.id === 'inventario') {
+          // Filtrar sub-items de inventario según permisos
+          const filteredItems = menu.items.filter(item => {
+            if (item.href === '/inventario/alertas') return hasPermission('inventario', 'alertas');
+            return true;
+          });
+          return { ...menu, items: filteredItems };
+        }
+        if (menu.id === 'dashboard') {
+          // Filtrar Reportes del dashboard si no tiene permiso
+          const filteredItems = menu.items.filter(item => {
+            if (item.href === '/reportes') return hasPermission('reportes', 'ver');
+            return true;
+          });
+          return { ...menu, items: filteredItems };
+        }
+        return menu;
+      });
   }
-  return allMenuConfig;
+  if (rol === 'admin') {
+    return allMenuConfig;
+  }
+  // Internos no-admin: ocultar menús soloAdmin
+  return allMenuConfig.filter(menu => !menu.soloAdmin);
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -291,7 +333,7 @@ const KeyboardShortcutsModal = ({ isOpen, onClose }) => {
         { keys: ['G', 'I'], description: 'Ir a Inventario' },
         { keys: ['G', 'E'], description: 'Ir a Entradas' },
         { keys: ['G', 'S'], description: 'Ir a Salidas' },
-
+        { keys: ['G', 'P'], description: 'Ir a Plantillas'},
         { keys: ['G', 'R'], description: 'Ir a Reportes' },
       ]
     },
@@ -853,12 +895,12 @@ AvatarDropdown.propTypes = {
  */
 const FloatingHeader = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { isDark, toggleDark } = useThemeContext();
   const { isVisible, isAtTop } = useScrollBehavior();
 
-  // Menú filtrado por rol
-  const menuConfig = getMenuForRole(user?.rol);
+  // Menú filtrado por rol y permisos de portal
+  const menuConfig = getMenuForRole(user?.rol, hasPermission);
 
   // Estados locales
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

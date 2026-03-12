@@ -17,9 +17,100 @@
 
 const jwt = require('jsonwebtoken');
 const jwtConfig = require('../config/jwt');
-const { Usuario } = require('../models');
+const { Usuario, Rol, Permiso } = require('../models');
 const { unauthorized, forbidden } = require('../utils/responses');
 const logger = require('../utils/logger');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CACHE DE PERMISOS POR ROL (evita JOINs en cada request)
+// ═══════════════════════════════════════════════════════════════════════════
+let _permisosCache = {};
+let _rolesCache = {};
+let _cacheTimestamp = 0;
+const CACHE_TTL = 60 * 1000; // 1 minuto
+
+const cargarCachePermisos = async () => {
+  const ahora = Date.now();
+  if (ahora - _cacheTimestamp < CACHE_TTL && Object.keys(_rolesCache).length > 0) {
+    return; // Cache aún válido
+  }
+
+  try {
+    const roles = await Rol.findAll({
+      where: { activo: true },
+      include: [{
+        model: Permiso,
+        as: 'permisos',
+        attributes: ['modulo', 'accion'],
+        through: { attributes: [] }
+      }]
+    });
+
+    const newPermisosCache = {};
+    const newRolesCache = {};
+
+    roles.forEach(function(rol) {
+      newRolesCache[rol.id] = {
+        id: rol.id,
+        codigo: rol.codigo,
+        nombre: rol.nombre,
+        nivel_jerarquia: rol.nivel_jerarquia,
+        es_sistema: rol.es_sistema,
+        es_cliente: rol.es_cliente,
+        color: rol.color
+      };
+
+      // Permisos como { modulo: [acciones] }
+      const permisos = {};
+      rol.permisos.forEach(function(p) {
+        if (!permisos[p.modulo]) permisos[p.modulo] = [];
+        permisos[p.modulo].push(p.accion);
+      });
+      newPermisosCache[rol.id] = permisos;
+    });
+
+    _rolesCache = newRolesCache;
+    _permisosCache = newPermisosCache;
+    _cacheTimestamp = ahora;
+  } catch (error) {
+    logger.error('Error cargando cache de permisos:', { message: error.message });
+  }
+};
+
+/**
+ * Invalida el cache (llamar cuando se editen roles/permisos)
+ */
+const invalidarCachePermisos = () => {
+  _cacheTimestamp = 0;
+  _permisosCache = {};
+  _rolesCache = {};
+};
+
+/**
+ * Verificar si un rol_id tiene permiso (módulo + acción)
+ */
+const rolTienePermiso = (rolId, modulo, accion) => {
+  const permisos = _permisosCache[rolId];
+  if (!permisos) return false;
+  return permisos[modulo] && permisos[modulo].includes(accion);
+};
+
+/**
+ * Obtener info de un rol por ID desde el cache
+ */
+const getRolFromCache = (rolId) => {
+  return _rolesCache[rolId] || null;
+};
+
+/**
+ * Obtener permisos dinámicos de un rol desde el cache
+ * Formato: { modulo: ['accion1', 'accion2'] }
+ * @param {number} rolId
+ * @returns {Object|null}
+ */
+const getPermisosForRol = (rolId) => {
+  return _permisosCache[rolId] || null;
+};
 
 /**
  * Middleware para verificar token JWT
@@ -55,21 +146,24 @@ const verificarToken = async (req, res, next) => {
       audience: jwtConfig.audience
     });
     
+    // Cargar cache de permisos dinámicos
+    await cargarCachePermisos();
+
     // Buscar usuario en BD para verificar que sigue activo
-    // ✅ Incluimos campos para usuarios cliente
     const usuario = await Usuario.findByPk(decoded.id, {
       attributes: [
-        'id', 
-        'username', 
-        'email', 
-        'nombre', 
+        'id',
+        'username',
+        'email',
+        'nombre',
         'apellido',
-        'nombre_completo', 
-        'rol', 
+        'nombre_completo',
+        'rol',
+        'rol_id',
         'activo',
-        'cliente_id',           // ← NUEVO
-        'permisos_cliente',     // ← NUEVO
-        'requiere_cambio_password', // ← NUEVO
+        'cliente_id',
+        'permisos_cliente',
+        'requiere_cambio_password',
         'ultimo_acceso'
       ]
     });
@@ -82,6 +176,9 @@ const verificarToken = async (req, res, next) => {
       return forbidden(res, 'Usuario desactivado. Contacte al administrador');
     }
     
+    // Obtener info del rol dinámico desde cache
+    const rolInfo = usuario.rol_id ? getRolFromCache(usuario.rol_id) : null;
+
     // ✅ Agregar usuario a la request con datos extendidos
     req.user = {
       id: usuario.id,
@@ -91,6 +188,8 @@ const verificarToken = async (req, res, next) => {
       apellido: usuario.apellido,
       nombre_completo: usuario.nombre_completo || usuario.getNombreDisplay(),
       rol: usuario.rol,
+      rol_id: usuario.rol_id,
+      rolInfo: rolInfo,
       // Campos de cliente
       cliente_id: usuario.cliente_id || null,
       permisos_cliente: usuario.permisos_cliente || null,
@@ -98,7 +197,20 @@ const verificarToken = async (req, res, next) => {
       // Helpers
       esCliente: usuario.esCliente(),
       esInterno: usuario.esInterno(),
-      esAdmin: usuario.esAdmin()
+      esAdmin: usuario.esAdmin(),
+      // Función de verificación de permiso dinámico
+      tienePermiso: function(modulo, accion) {
+        if (usuario.esAdmin()) return true;
+        // Usuario cliente: verificar permisos_cliente individuales
+        if (usuario.esCliente()) {
+          const permisos = usuario.permisos_cliente || {};
+          if (!permisos[modulo]) return false;
+          return permisos[modulo][accion] === true;
+        }
+        // Usuario interno: verificar permisos dinámicos de BD por rol_id
+        if (usuario.rol_id) return rolTienePermiso(usuario.rol_id, modulo, accion);
+        return false;
+      }
     };
     
     // ✅ Referencia al modelo completo (útil para métodos)
@@ -196,24 +308,30 @@ const verificarPermisoCliente = (modulo, accion) => {
     if (!req.user) {
       return unauthorized(res, 'Usuario no autenticado');
     }
-    
+
     // Admin tiene todos los permisos
     if (req.user.esAdmin) {
       return next();
     }
-    
-    // Usuarios internos: verificar por rol
+
+    // Usuarios internos: verificar permisos dinámicos de BD
     if (req.user.esInterno) {
-      // Por ahora, usuarios internos tienen acceso según su rol
-      // Se puede expandir con permisos más granulares
+      if (req.user.tienePermiso && !req.user.tienePermiso(modulo, accion)) {
+        logger.warn('Permiso denegado a usuario interno:', {
+          usuario: req.user.username,
+          rol: req.user.rol,
+          modulo,
+          accion,
+          ruta: req.originalUrl
+        });
+        return forbidden(res, `No tiene permiso para ${accion} en ${modulo}`);
+      }
       return next();
     }
-    
+
     // Usuario cliente: verificar permisos_cliente
-    if (req.user.esCliente && req.usuarioModel) {
-      const tienePermiso = req.usuarioModel.tienePermiso(modulo, accion);
-      
-      if (!tienePermiso) {
+    if (req.user.esCliente) {
+      if (req.user.tienePermiso && !req.user.tienePermiso(modulo, accion)) {
         logger.warn('Permiso denegado a usuario cliente:', {
           usuario: req.user.username,
           cliente_id: req.user.cliente_id,
@@ -224,7 +342,7 @@ const verificarPermisoCliente = (modulo, accion) => {
         return forbidden(res, `No tiene permiso para ${accion} en ${modulo}`);
       }
     }
-    
+
     next();
   };
 };
@@ -379,5 +497,11 @@ module.exports = {
   
   // Utilidades
   registrarAcceso,
-  obtenerClienteIdContexto
+  obtenerClienteIdContexto,
+
+  // Cache de permisos
+  invalidarCachePermisos,
+  cargarCachePermisos,
+  getRolFromCache,
+  getPermisosForRol
 };

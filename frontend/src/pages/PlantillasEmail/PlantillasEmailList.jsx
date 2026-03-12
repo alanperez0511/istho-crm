@@ -25,6 +25,7 @@ import {
 import { Button, ConfirmDialog } from '../../components/common';
 import useNotification from '../../hooks/useNotification';
 import plantillasEmailService from '../../api/plantillasEmail.service';
+import { useAuth } from '../../context/AuthContext';
 
 const TIPO_CONFIG = {
   operacion_cierre: {
@@ -53,7 +54,7 @@ const TIPO_CONFIG = {
   },
 };
 
-const PlantillaCard = ({ plantilla, onEdit, onDelete, onPreview }) => {
+const PlantillaCard = ({ plantilla, onEdit, onDelete, onPreview, canEdit, canDelete }) => {
   const config = TIPO_CONFIG[plantilla.tipo] || TIPO_CONFIG.general;
   const Icon = config.icon;
 
@@ -100,10 +101,14 @@ const PlantillaCard = ({ plantilla, onEdit, onDelete, onPreview }) => {
           <Button variant="outline" size="sm" icon={Eye} onClick={() => onPreview(plantilla)} className="flex-1">
             Vista Previa
           </Button>
-          <Button variant="outline" size="sm" icon={Pencil} onClick={() => onEdit(plantilla)}>
-            Editar
-          </Button>
-          <Button variant="ghost" size="sm" icon={Trash2} onClick={() => onDelete(plantilla)} className="text-slate-400 hover:text-red-500" />
+          {canEdit && (
+            <Button variant="outline" size="sm" icon={Pencil} onClick={() => onEdit(plantilla)}>
+              Editar
+            </Button>
+          )}
+          {canDelete && (
+            <Button variant="ghost" size="sm" icon={Trash2} onClick={() => onDelete(plantilla)} className="text-slate-400 hover:text-red-500" />
+          )}
         </div>
       </div>
     </div>
@@ -113,6 +118,10 @@ const PlantillaCard = ({ plantilla, onEdit, onDelete, onPreview }) => {
 const PlantillasEmailList = () => {
   const navigate = useNavigate();
   const { success, error: notifyError } = useNotification();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('notificaciones', 'crear');
+  const canEdit = hasPermission('notificaciones', 'editar');
+  const canDelete = hasPermission('notificaciones', 'eliminar');
 
   const [plantillas, setPlantillas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -189,9 +198,11 @@ const PlantillasEmailList = () => {
             <Button variant="ghost" icon={RefreshCw} onClick={fetchPlantillas} disabled={loading}>
               Actualizar
             </Button>
-            <Button variant="primary" icon={Plus} onClick={() => navigate('/plantillas-email/nueva')}>
-              Nueva Plantilla
-            </Button>
+            {canCreate && (
+              <Button variant="primary" icon={Plus} onClick={() => navigate('/plantillas-email/nueva')}>
+                Nueva Plantilla
+              </Button>
+            )}
           </div>
         </div>
 
@@ -222,6 +233,8 @@ const PlantillasEmailList = () => {
                 onEdit={(p) => navigate(`/plantillas-email/${p.id}`)}
                 onDelete={(p) => setDeleteModal({ isOpen: true, plantilla: p })}
                 onPreview={handlePreview}
+                canEdit={canEdit}
+                canDelete={canDelete}
               />
             ))}
           </div>

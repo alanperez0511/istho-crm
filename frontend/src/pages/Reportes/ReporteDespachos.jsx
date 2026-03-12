@@ -1,6 +1,6 @@
 /**
  * ISTHO CRM - ReporteDespachos Page
- * Reporte de operaciones (entradas/salidas) con exportación real
+ * Reporte de operaciones (entradas/salidas) con exportación real y filtros
  *
  * @author Coordinación TI ISTHO
  * @date Marzo 2026
@@ -15,9 +15,7 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  AlertTriangle,
   FileSpreadsheet,
-  Printer,
   RefreshCw,
   ArrowDownCircle,
   ArrowUpCircle,
@@ -25,38 +23,24 @@ import {
 } from 'lucide-react';
 
 // Components
-import { Button } from '../../components/common';
+import { Button, KpiCard, ReportFilters } from '../../components/common';
 import { BarChart, PieChart } from '../../components/charts';
 
 // API
 import reportesService from '../../api/reportes.service';
-
-// ============================================
-// STAT CARD
-// ============================================
-const StatCard = ({ title, value, subtitle, icon: Icon, iconBg, iconColor }) => (
-  <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700">
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{title}</p>
-        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
-        {subtitle && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{subtitle}</p>}
-      </div>
-      <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center`}>
-        <Icon className={`w-6 h-6 ${iconColor}`} />
-      </div>
-    </div>
-  </div>
-);
+import { useAuth } from '../../context/AuthContext';
 
 // ============================================
 // MAIN COMPONENT
 // ============================================
 const ReporteDespachos = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canDownload = hasPermission('reportes', 'exportar') || hasPermission('reportes', 'descargar');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({ fecha_desde: '', fecha_hasta: '', cliente_id: '' });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -77,13 +61,23 @@ const ReporteDespachos = () => {
     fetchData();
   }, [fetchData]);
 
+  // Construir query string con filtros
+  const buildFilterParams = () => {
+    const params = new URLSearchParams();
+    const token = localStorage.getItem('istho_token');
+    if (token) params.set('token', token);
+    if (filters.fecha_desde) params.set('fecha_desde', filters.fecha_desde);
+    if (filters.fecha_hasta) params.set('fecha_hasta', filters.fecha_hasta);
+    if (filters.cliente_id) params.set('cliente_id', filters.cliente_id);
+    return params.toString();
+  };
+
   const handleExport = (format) => {
     const baseUrl = import.meta.env.VITE_API_URL || '/api/v1';
-    const token = localStorage.getItem('istho_token');
-    const url = format === 'excel'
-      ? `${baseUrl}/reportes/operaciones/excel`
-      : `${baseUrl}/reportes/operaciones/pdf`;
-    window.open(`${url}?token=${token}`, '_blank');
+    const endpoint = format === 'excel'
+      ? '/reportes/operaciones/excel'
+      : '/reportes/operaciones/pdf';
+    window.open(`${baseUrl}${endpoint}?${buildFilterParams()}`, '_blank');
   };
 
   if (loading) {
@@ -149,12 +143,16 @@ const ReporteDespachos = () => {
             <Button variant="outline" icon={RefreshCw} onClick={fetchData}>
               Actualizar
             </Button>
-            <Button variant="outline" icon={FileSpreadsheet} onClick={() => handleExport('excel')}>
-              Excel
-            </Button>
-            <Button variant="primary" icon={Download} onClick={() => handleExport('pdf')}>
-              PDF
-            </Button>
+            {canDownload && (
+              <>
+                <Button variant="outline" icon={FileSpreadsheet} onClick={() => handleExport('excel')}>
+                  Excel
+                </Button>
+                <Button variant="primary" icon={Download} onClick={() => handleExport('pdf')}>
+                  PDF
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -164,9 +162,12 @@ const ReporteDespachos = () => {
           </div>
         )}
 
+        {/* Filtros */}
+        <ReportFilters filters={filters} onChange={setFilters} />
+
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard
+          <KpiCard
             title="Total Operaciones"
             value={operaciones.total || 0}
             subtitle={`${operaciones.mes || 0} este mes`}
@@ -174,7 +175,7 @@ const ReporteDespachos = () => {
             iconBg="bg-blue-100 dark:bg-blue-900/30"
             iconColor="text-blue-600 dark:text-blue-400"
           />
-          <StatCard
+          <KpiCard
             title="Entradas Pendientes"
             value={operaciones.entradasPendientes || 0}
             subtitle="Ingresos por auditar"
@@ -182,7 +183,7 @@ const ReporteDespachos = () => {
             iconBg="bg-emerald-100 dark:bg-emerald-900/30"
             iconColor="text-emerald-600 dark:text-emerald-400"
           />
-          <StatCard
+          <KpiCard
             title="Salidas Pendientes"
             value={operaciones.salidasPendientes || 0}
             subtitle="Despachos por auditar"
@@ -190,7 +191,7 @@ const ReporteDespachos = () => {
             iconBg="bg-amber-100 dark:bg-amber-900/30"
             iconColor="text-amber-600 dark:text-amber-400"
           />
-          <StatCard
+          <KpiCard
             title="Cerradas este Mes"
             value={operaciones.cerradasMes || 0}
             subtitle={`${porEstado.anulado || 0} anuladas`}

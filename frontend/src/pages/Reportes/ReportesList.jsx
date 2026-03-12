@@ -21,6 +21,7 @@ import {
 
 // Components
 import { Button } from '../../components/common';
+import { useAuth } from '../../context/AuthContext';
 
 // ============================================
 // REPORTES DISPONIBLES (Configuración UI)
@@ -55,7 +56,7 @@ const REPORTES_DISPONIBLES = [
 // ============================================
 // REPORTE CARD
 // ============================================
-const ReporteCard = ({ reporte }) => {
+const ReporteCard = ({ reporte, canExport }) => {
   const navigate = useNavigate();
   const Icon = reporte.icon;
 
@@ -80,14 +81,15 @@ const ReporteCard = ({ reporte }) => {
         >
           Ver Reporte
         </Button>
-        {reporte.exportEndpoints?.excel && (
+        {canExport && reporte.exportEndpoints?.excel && (
           <Button
             variant="outline"
             size="sm"
             icon={Download}
             onClick={() => {
               const baseUrl = import.meta.env.VITE_API_URL || '/api/v1';
-              window.open(`${baseUrl}${reporte.exportEndpoints.excel}`, '_blank');
+              const token = localStorage.getItem('istho_token');
+              window.open(`${baseUrl}${reporte.exportEndpoints.excel}?token=${token}`, '_blank');
             }}
           >
             Excel
@@ -103,6 +105,9 @@ const ReporteCard = ({ reporte }) => {
 // ============================================
 const ReportesList = () => {
   const navigate = useNavigate();
+  const { hasPermission, isCliente } = useAuth();
+  // Portal clients use 'descargar', internal roles use 'exportar'
+  const canExport = hasPermission('reportes', 'exportar') || hasPermission('reportes', 'descargar');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
@@ -157,7 +162,7 @@ const ReportesList = () => {
         {/* Reportes Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           {REPORTES_DISPONIBLES.map((reporte) => (
-            <ReporteCard key={reporte.id} reporte={reporte} />
+            <ReporteCard key={reporte.id} reporte={reporte} canExport={canExport} />
           ))}
         </div>
 

@@ -234,17 +234,31 @@ const enviarCierreOperacion = async (operacion, correosDestino) => {
     }
 
     // Intentar usar plantilla personalizada de la BD
-    // Busca primero por subtipo (ingreso/salida), si no hay busca genérica
+    // Busca: 1) predeterminada + subtipo, 2) predeterminada genérica, 3) cualquier activa con subtipo
     try {
       const { PlantillaEmail } = require('../models');
       const subtipo = operacion.tipo; // 'ingreso' o 'salida'
+
+      // 1. Predeterminada con subtipo exacto
       let plantillaCustom = await PlantillaEmail.findOne({
         where: { tipo: 'operacion_cierre', subtipo, es_predeterminada: true, activo: true }
       });
-      // Fallback: plantilla genérica sin subtipo
+      // 2. Predeterminada genérica (sin subtipo)
       if (!plantillaCustom) {
         plantillaCustom = await PlantillaEmail.findOne({
           where: { tipo: 'operacion_cierre', subtipo: null, es_predeterminada: true, activo: true }
+        });
+      }
+      // 3. Cualquier plantilla activa con el subtipo correcto (aunque no sea predeterminada)
+      if (!plantillaCustom) {
+        plantillaCustom = await PlantillaEmail.findOne({
+          where: { tipo: 'operacion_cierre', subtipo, activo: true }
+        });
+      }
+      // 4. Cualquier plantilla activa de operacion_cierre
+      if (!plantillaCustom) {
+        plantillaCustom = await PlantillaEmail.findOne({
+          where: { tipo: 'operacion_cierre', activo: true }
         });
       }
 

@@ -1,12 +1,13 @@
 import PropTypes from 'prop-types';
 
-const KpiCard = ({ 
-  title, 
-  value, 
-  change, 
-  positive = true, 
-  icon: Icon, 
-  iconBg = 'bg-blue-100 dark:bg-blue-900/30', 
+const KpiCard = ({
+  title,
+  value,
+  change,
+  subtitle,
+  positive = true,
+  icon: Icon,
+  iconBg = 'bg-blue-100 dark:bg-blue-900/30',
   iconColor = 'text-blue-600 dark:text-blue-400',
   onClick,
   loading = false,
@@ -51,6 +52,9 @@ const KpiCard = ({
           <p className="text-3xl font-bold text-slate-800 dark:text-slate-100">
             {value}
           </p>
+          {subtitle && (
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{subtitle}</p>
+          )}
           {change && (
             <p
               className={`
@@ -79,6 +83,7 @@ KpiCard.propTypes = {
   title: PropTypes.string.isRequired,
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   change: PropTypes.string,
+  subtitle: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   positive: PropTypes.bool,
   icon: PropTypes.elementType,
   iconBg: PropTypes.string,

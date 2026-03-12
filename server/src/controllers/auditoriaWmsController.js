@@ -45,9 +45,14 @@ const logger = require('../utils/logger');
 const listarEntradas = async (req, res) => {
   try {
     const { page, limit, offset } = parsePaginacion(req.query);
-    const { estado, search } = req.query;
+    const { estado, search, cliente_id } = req.query;
 
     const where = { tipo: 'ingreso' };
+
+    // Filtro por cliente (inyectado por filtrarPorCliente para usuarios portal)
+    if (cliente_id) {
+      where.cliente_id = cliente_id;
+    }
 
     if (estado && estado !== 'todos') {
       where.estado = estado;
@@ -60,26 +65,31 @@ const listarEntradas = async (req, res) => {
       ];
     }
 
-    const { count, rows } = await Operacion.findAndCountAll({
+    // Obtener IDs paginados primero (evita el bug de LIMIT con JOINs)
+    const needsClienteJoin = search || false;
+    const { count, rows: idRows } = await Operacion.findAndCountAll({
       where,
-      include: [
-        {
-          model: Cliente,
-          as: 'cliente',
-          attributes: ['id', 'razon_social']
-        },
-        {
-          model: OperacionDetalle,
-          as: 'detalles',
-          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'verificado']
-        }
-      ],
+      attributes: ['id'],
+      include: needsClienteJoin ? [{ model: Cliente, as: 'cliente', attributes: [] }] : [],
       order: [['created_at', 'DESC']],
       limit,
       offset,
       distinct: true,
-      subQuery: false
     });
+
+    // Luego traer los datos completos de esos IDs
+    const ids = idRows.map(r => r.id);
+    let rows = [];
+    if (ids.length > 0) {
+      rows = await Operacion.findAll({
+        where: { id: { [Op.in]: ids } },
+        include: [
+          { model: Cliente, as: 'cliente', attributes: ['id', 'razon_social'] },
+          { model: OperacionDetalle, as: 'detalles', attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'verificado'] }
+        ],
+        order: [['created_at', 'DESC']],
+      });
+    }
 
     const entradas = rows.map(op => ({
       id: op.id,
@@ -89,7 +99,7 @@ const listarEntradas = async (req, res) => {
       tipo_documento: 'Recepción',
       fecha_ingreso: op.fecha_operacion || op.created_at,
       estado: op.estado,
-      lineas: op.detalles?.length || 0,
+      lineas: op.total_referencias || op.detalles?.length || 0,
       lineas_verificadas: (op.detalles || []).filter(d => d.verificado).length,
     }));
 
@@ -192,9 +202,14 @@ const obtenerEntradaPorId = async (req, res) => {
 const listarSalidas = async (req, res) => {
   try {
     const { page, limit, offset } = parsePaginacion(req.query);
-    const { estado, search } = req.query;
+    const { estado, search, cliente_id } = req.query;
 
     const where = { tipo: 'salida' };
+
+    // Filtro por cliente (inyectado por filtrarPorCliente para usuarios portal)
+    if (cliente_id) {
+      where.cliente_id = cliente_id;
+    }
 
     if (estado && estado !== 'todos') {
       where.estado = estado;
@@ -207,26 +222,31 @@ const listarSalidas = async (req, res) => {
       ];
     }
 
-    const { count, rows } = await Operacion.findAndCountAll({
+    // Obtener IDs paginados primero (evita el bug de LIMIT con JOINs)
+    const needsClienteJoin = search || false;
+    const { count, rows: idRows } = await Operacion.findAndCountAll({
       where,
-      include: [
-        {
-          model: Cliente,
-          as: 'cliente',
-          attributes: ['id', 'razon_social']
-        },
-        {
-          model: OperacionDetalle,
-          as: 'detalles',
-          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'verificado']
-        }
-      ],
+      attributes: ['id'],
+      include: needsClienteJoin ? [{ model: Cliente, as: 'cliente', attributes: [] }] : [],
       order: [['created_at', 'DESC']],
       limit,
       offset,
       distinct: true,
-      subQuery: false
     });
+
+    // Luego traer los datos completos de esos IDs
+    const ids = idRows.map(r => r.id);
+    let rows = [];
+    if (ids.length > 0) {
+      rows = await Operacion.findAll({
+        where: { id: { [Op.in]: ids } },
+        include: [
+          { model: Cliente, as: 'cliente', attributes: ['id', 'razon_social'] },
+          { model: OperacionDetalle, as: 'detalles', attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'verificado'] }
+        ],
+        order: [['created_at', 'DESC']],
+      });
+    }
 
     const salidas = rows.map(op => ({
       id: op.id,
@@ -236,7 +256,7 @@ const listarSalidas = async (req, res) => {
       tipo_documento: 'Despacho',
       fecha_salida: op.fecha_operacion || op.created_at,
       estado: op.estado,
-      lineas: op.detalles?.length || 0,
+      lineas: op.total_referencias || op.detalles?.length || 0,
       lineas_verificadas: (op.detalles || []).filter(d => d.verificado).length,
     }));
 
@@ -681,43 +701,40 @@ const cerrarAuditoria = async (req, res) => {
     // ENVIAR CORREO ELECTRÓNICO
     // ════════════════════════════════════════════════════════════════════
 
-    let resultadoCorreo = { success: false };
-    if (enviar_correo !== false && correosEnvio) {
-      try {
-        // Recargar operación con todas las relaciones para el email
-        await operacion.reload({
-          include: [
-            { model: Cliente, as: 'cliente' },
-            { model: OperacionDetalle, as: 'detalles' },
-            { model: OperacionDocumento, as: 'documentos' },
-            { model: OperacionAveria, as: 'averias' },
-            { model: Usuario, as: 'cerrador', attributes: ['id', 'nombre_completo'] }
-          ]
-        });
-
-        resultadoCorreo = await emailService.enviarCierreOperacion(operacion, correosEnvio);
-
-        await operacion.update({
-          correo_enviado: resultadoCorreo.success,
-          fecha_correo_enviado: resultadoCorreo.success ? new Date() : null
-        });
-
-        logger.info('[AUDITORIAS] Correo de cierre enviado:', {
-          operacion_id: operacion.id,
-          numero: operacion.numero_operacion,
-          destinatarios: correosEnvio,
-          success: resultadoCorreo.success
-        });
-      } catch (emailErr) {
-        logger.error('[AUDITORIAS] Error al enviar correo de cierre:', { message: emailErr.message });
-      }
+    // Enviar correo en background (NO bloquea la respuesta)
+    const enviarEnBackground = enviar_correo !== false && correosEnvio;
+    if (enviarEnBackground) {
+      const opId = operacion.id;
+      setImmediate(async () => {
+        try {
+          await operacion.reload({
+            include: [
+              { model: Cliente, as: 'cliente' },
+              { model: OperacionDetalle, as: 'detalles' },
+              { model: OperacionDocumento, as: 'documentos' },
+              { model: OperacionAveria, as: 'averias' },
+              { model: Usuario, as: 'cerrador', attributes: ['id', 'nombre_completo'] }
+            ]
+          });
+          const resultado = await emailService.enviarCierreOperacion(operacion, correosEnvio);
+          await operacion.update({
+            correo_enviado: resultado.success,
+            fecha_correo_enviado: resultado.success ? new Date() : null
+          });
+          logger.info('[AUDITORIAS] Correo de cierre enviado en background:', {
+            operacion_id: opId, destinatarios: correosEnvio, success: resultado.success
+          });
+        } catch (emailErr) {
+          logger.error('[AUDITORIAS] Error al enviar correo en background:', { operacion_id: opId, message: emailErr.message });
+          await Operacion.update({ correo_enviado: false }, { where: { id: opId } }).catch(() => {});
+        }
+      });
     }
 
     return successMessage(res, 'Auditoría cerrada correctamente', {
       numero_operacion: operacion.numero_operacion,
-      correo_enviado: resultadoCorreo.success,
+      correo_enviado: enviarEnBackground ? 'enviando' : false,
       correos_destino: correosEnvio || null,
-      preview_url: resultadoCorreo.previewUrl
     });
   } catch (err) {
     logger.error('[AUDITORIAS] Error al cerrar auditoría:', err);
@@ -735,15 +752,23 @@ const cerrarAuditoria = async (req, res) => {
  */
 const estadisticas = async (req, res) => {
   try {
+    const { cliente_id } = req.query;
+    const whereEntradas = { tipo: 'ingreso' };
+    const whereSalidas = { tipo: 'salida' };
+    if (cliente_id) {
+      whereEntradas.cliente_id = cliente_id;
+      whereSalidas.cliente_id = cliente_id;
+    }
+
     const [entradas, salidas] = await Promise.all([
       Operacion.findAll({
-        where: { tipo: 'ingreso' },
+        where: whereEntradas,
         attributes: ['estado', [sequelize.fn('COUNT', sequelize.col('id')), 'total']],
         group: ['estado'],
         raw: true
       }),
       Operacion.findAll({
-        where: { tipo: 'salida' },
+        where: whereSalidas,
         attributes: ['estado', [sequelize.fn('COUNT', sequelize.col('id')), 'total']],
         group: ['estado'],
         raw: true
@@ -779,16 +804,23 @@ const estadisticas = async (req, res) => {
 const recientes = async (req, res) => {
   try {
     const limite = parseInt(req.query.limit) || 5;
+    const { cliente_id } = req.query;
+    const whereEntradas = { tipo: 'ingreso' };
+    const whereSalidas = { tipo: 'salida' };
+    if (cliente_id) {
+      whereEntradas.cliente_id = cliente_id;
+      whereSalidas.cliente_id = cliente_id;
+    }
 
     const [entradas, salidas] = await Promise.all([
       Operacion.findAll({
-        where: { tipo: 'ingreso' },
+        where: whereEntradas,
         include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
         order: [['created_at', 'DESC']],
         limit: limite
       }),
       Operacion.findAll({
-        where: { tipo: 'salida' },
+        where: whereSalidas,
         include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
         order: [['created_at', 'DESC']],
         limit: limite

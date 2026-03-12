@@ -1145,40 +1145,46 @@ const cerrar = async (req, res) => {
       logger.error('Error al enviar notificación de cierre:', { message: err.message, operacion_id: operacion.id, cliente_id: operacion.cliente_id });
     });
 
-    // Enviar correo (fuera de transacción) — recargar con cerrador para el email
-    let resultadoCorreo = { success: false };
+    // Enviar correo en background (NO bloquea la respuesta)
     if (enviar_correo !== false && correosEnvio) {
-      await operacion.reload({
-        include: [
-          { model: Cliente, as: 'cliente' },
-          { model: OperacionDetalle, as: 'detalles' },
-          { model: OperacionDocumento, as: 'documentos' },
-          { model: OperacionAveria, as: 'averias' },
-          { model: Usuario, as: 'cerrador', attributes: ['id', 'nombre_completo'] }
-        ]
-      });
-      resultadoCorreo = await emailService.enviarCierreOperacion(operacion, correosEnvio);
-      
-      await operacion.update({
-        correo_enviado: resultadoCorreo.success,
-        fecha_correo_enviado: resultadoCorreo.success ? new Date() : null
+      const opId = operacion.id;
+      setImmediate(async () => {
+        try {
+          await operacion.reload({
+            include: [
+              { model: Cliente, as: 'cliente' },
+              { model: OperacionDetalle, as: 'detalles' },
+              { model: OperacionDocumento, as: 'documentos' },
+              { model: OperacionAveria, as: 'averias' },
+              { model: Usuario, as: 'cerrador', attributes: ['id', 'nombre_completo'] }
+            ]
+          });
+          const resultado = await emailService.enviarCierreOperacion(operacion, correosEnvio);
+          await operacion.update({
+            correo_enviado: resultado.success,
+            fecha_correo_enviado: resultado.success ? new Date() : null
+          });
+          logger.info('Correo de cierre enviado en background:', { operacion_id: opId, success: resultado.success });
+        } catch (emailErr) {
+          logger.error('Error al enviar correo de cierre en background:', { operacion_id: opId, message: emailErr.message });
+          await Operacion.update({ correo_enviado: false }, { where: { id: opId } }).catch(() => {});
+        }
       });
     }
-    
-    logger.info('Operación cerrada:', { 
+
+    logger.info('Operación cerrada:', {
       operacionId: id,
       tipo: operacion.tipo,
       stockActualizado: true,
-      correoEnviado: resultadoCorreo.success
+      correoEnBackground: !!(enviar_correo !== false && correosEnvio)
     });
-    
+
     return successMessage(res, 'Operación cerrada exitosamente', {
       numero_operacion: operacion.numero_operacion,
       estado: 'cerrado',
       stock_actualizado: true,
-      correo_enviado: resultadoCorreo.success,
+      correo_enviado: !!(enviar_correo !== false && correosEnvio) ? 'enviando' : false,
       correos_destino: correosEnvio,
-      preview_url: resultadoCorreo.previewUrl
     });
     
   } catch (error) {
@@ -1308,6 +1314,82 @@ const listarAverias = async (req, res) => {
   }
 };
 
+/**
+ * POST /operaciones/:id/reenviar-correo
+ * Reenviar correo de cierre de operación
+ */
+const reenviarCorreo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { correos_destino } = req.body;
+
+    const operacion = await Operacion.findByPk(id, {
+      include: [
+        { model: Cliente, as: 'cliente' },
+        { model: OperacionDetalle, as: 'detalles' },
+        { model: OperacionDocumento, as: 'documentos' },
+        { model: OperacionAveria, as: 'averias' },
+        { model: Usuario, as: 'cerrador', attributes: ['id', 'nombre_completo'] }
+      ]
+    });
+
+    if (!operacion) {
+      return notFound(res, 'Operación no encontrada');
+    }
+
+    if (operacion.estado !== 'cerrado') {
+      return errorResponse(res, 'Solo se puede reenviar correo de operaciones cerradas', 400);
+    }
+
+    // Determinar destinatarios
+    let correosEnvio = correos_destino;
+    if (!correosEnvio) {
+      // Usar los correos del cierre original, o buscar en contactos
+      if (operacion.correos_destino) {
+        correosEnvio = operacion.correos_destino;
+      } else {
+        const contactos = await Contacto.findAll({
+          where: {
+            cliente_id: operacion.cliente_id,
+            recibe_notificaciones: true,
+            activo: true,
+            email: { [Op.ne]: null }
+          }
+        });
+        correosEnvio = contactos.map(c => c.email).join(', ');
+      }
+    }
+
+    if (!correosEnvio) {
+      return errorResponse(res, 'No hay destinatarios configurados. Verifique los contactos del cliente.', 400);
+    }
+
+    const resultado = await emailService.enviarCierreOperacion(operacion, correosEnvio);
+
+    if (resultado.success) {
+      await operacion.update({
+        correo_enviado: true,
+        fecha_correo_enviado: new Date(),
+        correos_destino: correosEnvio
+      });
+    }
+
+    logger.info('Reenvío de correo:', {
+      operacion_id: id,
+      destinatarios: correosEnvio,
+      success: resultado.success
+    });
+
+    return successMessage(res, resultado.success ? 'Correo reenviado exitosamente' : 'Error al reenviar correo', {
+      correo_enviado: resultado.success,
+      correos_destino: correosEnvio,
+    });
+  } catch (error) {
+    logger.error('Error al reenviar correo:', { message: error.message });
+    return serverError(res, 'Error al reenviar el correo', error);
+  }
+};
+
 module.exports = {
   listarDocumentosWMS,
   buscarDocumentoWMS,
@@ -1320,5 +1402,6 @@ module.exports = {
   listarAverias,
   subirDocumento,
   cerrar,
+  reenviarCorreo,
   anular
 };

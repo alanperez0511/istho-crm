@@ -28,6 +28,7 @@ const {
 } = require('../utils/responses');
 const logger = require('../utils/logger');
 const emailService = require('../services/emailService');
+const { cargarCachePermisos, getPermisosForRol } = require('../middleware/auth');
 
 // ============================================================================
 // CONSTANTES
@@ -154,8 +155,10 @@ const login = async (req, res) => {
 
     logger.info('Login exitoso:', { userId: usuario.id, email: usuario.email });
 
-    // Construir datos de respuesta
-    const userData = usuario.toPublicJSON();
+    // Cargar cache de permisos dinámicos y construir datos de respuesta
+    await cargarCachePermisos();
+    const permisosDB = usuario.rol_id ? getPermisosForRol(usuario.rol_id) : null;
+    const userData = usuario.toPublicJSON(permisosDB);
 
     // Si es usuario de cliente, incluir datos del cliente (logo, nombre)
     if (usuario.rol === 'cliente' && usuario.cliente_id) {
@@ -198,7 +201,10 @@ const me = async (req, res) => {
       return notFound(res, 'Usuario no encontrado');
     }
 
-    const userData = usuario.toPublicJSON();
+    // Cargar permisos dinámicos
+    await cargarCachePermisos();
+    const permisosDB = usuario.rol_id ? getPermisosForRol(usuario.rol_id) : null;
+    const userData = usuario.toPublicJSON(permisosDB);
 
     // Si es usuario de cliente, incluir datos del cliente
     if (usuario.rol === 'cliente' && usuario.cliente_id) {
@@ -263,7 +269,9 @@ const actualizarPerfil = async (req, res) => {
 
     logger.info('Perfil actualizado:', { userId, campos: Object.keys(camposActualizables) });
 
-    return successMessage(res, 'Perfil actualizado correctamente', usuarioActualizado.toPublicJSON());
+    await cargarCachePermisos();
+    const permisosDB = usuarioActualizado.rol_id ? getPermisosForRol(usuarioActualizado.rol_id) : null;
+    return successMessage(res, 'Perfil actualizado correctamente', usuarioActualizado.toPublicJSON(permisosDB));
 
   } catch (error) {
     logger.error('Error actualizando perfil:', { message: error.message });
