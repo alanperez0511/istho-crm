@@ -192,6 +192,21 @@ module.exports = (sequelize) => {
         return val;
       }
     },
+
+    permisos_personalizados: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Permisos personalizados por usuario (override de rol). Array de permiso_ids o null para usar permisos del rol',
+      get() {
+        const val = this.getDataValue('permisos_personalizados');
+        if (!val) return null;
+        if (typeof val === 'string') {
+          try { return JSON.parse(val); } catch { return null; }
+        }
+        return val;
+      }
+    },
     
     requiere_cambio_password: {
       type: DataTypes.BOOLEAN,
@@ -371,6 +386,16 @@ module.exports = (sequelize) => {
       return permisos[modulo][accion] === true;
     }
 
+    // Usuario interno con permisos personalizados: usar permisosDB personalizado
+    if (this.permisos_personalizados) {
+      const pp = this.permisos_personalizados;
+      // Formato: { modulo: ['accion1', 'accion2'] }
+      if (pp[modulo]) {
+        return pp[modulo].includes(accion);
+      }
+      return false;
+    }
+
     // Usuario interno: usar permisos dinámicos de BD si están disponibles
     if (permisosDB) {
       return permisosDB[modulo]?.includes(accion) || false;
@@ -404,6 +429,17 @@ module.exports = (sequelize) => {
         esCliente: true,
         clienteId: this.cliente_id,
         permisos: this.permisos_cliente || PERMISOS_CLIENTE_DEFAULT
+      };
+    }
+
+    // Usuario interno con permisos personalizados
+    if (this.permisos_personalizados) {
+      return {
+        esAdmin: false,
+        esCliente: false,
+        rol: this.rol,
+        personalizado: true,
+        permisos: this.permisos_personalizados
       };
     }
 

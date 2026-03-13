@@ -10,10 +10,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Search, RefreshCw, UserCheck, UserX, KeyRound,
-  MoreVertical, Pencil, Trash2, Eye, ChevronLeft, ChevronRight
+  MoreVertical, Pencil, Trash2, Eye, ChevronLeft, ChevronRight, Shield, Mail
 } from 'lucide-react';
 import adminService from '../../api/admin.service';
 import UsuarioForm from './UsuarioForm';
+import UsuarioPermisos from './UsuarioPermisos';
 import { useAuth } from '../../context/AuthContext';
 
 const UsuariosList = () => {
@@ -31,6 +32,9 @@ const UsuariosList = () => {
   const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
   const [showResetPassword, setShowResetPassword] = useState(null);
   const [newPassword, setNewPassword] = useState('');
+  const [showPermisos, setShowPermisos] = useState(null);
+  const [sendingCredentials, setSendingCredentials] = useState(null);
+  const [credentialsMsg, setCredentialsMsg] = useState(null);
 
   const fetchUsuarios = useCallback(async () => {
     setLoading(true);
@@ -91,6 +95,19 @@ const UsuariosList = () => {
     }
   };
 
+  const handleReenviarCredenciales = async (user) => {
+    setSendingCredentials(user.id);
+    setMenuOpen(null);
+    try {
+      await adminService.reenviarCredenciales(user.id);
+      setCredentialsMsg({ type: 'success', text: `Credenciales enviadas a ${user.email}` });
+    } catch (error) {
+      setCredentialsMsg({ type: 'error', text: error.response?.data?.message || 'Error al enviar credenciales' });
+    }
+    setSendingCredentials(null);
+    setTimeout(() => setCredentialsMsg(null), 4000);
+  };
+
   const handleFormSave = () => {
     setShowForm(false);
     setEditingUser(null);
@@ -99,6 +116,18 @@ const UsuariosList = () => {
 
   return (
     <div className="space-y-4">
+      {/* Toast de credenciales */}
+      {credentialsMsg && (
+        <div className={`px-4 py-3 rounded-xl text-sm flex items-center gap-2 ${
+          credentialsMsg.type === 'success'
+            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+        }`}>
+          <Mail className="w-4 h-4 shrink-0" />
+          {credentialsMsg.text}
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Search */}
@@ -323,6 +352,15 @@ const UsuariosList = () => {
         </div>
       )}
 
+      {/* Modal: Permisos */}
+      {showPermisos && (
+        <UsuarioPermisos
+          usuario={showPermisos}
+          onClose={() => setShowPermisos(null)}
+          onSave={() => fetchUsuarios()}
+        />
+      )}
+
       {/* Dropdown menu (fixed, fuera del overflow de la tabla) */}
       {menuOpen && (() => {
         const user = usuarios.find(u => u.id === menuOpen);
@@ -348,6 +386,24 @@ const UsuariosList = () => {
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
                   <KeyRound className="w-3.5 h-3.5" /> Resetear contraseña
+                </button>
+              )}
+              {hasPermission('usuarios', 'editar') && user.rol !== 'admin' && (
+                <button
+                  onClick={() => { setShowPermisos(user); setMenuOpen(null); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+                >
+                  <Shield className="w-3.5 h-3.5" /> Permisos
+                </button>
+              )}
+              {hasPermission('usuarios', 'editar') && (
+                <button
+                  onClick={() => handleReenviarCredenciales(user)}
+                  disabled={sendingCredentials === user.id}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  {sendingCredentials === user.id ? 'Enviando...' : 'Reenviar credenciales'}
                 </button>
               )}
               {hasPermission('usuarios', 'eliminar') && (

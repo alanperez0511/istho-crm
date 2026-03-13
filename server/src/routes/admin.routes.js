@@ -27,6 +27,9 @@ router.get('/usuarios/:id', adminController.obtenerUsuario);
 router.post('/usuarios', adminController.crearUsuario);
 router.put('/usuarios/:id', adminController.actualizarUsuario);
 router.put('/usuarios/:id/resetear-password', adminController.resetearPassword);
+router.post('/usuarios/:id/reenviar-credenciales', adminController.reenviarCredenciales);
+router.get('/usuarios/:id/permisos', adminController.obtenerPermisosUsuario);
+router.put('/usuarios/:id/permisos', adminController.actualizarPermisosUsuario);
 router.delete('/usuarios/:id', adminController.desactivarUsuario);
 
 // =============================================

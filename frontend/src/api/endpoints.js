@@ -209,6 +209,8 @@ export const ADMIN_ENDPOINTS = {
   USUARIOS: '/admin/usuarios',
   USUARIO_BY_ID: (id) => `/admin/usuarios/${id}`,
   USUARIO_RESET_PASSWORD: (id) => `/admin/usuarios/${id}/resetear-password`,
+  USUARIO_PERMISOS: (id) => `/admin/usuarios/${id}/permisos`,
+  USUARIO_REENVIAR_CREDENCIALES: (id) => `/admin/usuarios/${id}/reenviar-credenciales`,
 
   // Roles
   ROLES: '/admin/roles',
@@ -216,6 +218,16 @@ export const ADMIN_ENDPOINTS = {
 
   // Permisos
   PERMISOS: '/admin/permisos',
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// AUDITORÍA DE ACCIONES
+// ════════════════════════════════════════════════════════════════════════════
+
+export const AUDITORIA_ACCIONES_ENDPOINTS = {
+  BASE: '/auditoria-acciones',
+  STATS: '/auditoria-acciones/stats',
+  TABLAS: '/auditoria-acciones/tablas',
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -236,6 +248,7 @@ export const ENDPOINTS = {
   DASHBOARD: DASHBOARD_ENDPOINTS,
   PLANTILLAS_EMAIL: PLANTILLAS_EMAIL_ENDPOINTS,
   ADMIN: ADMIN_ENDPOINTS,
+  AUDITORIA_ACCIONES: AUDITORIA_ACCIONES_ENDPOINTS,
 };
 
 export default ENDPOINTS;

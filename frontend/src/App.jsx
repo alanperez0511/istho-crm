@@ -100,6 +100,9 @@ const Notificaciones = lazy(() => import('./pages/Perfil/Notificaciones'));
 // Administración
 const Administracion = lazy(() => import('./pages/Administracion'));
 
+// Auditoría de Acciones
+const AuditoriaAcciones = lazy(() => import('./pages/AuditoriaAcciones'));
+
 // ════════════════════════════════════════════════════════════════════════════
 // PLACEHOLDER PARA PÁGINAS EN DESARROLLO
 // ════════════════════════════════════════════════════════════════════════════
@@ -236,6 +239,7 @@ function App() {
                 {/* ADMINISTRACIÓN - Solo admin */}
                 {/* ────────────────────────────────────────────────────────── */}
                 <Route path="/administracion" element={<AdminRoute><Administracion /></AdminRoute>} />
+                <Route path="/auditoria-acciones" element={<AdminRoute><AuditoriaAcciones /></AdminRoute>} />
 
                 {/* ────────────────────────────────────────────────────────── */}
                 {/* PERFIL Y CONFIGURACIÓN */}

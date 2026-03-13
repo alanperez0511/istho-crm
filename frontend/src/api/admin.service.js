@@ -39,6 +39,18 @@ const adminService = {
     return apiClient.delete(ADMIN_ENDPOINTS.USUARIO_BY_ID(id));
   },
 
+  reenviarCredenciales(id) {
+    return apiClient.post(ADMIN_ENDPOINTS.USUARIO_REENVIAR_CREDENCIALES(id));
+  },
+
+  getPermisosUsuario(id) {
+    return apiClient.get(ADMIN_ENDPOINTS.USUARIO_PERMISOS(id));
+  },
+
+  actualizarPermisosUsuario(id, data) {
+    return apiClient.put(ADMIN_ENDPOINTS.USUARIO_PERMISOS(id), data);
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // ROLES
   // ═══════════════════════════════════════════════════════════════════════════

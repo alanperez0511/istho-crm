@@ -29,6 +29,7 @@ const {
 const logger = require('../utils/logger');
 const emailService = require('../services/emailService');
 const { cargarCachePermisos, getPermisosForRol } = require('../middleware/auth');
+const { getClientIP } = require('../utils/helpers');
 
 // ============================================================================
 // CONSTANTES
@@ -148,7 +149,7 @@ const login = async (req, res) => {
       accion: 'login',
       usuario_id: usuario.id,
       usuario_nombre: usuario.getNombreDisplay(),
-      ip_address: req.ip,
+      ip_address: getClientIP(req),
       user_agent: req.get('user-agent'),
       descripcion: `Login exitoso: ${usuario.email}`
     });
@@ -315,7 +316,7 @@ const registro = async (req, res) => {
       usuario_id: req.user.id,
       usuario_nombre: req.user.nombre_completo,
       datos_nuevos: { username, email, nombre, apellido, rol },
-      ip_address: req.ip,
+      ip_address: getClientIP(req),
       descripcion: `Usuario creado: ${username}`
     });
 
@@ -341,7 +342,7 @@ const logout = async (req, res) => {
       accion: 'logout',
       usuario_id: req.user.id,
       usuario_nombre: req.user.nombre_completo,
-      ip_address: req.ip,
+      ip_address: getClientIP(req),
       descripcion: `Logout: ${req.user.email}`
     });
 
@@ -386,7 +387,7 @@ const cambiarPassword = async (req, res) => {
       accion: 'actualizar',
       usuario_id: usuario.id,
       usuario_nombre: usuario.getNombreDisplay(),
-      ip_address: req.ip,
+      ip_address: getClientIP(req),
       descripcion: 'Cambio de contraseña'
     });
 
@@ -476,7 +477,7 @@ const resetPassword = async (req, res) => {
       accion: 'actualizar',
       usuario_id: usuario.id,
       usuario_nombre: usuario.getNombreDisplay(),
-      ip_address: req.ip,
+      ip_address: getClientIP(req),
       descripcion: 'Contraseña restablecida mediante token'
     });
 

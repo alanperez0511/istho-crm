@@ -9,10 +9,12 @@
 
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
-const { Usuario, Rol, Permiso, RolPermiso, Cliente, sequelize } = require('../models');
+const { Usuario, Rol, Permiso, RolPermiso, Cliente, Auditoria, sequelize } = require('../models');
 const { success, successMessage, created, serverError, notFound, badRequest, forbidden } = require('../utils/responses');
 const { invalidarCachePermisos } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const { enviarBienvenidaUsuarioCliente, enviarBienvenida } = require('../services/emailService');
+const { getClientIP } = require('../utils/helpers');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // USUARIOS INTERNOS
@@ -132,10 +134,47 @@ const crearUsuario = async (req, res) => {
 
     const resultado = await Usuario.findByPk(usuario.id, {
       attributes: { exclude: ['password_hash', 'reset_token', 'reset_token_expires'] },
-      include: [{ model: Rol, as: 'rolInfo', attributes: ['id', 'nombre', 'codigo', 'color'] }]
+      include: [
+        { model: Rol, as: 'rolInfo', attributes: ['id', 'nombre', 'codigo', 'color'] },
+        { model: Cliente, as: 'cliente', attributes: ['id', 'razon_social'], required: false }
+      ]
     });
 
+    // Enviar email de bienvenida con credenciales
+    try {
+      if (rol.es_cliente && cliente_id) {
+        const clienteNombre = resultado.cliente?.razon_social || '';
+        await enviarBienvenidaUsuarioCliente({
+          email: email.toLowerCase(),
+          nombre: `${nombre || ''} ${apellido || ''}`.trim() || username,
+          username,
+          password,
+          cliente: clienteNombre,
+          invitadoPor: req.user.nombre_completo || req.user.username,
+          esReenvio: false
+        });
+        logger.info('Email de bienvenida (portal) enviado:', { usuarioId: usuario.id, email });
+      } else {
+        await enviarBienvenida({
+          nombre_completo: `${nombre || ''} ${apellido || ''}`.trim() || username,
+          username,
+          email: email.toLowerCase(),
+          rol: rol.codigo
+        }, password);
+        logger.info('Email de bienvenida enviado:', { usuarioId: usuario.id, email });
+      }
+    } catch (emailError) {
+      logger.error('Error al enviar email de bienvenida:', { message: emailError.message });
+      // No fallar la creación por error de email
+    }
+
     logger.info('Usuario creado:', { id: usuario.id, username, rol: rol.codigo, creadoPor: req.user.id });
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: usuario.id, accion: 'crear',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      datos_nuevos: { username, email, rol: rol.codigo, rol_id: rol.id },
+      ip_address: getClientIP(req), descripcion: `Usuario "${username}" creado con rol ${rol.nombre}`
+    });
     return created(res, 'Usuario creado exitosamente', resultado);
   } catch (error) {
     logger.error('Error al crear usuario:', { message: error.message });
@@ -187,6 +226,12 @@ const actualizarUsuario = async (req, res) => {
     });
 
     logger.info('Usuario actualizado:', { id: usuario.id, modificadoPor: req.user.id });
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: usuario.id, accion: 'actualizar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      datos_nuevos: req.body, ip_address: getClientIP(req),
+      descripcion: `Usuario "${usuario.username}" actualizado`
+    });
     return successMessage(res, 'Usuario actualizado exitosamente', resultado);
   } catch (error) {
     logger.error('Error al actualizar usuario:', { message: error.message });
@@ -212,10 +257,77 @@ const resetearPassword = async (req, res) => {
     await usuario.save();
 
     logger.info('Password reseteado:', { id: usuario.id, por: req.user.id });
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: usuario.id, accion: 'actualizar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      ip_address: getClientIP(req), descripcion: `Contraseña de "${usuario.username}" reseteada`
+    });
     return successMessage(res, 'Contraseña reseteada exitosamente. El usuario deberá cambiarla al iniciar sesión.');
   } catch (error) {
     logger.error('Error al resetear password:', { message: error.message });
     return serverError(res, 'Error al resetear contraseña', error);
+  }
+};
+
+/**
+ * POST /admin/usuarios/:id/reenviar-credenciales
+ * Genera nueva contraseña temporal y envía email con credenciales
+ */
+const reenviarCredenciales = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.params.id, {
+      include: [
+        { model: Rol, as: 'rolInfo', attributes: ['id', 'nombre', 'codigo', 'es_cliente'] },
+        { model: Cliente, as: 'cliente', attributes: ['id', 'razon_social'], required: false }
+      ]
+    });
+    if (!usuario) return notFound(res, 'Usuario no encontrado');
+
+    // Generar contraseña temporal
+    const crypto = require('crypto');
+    const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    let passwordTemporal = '';
+    for (let i = 0; i < 12; i++) {
+      passwordTemporal += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    }
+
+    // Actualizar contraseña
+    usuario.password_hash = passwordTemporal;
+    usuario.requiere_cambio_password = true;
+    await usuario.save();
+
+    // Enviar email
+    const esCliente = usuario.rolInfo?.es_cliente || usuario.rol === 'cliente';
+
+    if (esCliente) {
+      await enviarBienvenidaUsuarioCliente({
+        email: usuario.email,
+        nombre: usuario.nombre_completo || usuario.getNombreDisplay(),
+        username: usuario.username,
+        password: passwordTemporal,
+        cliente: usuario.cliente?.razon_social || '',
+        invitadoPor: req.user.nombre_completo || req.user.username,
+        esReenvio: true
+      });
+    } else {
+      await enviarBienvenida({
+        nombre_completo: usuario.nombre_completo || usuario.getNombreDisplay(),
+        username: usuario.username,
+        email: usuario.email,
+        rol: usuario.rol
+      }, passwordTemporal);
+    }
+
+    logger.info('Credenciales reenviadas:', { usuarioId: usuario.id, por: req.user.id });
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: usuario.id, accion: 'actualizar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      ip_address: getClientIP(req), descripcion: `Credenciales reenviadas a "${usuario.email}"`
+    });
+    return successMessage(res, 'Credenciales enviadas al correo del usuario exitosamente');
+  } catch (error) {
+    logger.error('Error al reenviar credenciales:', { message: error.message });
+    return serverError(res, 'Error al reenviar credenciales', error);
   }
 };
 
@@ -234,10 +346,130 @@ const desactivarUsuario = async (req, res) => {
 
     await usuario.update({ activo: false });
     logger.info('Usuario desactivado:', { id: usuario.id, por: req.user.id });
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: usuario.id, accion: 'eliminar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      ip_address: getClientIP(req), descripcion: `Usuario "${usuario.username}" desactivado`
+    });
     return successMessage(res, 'Usuario desactivado exitosamente');
   } catch (error) {
     logger.error('Error al desactivar usuario:', { message: error.message });
     return serverError(res, 'Error al desactivar usuario', error);
+  }
+};
+
+/**
+ * GET /admin/usuarios/:id/permisos
+ * Obtener permisos efectivos de un usuario (rol + personalizados)
+ */
+const obtenerPermisosUsuario = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.params.id, {
+      attributes: ['id', 'username', 'nombre_completo', 'rol', 'rol_id', 'cliente_id', 'permisos_cliente', 'permisos_personalizados'],
+      include: [
+        { model: Rol, as: 'rolInfo', attributes: ['id', 'nombre', 'codigo', 'color', 'es_cliente'], include: [
+          { model: Permiso, as: 'permisos', attributes: ['id', 'modulo', 'accion', 'descripcion', 'grupo'], through: { attributes: [] } }
+        ]}
+      ]
+    });
+
+    if (!usuario) return notFound(res, 'Usuario no encontrado');
+
+    const esCliente = usuario.rolInfo?.es_cliente || usuario.rol === 'cliente';
+
+    if (esCliente) {
+      // Retornar permisos del portal cliente
+      return success(res, {
+        tipo: 'cliente',
+        usuario: { id: usuario.id, username: usuario.username, nombre: usuario.nombre_completo },
+        permisos_cliente: usuario.permisos_cliente || null,
+        catalogo: Usuario.getPermisosClienteCatalogo(),
+        defaults: Usuario.getPermisosClienteDefault()
+      });
+    }
+
+    // Usuario interno: retornar permisos del rol + personalizados
+    const rolPermisos = (usuario.rolInfo?.permisos || []).map(p => ({ id: p.id, modulo: p.modulo, accion: p.accion, descripcion: p.descripcion, grupo: p.grupo }));
+
+    return success(res, {
+      tipo: 'interno',
+      usuario: { id: usuario.id, username: usuario.username, nombre: usuario.nombre_completo },
+      rol: usuario.rolInfo ? { id: usuario.rolInfo.id, nombre: usuario.rolInfo.nombre, codigo: usuario.rolInfo.codigo, color: usuario.rolInfo.color } : null,
+      permisos_rol: rolPermisos,
+      permisos_personalizados: usuario.permisos_personalizados,
+      tiene_personalizados: usuario.permisos_personalizados !== null
+    });
+  } catch (error) {
+    logger.error('Error al obtener permisos de usuario:', { message: error.message });
+    return serverError(res, 'Error al obtener permisos de usuario', error);
+  }
+};
+
+/**
+ * PUT /admin/usuarios/:id/permisos
+ * Actualizar permisos personalizados de un usuario
+ */
+const actualizarPermisosUsuario = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.params.id, {
+      include: [{ model: Rol, as: 'rolInfo', attributes: ['id', 'es_cliente'] }]
+    });
+    if (!usuario) return notFound(res, 'Usuario no encontrado');
+
+    // No se pueden personalizar permisos de admin
+    if (usuario.rol === 'admin') {
+      return badRequest(res, 'No se pueden personalizar los permisos de un administrador');
+    }
+
+    const esCliente = usuario.rolInfo?.es_cliente || usuario.rol === 'cliente';
+
+    if (esCliente) {
+      // Actualizar permisos_cliente
+      const { permisos_cliente } = req.body;
+      if (!permisos_cliente || typeof permisos_cliente !== 'object') {
+        return badRequest(res, 'permisos_cliente es requerido y debe ser un objeto');
+      }
+      await usuario.update({ permisos_cliente });
+      invalidarCachePermisos();
+      logger.info('Permisos de cliente actualizados:', { usuarioId: usuario.id, por: req.user.id });
+      return successMessage(res, 'Permisos del usuario actualizados exitosamente', { permisos_cliente });
+    }
+
+    // Usuario interno: actualizar permisos_personalizados
+    const { permisos_personalizados, restaurar_rol } = req.body;
+
+    if (restaurar_rol) {
+      // Restaurar a permisos del rol (eliminar override)
+      await usuario.update({ permisos_personalizados: null });
+      invalidarCachePermisos();
+      logger.info('Permisos personalizados eliminados (restaurar rol):', { usuarioId: usuario.id, por: req.user.id });
+      return successMessage(res, 'Permisos restaurados a los del rol');
+    }
+
+    if (!permisos_personalizados || typeof permisos_personalizados !== 'object') {
+      return badRequest(res, 'permisos_personalizados es requerido y debe ser un objeto');
+    }
+
+    // Validar formato: { modulo: ['accion1', 'accion2'] }
+    for (const [modulo, acciones] of Object.entries(permisos_personalizados)) {
+      if (!Array.isArray(acciones)) {
+        return badRequest(res, `Las acciones del módulo ${modulo} deben ser un array`);
+      }
+    }
+
+    await usuario.update({ permisos_personalizados });
+    invalidarCachePermisos();
+    logger.info('Permisos personalizados actualizados:', { usuarioId: usuario.id, por: req.user.id });
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: usuario.id, accion: 'actualizar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      datos_nuevos: { permisos_personalizados }, ip_address: getClientIP(req),
+      descripcion: `Permisos personalizados de usuario #${usuario.id} actualizados`
+    });
+    return successMessage(res, 'Permisos del usuario actualizados exitosamente', { permisos_personalizados });
+  } catch (error) {
+    logger.error('Error al actualizar permisos de usuario:', { message: error.message });
+    return serverError(res, 'Error al actualizar permisos de usuario', error);
   }
 };
 
@@ -422,6 +654,12 @@ const actualizarRol = async (req, res) => {
 
     invalidarCachePermisos();
     logger.info('Rol actualizado:', { id: rol.id, modificadoPor: req.user.id });
+    Auditoria.registrar({
+      tabla: 'roles', registro_id: rol.id, accion: 'actualizar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      datos_nuevos: req.body, ip_address: getClientIP(req),
+      descripcion: `Rol "${rol.nombre}" actualizado${req.body.permisos_ids !== undefined ? ' (permisos modificados)' : ''}`
+    });
     return successMessage(res, 'Rol actualizado exitosamente', resultado);
   } catch (error) {
     logger.error('Error al actualizar rol:', { message: error.message });
@@ -504,6 +742,9 @@ module.exports = {
   actualizarUsuario,
   resetearPassword,
   desactivarUsuario,
+  reenviarCredenciales,
+  obtenerPermisosUsuario,
+  actualizarPermisosUsuario,
   // Roles
   listarRoles,
   obtenerRol,

@@ -44,6 +44,7 @@ import {
   Moon,
   Keyboard,
   Mail,
+  Activity,
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
@@ -112,6 +113,7 @@ const allMenuConfig = [
     soloAdmin: true,
     items: [
       { icon: Settings, label: 'Usuarios y Roles', href: '/administracion' },
+      { icon: Activity, label: 'Auditoría de Acciones', href: '/auditoria-acciones' },
     ],
   },
 ];
