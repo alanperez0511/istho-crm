@@ -20,12 +20,12 @@ const sequelize = new Sequelize(
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
-    
+
     // Logging: true en desarrollo, false en producción
-    logging: process.env.DB_LOGGING === 'true' 
-      ? (msg) => console.log(`[DB] ${msg}`) 
+    logging: process.env.DB_LOGGING === 'true'
+      ? (msg) => console.log(`[DB] ${msg}`)
       : false,
-    
+
     // Pool de conexiones
     pool: {
       max: parseInt(process.env.DB_POOL_MAX) || 10,
@@ -33,10 +33,10 @@ const sequelize = new Sequelize(
       acquire: parseInt(process.env.DB_POOL_ACQUIRE) || 30000,
       idle: parseInt(process.env.DB_POOL_IDLE) || 10000
     },
-    
+
     // Timezone Colombia
     timezone: '-05:00',
-    
+
     // Opciones de dialecto
     dialectOptions: {
       // SSL para producción (Railway)
@@ -50,7 +50,7 @@ const sequelize = new Sequelize(
       dateStrings: true,
       typeCast: true
     },
-    
+
     // Definiciones globales
     define: {
       timestamps: true,
