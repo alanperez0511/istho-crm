@@ -45,6 +45,8 @@ import {
 
 import auditoriasService from '../../../api/auditorias.service';
 import { useAlert } from '../../../context/AlertContext';
+import { useAuth } from '../../../context/AuthContext';
+import CierreAuditoriaModal from '../../../components/common/CierreAuditoriaModal';
 
 // URL base del servidor para archivos estáticos (sin /api/v1)
 const SERVER_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
@@ -505,6 +507,7 @@ const EntradaAuditoria = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showAlert, showConfirm } = useAlert();
+  const { hasPermission } = useAuth();
 
   // Estado de carga
   const [pageLoading, setPageLoading] = useState(true);
@@ -529,6 +532,7 @@ const EntradaAuditoria = () => {
   // Archivos
   const [files, setFiles] = useState([]);
   const [closing, setClosing] = useState(false);
+  const [showCierreModal, setShowCierreModal] = useState(false);
 
   // Averías
   const [averias, setAverias] = useState([]);
@@ -786,19 +790,12 @@ const EntradaAuditoria = () => {
 
   const isCerrado = estado === 'cerrado';
 
-  const handleCerrarAuditoria = async () => {
+  const handleCerrarAuditoria = () => {
     if (!canClose || closing) return;
+    setShowCierreModal(true);
+  };
 
-    const confirmed = await showConfirm({
-      type: 'success',
-      title: '¿Completar Auditoría?',
-      message: 'Una vez cerrada, no podrá realizar más cambios en esta operación.',
-      confirmText: 'Sí, cerrar ahora',
-      cancelText: 'Seguir revisando'
-    });
-
-    if (!confirmed) return;
-
+  const handleConfirmarCierre = async ({ enviar_correo, plantilla_id }) => {
     setClosing(true);
 
     try {
@@ -806,9 +803,10 @@ const EntradaAuditoria = () => {
       if (logisticaTimerRef.current) clearTimeout(logisticaTimerRef.current);
       await auditoriasService.guardarDatosLogisticos(id, formData);
 
-      // Cerrar auditoría (evidencias ya están subidas) + enviar correo
-      const result = await auditoriasService.cerrar(id, { enviar_correo: true });
+      // Cerrar auditoría + enviar correo con plantilla seleccionada
+      const result = await auditoriasService.cerrar(id, { enviar_correo, plantilla_id });
       setEstado('cerrado');
+      setShowCierreModal(false);
 
       // Feedback: correo se envía en background
       const correoEstado = result?.data?.correo_enviado || result?.correo_enviado;
@@ -1430,17 +1428,28 @@ const EntradaAuditoria = () => {
               <CheckCircle2 className="w-5 h-5" />
               <span className="font-semibold">Auditoría completada y cerrada exitosamente</span>
             </div>
-            <button
-              onClick={handleReenviarCorreo}
-              disabled={reenviando}
-              className="flex items-center gap-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
-            >
-              {reenviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-              {reenviando ? 'Enviando...' : 'Reenviar correo'}
-            </button>
+            {hasPermission('auditoria', 'reenviar_correo') && (
+              <button
+                onClick={handleReenviarCorreo}
+                disabled={reenviando}
+                className="flex items-center gap-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
+              >
+                {reenviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                {reenviando ? 'Enviando...' : 'Reenviar correo'}
+              </button>
+            )}
           </div>
         </div>
       )}
+      {/* Modal de cierre con selección de plantilla */}
+      <CierreAuditoriaModal
+        isOpen={showCierreModal}
+        onClose={() => setShowCierreModal(false)}
+        onConfirm={handleConfirmarCierre}
+        tipoAuditoria="ingreso"
+        closing={closing}
+        colorScheme="emerald"
+      />
     </div>
   );
 };

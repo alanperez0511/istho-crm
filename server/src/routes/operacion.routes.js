@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 
 const operacionController = require('../controllers/operacionController');
-const { verificarToken, filtrarPorCliente } = require('../middleware/auth');
+const { verificarToken, filtrarPorCliente, verificarPermisoCliente } = require('../middleware/auth');
 const { requiereRolMinimo, noClientes } = require('../middleware/roles');
 const { uploadAveria, uploadCumplido } = require('../config/multer');
 const {
@@ -54,8 +54,8 @@ router.post('/:id/documentos', noClientes, requiereRolMinimo('operador'), upload
 // Cerrar operación
 router.post('/:id/cerrar', noClientes, requiereRolMinimo('operador'), cerrarOperacionValidator, operacionController.cerrar);
 
-// Reenviar correo de cierre
-router.post('/:id/reenviar-correo', noClientes, requiereRolMinimo('operador'), operacionController.reenviarCorreo);
+// Reenviar correo de cierre (requiere permiso auditoria.reenviar_correo)
+router.post('/:id/reenviar-correo', noClientes, requiereRolMinimo('operador'), verificarPermisoCliente('auditoria', 'reenviar_correo'), operacionController.reenviarCorreo);
 
 // Anular operación
 router.delete('/:id', requiereRolMinimo('supervisor'), idParamValidator, operacionController.anular);

@@ -93,14 +93,14 @@ module.exports = (sequelize) => {
 
     // Tipo de movimiento
     tipo: {
-      type: DataTypes.ENUM('entrada', 'salida'),
+      type: DataTypes.ENUM('entrada', 'salida', 'kardex'),
       allowNull: false,
-      comment: 'Si la caja ingresó o salió del almacén'
+      comment: 'Si la caja ingresó, salió o fue ajustada por kardex'
     },
 
     // Estado de la caja
     estado: {
-      type: DataTypes.ENUM('disponible', 'despachada', 'en_transito', 'dañada', 'devuelta'),
+      type: DataTypes.ENUM('disponible', 'despachada', 'en_transito', 'dañada', 'devuelta', 'inactiva'),
       defaultValue: 'disponible',
       comment: 'Estado actual de la caja'
     },

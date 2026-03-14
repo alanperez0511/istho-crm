@@ -155,13 +155,16 @@ const enviarCorreo = async ({
 /**
  * Enviar notificación de cierre de operación
  */
-const enviarCierreOperacion = async (operacion, correosDestino) => {
+const enviarCierreOperacion = async (operacion, correosDestino, plantillaId = null) => {
   try {
     // Preparar datos para la plantilla
     const datos = {
-      tipoOperacion: operacion.tipo === 'ingreso' ? 'INGRESO DE MERCANCÍA' : 'SALIDA DE MERCANCÍA',
+      tipoOperacion: operacion.tipo === 'ingreso' ? 'INGRESO DE MERCANCÍA'
+        : operacion.tipo === 'kardex' ? 'AJUSTE DE INVENTARIO (KARDEX)'
+        : 'SALIDA DE MERCANCÍA',
       esIngreso: operacion.tipo === 'ingreso',
       esSalida: operacion.tipo === 'salida',
+      esKardex: operacion.tipo === 'kardex',
       numeroOperacion: operacion.numero_operacion,
       documentoWms: operacion.documento_wms || 'N/A (Manual)',
       fecha: new Date(operacion.fecha_operacion).toLocaleDateString('es-CO', {
@@ -202,6 +205,7 @@ const enviarCierreOperacion = async (operacion, correosDestino) => {
       tipoDocumentoWms: operacion.tipo_documento_wms || '',
       sucursalEntrega: operacion.sucursal_entrega || '',
       ciudadDestino: operacion.ciudad_destino || '',
+      motivoKardex: operacion.motivo_kardex || '',
       // Detalle de averías
       averias: (operacion.averias || []).map(a => {
         const plain = a.toJSON ? a.toJSON() : a;
@@ -237,12 +241,22 @@ const enviarCierreOperacion = async (operacion, correosDestino) => {
     // Busca: 1) predeterminada + subtipo, 2) predeterminada genérica, 3) cualquier activa con subtipo
     try {
       const { PlantillaEmail } = require('../models');
-      const subtipo = operacion.tipo; // 'ingreso' o 'salida'
+      const subtipo = operacion.tipo; // 'ingreso', 'salida' o 'kardex'
+
+      // 0. Si viene plantilla_id específica, usarla directamente
+      let plantillaCustom = null;
+      if (plantillaId) {
+        plantillaCustom = await PlantillaEmail.findOne({
+          where: { id: plantillaId, activo: true }
+        });
+      }
 
       // 1. Predeterminada con subtipo exacto
-      let plantillaCustom = await PlantillaEmail.findOne({
-        where: { tipo: 'operacion_cierre', subtipo, es_predeterminada: true, activo: true }
-      });
+      if (!plantillaCustom) {
+        plantillaCustom = await PlantillaEmail.findOne({
+          where: { tipo: 'operacion_cierre', subtipo, es_predeterminada: true, activo: true }
+        });
+      }
       // 2. Predeterminada genérica (sin subtipo)
       if (!plantillaCustom) {
         plantillaCustom = await PlantillaEmail.findOne({

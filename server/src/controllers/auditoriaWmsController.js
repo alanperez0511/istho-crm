@@ -97,6 +97,7 @@ const listarEntradas = async (req, res) => {
       documento_wms: op.documento_wms || null,
       cliente: op.cliente?.razon_social || 'Sin cliente',
       tipo_documento: 'Recepción',
+      tipo_documento_wms: op.tipo_documento_wms || 'CO',
       fecha_ingreso: op.fecha_operacion || op.created_at,
       estado: op.estado,
       lineas: op.total_referencias || op.detalles?.length || 0,
@@ -254,6 +255,7 @@ const listarSalidas = async (req, res) => {
       documento_wms: op.documento_wms || null,
       cliente: op.cliente?.razon_social || 'Sin cliente',
       tipo_documento: 'Despacho',
+      tipo_documento_wms: op.tipo_documento_wms || 'PK',
       fecha_salida: op.fecha_operacion || op.created_at,
       estado: op.estado,
       lineas: op.total_referencias || op.detalles?.length || 0,
@@ -345,6 +347,166 @@ const obtenerSalidaPorId = async (req, res) => {
   } catch (err) {
     logger.error('[AUDITORIAS] Error al obtener salida:', err);
     return serverError(res, 'Error al obtener salida', err);
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// KARDEX (Ajustes)
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Listar kardex/ajustes con filtros
+ * GET /auditorias/kardex
+ */
+const listarKardex = async (req, res) => {
+  try {
+    const { page, limit, offset } = parsePaginacion(req.query);
+    const { estado, search, cliente_id } = req.query;
+
+    const where = { tipo: 'kardex' };
+
+    if (cliente_id) {
+      where.cliente_id = cliente_id;
+    }
+
+    if (estado && estado !== 'todos') {
+      where.estado = estado;
+    }
+
+    if (search) {
+      where[Op.or] = [
+        { numero_operacion: { [Op.like]: `%${search}%` } },
+        { motivo_kardex: { [Op.like]: `%${search}%` } },
+        { '$cliente.razon_social$': { [Op.like]: `%${search}%` } }
+      ];
+    }
+
+    const needsClienteJoin = search || false;
+    const { count, rows: idRows } = await Operacion.findAndCountAll({
+      where,
+      attributes: ['id'],
+      include: needsClienteJoin ? [{ model: Cliente, as: 'cliente', attributes: [] }] : [],
+      order: [['created_at', 'DESC']],
+      limit,
+      offset,
+      distinct: true,
+    });
+
+    const ids = idRows.map(r => r.id);
+    let rows = [];
+    if (ids.length > 0) {
+      rows = await Operacion.findAll({
+        where: { id: { [Op.in]: ids } },
+        include: [
+          { model: Cliente, as: 'cliente', attributes: ['id', 'razon_social'] },
+          { model: OperacionDetalle, as: 'detalles', attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'verificado'] }
+        ],
+        order: [['created_at', 'DESC']],
+      });
+    }
+
+    const kardex = rows.map(op => ({
+      id: op.id,
+      documento: op.numero_operacion,
+      documento_wms: op.documento_wms || null,
+      cliente: op.cliente?.razon_social || 'Sin cliente',
+      tipo_documento: 'Kardex',
+      tipo_documento_wms: op.tipo_documento_wms || 'CR',
+      motivo: op.motivo_kardex || '',
+      fecha_ingreso: op.fecha_operacion || op.created_at,
+      estado: op.estado,
+      lineas: op.total_referencias || op.detalles?.length || 0,
+      lineas_verificadas: (op.detalles || []).filter(d => d.verificado).length,
+    }));
+
+    return paginated(res, kardex, { total: count, page, limit });
+  } catch (err) {
+    logger.error('[AUDITORIAS] Error al listar kardex:', err);
+    return serverError(res, 'Error al obtener kardex', err);
+  }
+};
+
+/**
+ * Obtener detalle de un kardex por ID
+ * GET /auditorias/kardex/:id
+ */
+const obtenerKardexPorId = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const operacion = await Operacion.findOne({
+      where: { id, tipo: 'kardex' },
+      include: [
+        {
+          model: Cliente,
+          as: 'cliente',
+          attributes: ['id', 'razon_social']
+        },
+        {
+          model: OperacionDetalle,
+          as: 'detalles',
+          attributes: ['id', 'producto', 'sku', 'cantidad', 'unidad_medida', 'cantidad_averia', 'lote', 'fecha_vencimiento', 'verificado', 'numero_caja', 'documento_asociado', 'deleted_at'],
+          paranoid: false
+        },
+        {
+          model: OperacionDocumento,
+          as: 'documentos',
+          attributes: ['id', 'archivo_nombre', 'archivo_url', 'archivo_tipo', 'archivo_tamanio', 'created_at']
+        }
+      ]
+    });
+
+    if (!operacion) {
+      return notFound(res, 'Kardex no encontrado');
+    }
+
+    const data = {
+      id: operacion.id,
+      documento: operacion.numero_operacion,
+      documento_wms: operacion.documento_wms || null,
+      cliente: operacion.cliente?.razon_social || 'Sin cliente',
+      tipo_documento: 'Kardex',
+      tipo_documento_wms: operacion.tipo_documento_wms || 'CR',
+      motivo: operacion.motivo_kardex || '',
+      fecha_ingreso: operacion.fecha_operacion || operacion.created_at,
+      estado: operacion.estado,
+      lineas: (operacion.detalles || []).map(d => ({
+        id: d.id,
+        sku: d.sku || '',
+        producto: d.producto,
+        cantidad_esperada: d.cantidad,
+        unidad: d.unidad_medida || 'UND',
+        cantidad_averia: d.cantidad_averia || 0,
+        lote: d.lote || '',
+        fecha_vencimiento: d.fecha_vencimiento || null,
+        verificado: !!d.verificado,
+        caja: d.numero_caja || '',
+        motivo_linea: d.documento_asociado || '',
+        eliminado: !!d.deleted_at,
+      })),
+      logistica: {
+        conductor: operacion.conductor_nombre || '',
+        cedula: operacion.conductor_cedula || '',
+        placa: operacion.vehiculo_placa || '',
+        telefono: operacion.conductor_telefono || '',
+        origen: operacion.origen || '',
+        destino: operacion.destino || '',
+        observaciones: operacion.observaciones || '',
+      },
+      evidencias: (operacion.documentos || []).map(doc => ({
+        id: doc.id,
+        nombre: doc.archivo_nombre,
+        url: doc.archivo_url,
+        tipo: doc.archivo_tipo,
+        tamanio: doc.archivo_tamanio,
+        fecha: doc.created_at
+      }))
+    };
+
+    return success(res, data);
+  } catch (err) {
+    logger.error('[AUDITORIAS] Error al obtener kardex:', err);
+    return serverError(res, 'Error al obtener kardex', err);
   }
 };
 
@@ -641,7 +803,7 @@ const eliminarEvidencia = async (req, res) => {
 const cerrarAuditoria = async (req, res) => {
   try {
     const { id } = req.params;
-    const { enviar_correo, correos_destino } = req.body;
+    const { enviar_correo, correos_destino, plantilla_id } = req.body;
 
     const operacion = await Operacion.findByPk(id, {
       include: [{ model: Cliente, as: 'cliente' }]
@@ -716,7 +878,7 @@ const cerrarAuditoria = async (req, res) => {
               { model: Usuario, as: 'cerrador', attributes: ['id', 'nombre_completo'] }
             ]
           });
-          const resultado = await emailService.enviarCierreOperacion(operacion, correosEnvio);
+          const resultado = await emailService.enviarCierreOperacion(operacion, correosEnvio, plantilla_id || null);
           await operacion.update({
             correo_enviado: resultado.success,
             fecha_correo_enviado: resultado.success ? new Date() : null
@@ -755,12 +917,14 @@ const estadisticas = async (req, res) => {
     const { cliente_id } = req.query;
     const whereEntradas = { tipo: 'ingreso' };
     const whereSalidas = { tipo: 'salida' };
+    const whereKardex = { tipo: 'kardex' };
     if (cliente_id) {
       whereEntradas.cliente_id = cliente_id;
       whereSalidas.cliente_id = cliente_id;
+      whereKardex.cliente_id = cliente_id;
     }
 
-    const [entradas, salidas] = await Promise.all([
+    const [entradas, salidas, kardex] = await Promise.all([
       Operacion.findAll({
         where: whereEntradas,
         attributes: ['estado', [sequelize.fn('COUNT', sequelize.col('id')), 'total']],
@@ -772,12 +936,19 @@ const estadisticas = async (req, res) => {
         attributes: ['estado', [sequelize.fn('COUNT', sequelize.col('id')), 'total']],
         group: ['estado'],
         raw: true
+      }),
+      Operacion.findAll({
+        where: whereKardex,
+        attributes: ['estado', [sequelize.fn('COUNT', sequelize.col('id')), 'total']],
+        group: ['estado'],
+        raw: true
       })
     ]);
 
     const toMap = (arr) => arr.reduce((acc, r) => ({ ...acc, [r.estado]: parseInt(r.total) }), {});
     const entradasMap = toMap(entradas);
     const salidasMap = toMap(salidas);
+    const kardexMap = toMap(kardex);
 
     return success(res, {
       entradas: {
@@ -789,6 +960,11 @@ const estadisticas = async (req, res) => {
         pendientes: salidasMap.pendiente || 0,
         en_proceso: salidasMap.en_proceso || 0,
         cerradas: salidasMap.cerrado || 0,
+      },
+      kardex: {
+        pendientes: kardexMap.pendiente || 0,
+        en_proceso: kardexMap.en_proceso || 0,
+        cerradas: kardexMap.cerrado || 0,
       }
     });
   } catch (err) {
@@ -807,12 +983,14 @@ const recientes = async (req, res) => {
     const { cliente_id } = req.query;
     const whereEntradas = { tipo: 'ingreso' };
     const whereSalidas = { tipo: 'salida' };
+    const whereKardex = { tipo: 'kardex' };
     if (cliente_id) {
       whereEntradas.cliente_id = cliente_id;
       whereSalidas.cliente_id = cliente_id;
+      whereKardex.cliente_id = cliente_id;
     }
 
-    const [entradas, salidas] = await Promise.all([
+    const [entradas, salidas, kardex] = await Promise.all([
       Operacion.findAll({
         where: whereEntradas,
         include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
@@ -824,6 +1002,12 @@ const recientes = async (req, res) => {
         include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
         order: [['created_at', 'DESC']],
         limit: limite
+      }),
+      Operacion.findAll({
+        where: whereKardex,
+        include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
+        order: [['created_at', 'DESC']],
+        limit: limite
       })
     ]);
 
@@ -831,7 +1015,8 @@ const recientes = async (req, res) => {
       id: op.id,
       documento: op.numero_operacion,
       cliente: op.cliente?.razon_social || 'Sin cliente',
-      tipo_documento: tipo === 'ingreso' ? 'Recepción' : 'Despacho',
+      tipo_documento: tipo === 'ingreso' ? 'Recepción' : tipo === 'kardex' ? 'Kardex' : 'Despacho',
+      tipo_documento_wms: op.tipo_documento_wms || null,
       fecha: op.fecha_operacion || op.created_at,
       estado: op.estado,
     });
@@ -839,6 +1024,7 @@ const recientes = async (req, res) => {
     return success(res, {
       entradas: entradas.map(e => mapOp(e, 'ingreso')),
       salidas: salidas.map(s => mapOp(s, 'salida')),
+      kardex: kardex.map(k => mapOp(k, 'kardex')),
     });
   } catch (err) {
     logger.error('[AUDITORIAS] Error al obtener recientes:', err);
@@ -851,6 +1037,8 @@ module.exports = {
   obtenerEntradaPorId,
   listarSalidas,
   obtenerSalidaPorId,
+  listarKardex,
+  obtenerKardexPorId,
   verificarLinea,
   eliminarLinea,
   restaurarLinea,

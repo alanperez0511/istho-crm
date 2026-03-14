@@ -76,6 +76,11 @@ const PERMISOS_CATALOGO = [
   // Auditoría
   { modulo: 'auditoria', accion: 'ver', descripcion: 'Ver auditorías WMS', grupo: 'Operaciones' },
   { modulo: 'auditoria', accion: 'exportar', descripcion: 'Exportar auditorías', grupo: 'Operaciones' },
+  { modulo: 'auditoria', accion: 'reenviar_correo', descripcion: 'Reenviar correos de auditoría', grupo: 'Operaciones' },
+
+  // Kardex
+  { modulo: 'kardex', accion: 'ver', descripcion: 'Ver auditorías Kardex', grupo: 'Operaciones' },
+  { modulo: 'kardex', accion: 'exportar', descripcion: 'Exportar auditorías Kardex', grupo: 'Operaciones' },
 
   // Configuración
   { modulo: 'configuracion', accion: 'ver', descripcion: 'Ver configuración del sistema', grupo: 'Sistema' },
@@ -111,7 +116,8 @@ const PERMISOS_POR_ROL = {
     despachos: ['ver', 'crear', 'editar', 'exportar'],
     reportes: ['ver', 'exportar'],
     usuarios: ['ver'],
-    auditoria: ['ver', 'exportar'],
+    auditoria: ['ver', 'exportar', 'reenviar_correo'],
+    kardex: ['ver', 'exportar'],
     configuracion: ['ver'],
     notificaciones: ['ver', 'editar'],
   },
@@ -124,6 +130,7 @@ const PERMISOS_POR_ROL = {
     despachos: ['ver', 'crear', 'editar'],
     reportes: ['ver'],
     auditoria: ['ver'],
+    kardex: ['ver'],
     notificaciones: ['ver'],
   },
 
@@ -134,6 +141,7 @@ const PERMISOS_POR_ROL = {
     despachos: ['ver'],
     reportes: ['ver', 'exportar'],
     auditoria: ['ver'],
+    kardex: ['ver'],
     notificaciones: ['ver'],
   },
 };

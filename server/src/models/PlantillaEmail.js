@@ -114,6 +114,7 @@ module.exports = (sequelize) => {
       { variable: 'tipoDocumentoWms', label: 'Tipo Doc. WMS', ejemplo: 'Factura' },
       { variable: 'sucursalEntrega', label: 'Sucursal Entrega', ejemplo: 'Sucursal Norte' },
       { variable: 'ciudadDestino', label: 'Ciudad Destino', ejemplo: 'Bogotá' },
+      { variable: 'motivoKardex', label: 'Motivo del Kardex', ejemplo: 'Ajuste por conteo físico' },
       { variable: 'averias', label: 'Lista de Averías ({{#each averias}})', ejemplo: '[{sku, tipo_averia, cantidad, descripcion}]' },
     ],
     alerta_inventario: [

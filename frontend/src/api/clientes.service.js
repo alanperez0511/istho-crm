@@ -250,7 +250,7 @@ const clientesService = {
   updateContacto: async (clienteId, contactoId, contactoData) => {
     try {
       const response = await apiClient.put(
-        CLIENTES_ENDPOINTS.CONTACTO_BY_ID(clienteId, contactoId), 
+        CLIENTES_ENDPOINTS.CONTACTO(clienteId, contactoId), 
         contactoData
       );
       return response; // ✅ Sin .data adicional
@@ -274,7 +274,7 @@ const clientesService = {
   deleteContacto: async (clienteId, contactoId) => {
     try {
       const response = await apiClient.delete(
-        CLIENTES_ENDPOINTS.CONTACTO_BY_ID(clienteId, contactoId)
+        CLIENTES_ENDPOINTS.CONTACTO(clienteId, contactoId)
       );
       return response; // ✅ Sin .data adicional
     } catch (error) {

@@ -82,6 +82,10 @@ const EntradaAuditoria = lazy(() => import('./pages/Inventario/Entradas/EntradaA
 const SalidasList = lazy(() => import('./pages/Inventario/Salidas/SalidasList'));
 const SalidaAuditoria = lazy(() => import('./pages/Inventario/Salidas/SalidaAuditoria'));
 
+// Inventario Kardex
+const KardexList = lazy(() => import('./pages/Inventario/Kardex/KardexList'));
+const KardexAuditoria = lazy(() => import('./pages/Inventario/Kardex/KardexAuditoria'));
+
 // Reportes
 const ReportesList = lazy(() => import('./pages/Reportes/ReportesList'));
 const ReporteDespachos = lazy(() => import('./pages/Reportes/ReporteDespachos'));
@@ -215,6 +219,9 @@ function App() {
 
                 <Route path="/inventario/salidas" element={<PortalPermissionRoute module="inventario" action="ver"><SalidasList /></PortalPermissionRoute>} />
                 <Route path="/inventario/salidas/:id" element={<PortalPermissionRoute module="inventario" action="ver"><SalidaAuditoria /></PortalPermissionRoute>} />
+
+                <Route path="/inventario/kardex" element={<PortalPermissionRoute module="kardex" action="ver"><KardexList /></PortalPermissionRoute>} />
+                <Route path="/inventario/kardex/:id" element={<PortalPermissionRoute module="kardex" action="ver"><KardexAuditoria /></PortalPermissionRoute>} />
 
                 {/* ────────────────────────────────────────────────────────── */}
                 {/* REPORTES - Portal users need reportes.ver */}

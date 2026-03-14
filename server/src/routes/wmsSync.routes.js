@@ -72,4 +72,7 @@ router.post('/entradas', wmsSyncController.syncEntrada);
 // Sincronizar salida (picking/despacho)
 router.post('/salidas', wmsSyncController.syncSalida);
 
+// Sincronizar kardex (ajuste de unidades en cajas existentes)
+router.post('/kardex', wmsSyncController.syncKardex);
+
 module.exports = router;

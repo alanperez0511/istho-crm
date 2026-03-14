@@ -119,6 +119,42 @@ const auditoriasService = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
+  // KARDEX
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Obtener lista de kardex con filtros y paginacion
+   */
+  getKardex: async (params = {}) => {
+    try {
+      const response = await apiClient.get(AUDITORIAS_ENDPOINTS.KARDEX, { params });
+      return response;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.message || 'Error al obtener kardex',
+        code: 'GET_KARDEX_ERROR',
+      };
+    }
+  },
+
+  /**
+   * Obtener detalle de un kardex por ID
+   */
+  getKardexById: async (id) => {
+    try {
+      const response = await apiClient.get(AUDITORIAS_ENDPOINTS.KARDEX_BY_ID(id));
+      return response;
+    } catch (error) {
+      throw {
+        success: false,
+        message: error.message || 'Error al obtener kardex',
+        code: 'GET_KARDEX_ERROR',
+      };
+    }
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
   // ACCIONES SOBRE LINEAS
   // ══════════════════════════════════════════════════════════════════════════
 

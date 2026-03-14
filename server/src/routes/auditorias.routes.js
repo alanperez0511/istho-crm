@@ -41,6 +41,13 @@ router.get('/salidas', auditoriaWmsController.listarSalidas);
 router.get('/salidas/:id', auditoriaWmsController.obtenerSalidaPorId);
 
 // =============================================
+// KARDEX (Ajustes)
+// =============================================
+
+router.get('/kardex', auditoriaWmsController.listarKardex);
+router.get('/kardex/:id', auditoriaWmsController.obtenerKardexPorId);
+
+// =============================================
 // ACCIONES SOBRE LÍNEAS
 // =============================================
 

@@ -45,6 +45,7 @@ import {
   Keyboard,
   Mail,
   Activity,
+  RefreshCw,
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
@@ -102,6 +103,7 @@ const allMenuConfig = [
       { icon: Package, label: 'Maestro de Productos', href: '/inventario', shortcut: 'G I' },
       { icon: ClipboardList, label: 'Entradas (Ingresos)', href: '/inventario/entradas', shortcut: 'G E' },
       { icon: Truck, label: 'Salidas (Despachos)', href: '/inventario/salidas', shortcut: 'G S' },
+      { icon: RefreshCw, label: 'Kardex (Ajustes)', href: '/inventario/kardex', shortcut: 'G K' },
       { icon: AlertCircle, label: 'Alertas de Stock', href: '/inventario/alertas' },
     ],
   },
@@ -335,6 +337,7 @@ const KeyboardShortcutsModal = ({ isOpen, onClose }) => {
         { keys: ['G', 'I'], description: 'Ir a Inventario' },
         { keys: ['G', 'E'], description: 'Ir a Entradas' },
         { keys: ['G', 'S'], description: 'Ir a Salidas' },
+        { keys: ['G', 'K'], description: 'Ir a Kardex' },
         { keys: ['G', 'P'], description: 'Ir a Plantillas'},
         { keys: ['G', 'R'], description: 'Ir a Reportes' },
       ]

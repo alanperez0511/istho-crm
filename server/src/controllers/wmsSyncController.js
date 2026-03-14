@@ -127,6 +127,49 @@ const syncSalida = async (req, res) => {
 };
 
 // ============================================================================
+// SYNC KARDEX (AJUSTE DE UNIDADES)
+// ============================================================================
+
+/**
+ * POST /api/v1/wms/sync/kardex
+ *
+ * Body: {
+ *   nit: "900797309",
+ *   documento_origen: "KDX-2026-001",  // opcional
+ *   fecha_ingreso: "2026-03-14",
+ *   motivo: "Reconteo físico",
+ *   detalles: [
+ *     {
+ *       producto: "656355",
+ *       descripcion: "PLACA ST 12.7...",
+ *       caja: 198697,
+ *       cantidad: 10,         // positivo=suma, negativo=resta
+ *       lote: "161675",
+ *       lote_externo: "15/02/2026"
+ *     },
+ *     ...
+ *   ]
+ * }
+ */
+const syncKardex = async (req, res) => {
+  try {
+    const resultado = await wmsSyncService.syncKardex(req.body);
+
+    return res.status(201).json({
+      success: true,
+      message: `Kardex ${resultado.numero_operacion} creado exitosamente (Motivo: ${resultado.motivo})`,
+      data: resultado,
+    });
+  } catch (error) {
+    logger.error('[WMS Sync] Error en syncKardex:', { message: error.message });
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ============================================================================
 // STATUS / HEALTH CHECK
 // ============================================================================
 
@@ -147,5 +190,6 @@ module.exports = {
   syncProductos,
   syncEntrada,
   syncSalida,
+  syncKardex,
   status,
 };

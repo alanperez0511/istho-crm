@@ -107,6 +107,10 @@ export const AUDITORIAS_ENDPOINTS = {
   SALIDAS: '/auditorias/salidas',
   SALIDA_BY_ID: (id) => `/auditorias/salidas/${id}`,
 
+  // Kardex
+  KARDEX: '/auditorias/kardex',
+  KARDEX_BY_ID: (id) => `/auditorias/kardex/${id}`,
+
   // Acciones sobre una auditoría (entrada o salida)
   VERIFICAR_LINEA: (id, lineaId) => `/auditorias/${id}/lineas/${lineaId}/verificar`,
   ELIMINAR_LINEA: (id, lineaId) => `/auditorias/${id}/lineas/${lineaId}`,

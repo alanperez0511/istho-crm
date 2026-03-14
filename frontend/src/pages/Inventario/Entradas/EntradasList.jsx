@@ -363,7 +363,7 @@ const EntradasList = () => {
                       Cliente
                     </th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:table-cell">
-                      Tipo
+                      Tipo Doc.
                     </th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden lg:table-cell">
                       Fecha Ingreso
@@ -413,10 +413,10 @@ const EntradasList = () => {
                         </div>
                       </td>
 
-                      {/* Tipo */}
+                      {/* Tipo Documento WMS */}
                       <td className="py-4 px-4 hidden md:table-cell">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                          {entrada.tipo_documento}
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                          {entrada.tipo_documento_wms || 'CO'}
                         </span>
                       </td>
 

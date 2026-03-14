@@ -36,7 +36,7 @@ module.exports = (sequelize) => {
     
     // Tipo de operación
     tipo: {
-      type: DataTypes.ENUM('ingreso', 'salida'),
+      type: DataTypes.ENUM('ingreso', 'salida', 'kardex'),
       allowNull: false
     },
     
@@ -205,9 +205,16 @@ module.exports = (sequelize) => {
     },
 
     tipo_documento_wms: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.ENUM('CO', 'PK', 'CR'),
       allowNull: true,
-      comment: 'Tipo de documento del WMS (factura, remisión, etc.)'
+      comment: 'Tipo de documento WMS: CO=Recepción, PK=Picking, CR=Kardex'
+    },
+
+    // Motivo del Kardex (solo para tipo='kardex')
+    motivo_kardex: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      comment: 'Motivo del ajuste Kardex (lista predefinida o texto libre)'
     },
 
     sucursal_entrega: {
@@ -234,7 +241,8 @@ module.exports = (sequelize) => {
       { fields: ['tipo'] },
       { fields: ['estado'] },
       { fields: ['fecha_operacion'] },
-      { fields: ['prioridad'] }
+      { fields: ['prioridad'] },
+      { fields: ['tipo_documento_wms'] }
     ]
   });
 
@@ -262,7 +270,7 @@ module.exports = (sequelize) => {
   Operacion.prototype.getResumenCorreo = function() {
     return {
       numero_operacion: this.numero_operacion,
-      tipo: this.tipo === 'ingreso' ? 'INGRESO DE MERCANCÍA' : 'SALIDA DE MERCANCÍA',
+      tipo: this.tipo === 'ingreso' ? 'INGRESO DE MERCANCÍA' : this.tipo === 'kardex' ? 'KARDEX (AJUSTE)' : 'SALIDA DE MERCANCÍA',
       documento_wms: this.documento_wms || 'N/A (Manual)',
       fecha: this.fecha_operacion,
       total_referencias: this.total_referencias,

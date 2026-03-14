@@ -555,6 +555,244 @@ const syncSalida = async (data) => {
 };
 
 // ============================================================================
+// SYNC KARDEX (AJUSTE DE UNIDADES)
+// ============================================================================
+
+/**
+ * Sincronizar un ajuste Kardex del WMS
+ *
+ * El Kardex suma o resta unidades a cajas/estibas existentes.
+ * Reglas:
+ * - Suma a caja disponible: actualiza cantidad
+ * - Resta a caja disponible: actualiza cantidad. Si llega a 0 → estado 'inactiva', se libera ubicación
+ * - Suma a caja inactiva (por resta previa): reactiva → 'disponible', ubicación = zona recepción
+ * - Suma a caja despachada (por picking previo): reactiva → 'disponible', ubicación = zona recepción
+ * - Resta a caja despachada: NO permitido
+ *
+ * @param {Object} data
+ * @param {string} data.nit - NIT del cliente
+ * @param {string} data.documento_origen - Número de documento WMS
+ * @param {string} data.fecha_ingreso - Fecha del ajuste (YYYY-MM-DD)
+ * @param {string} data.motivo - Motivo del ajuste (lista predefinida o texto libre)
+ * @param {Array} data.detalles - Líneas del ajuste
+ * @param {string} data.detalles[].caja - Número de caja/estiba
+ * @param {string} data.detalles[].producto - SKU del producto
+ * @param {number} data.detalles[].cantidad - Cantidad a ajustar (positivo=suma, negativo=resta)
+ * @param {string} [data.observaciones] - Observaciones adicionales
+ * @returns {Object} operación creada
+ */
+const syncKardex = async (data) => {
+  const { nit, documento_origen, fecha_ingreso, motivo, detalles, observaciones } = data;
+
+  if (!motivo) throw new Error('motivo es requerido para Kardex');
+  if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
+    throw new Error('Se requiere al menos una línea de detalle');
+  }
+
+  const cliente = await findClienteByNit(nit);
+
+  // Verificar duplicados por documento_origen si viene
+  if (documento_origen) {
+    const existente = await Operacion.findOne({
+      where: { documento_wms: documento_origen.toString().trim(), tipo_documento_wms: 'CR' },
+    });
+    if (existente) {
+      throw new Error(`Ya existe un Kardex con documento: ${documento_origen} (${existente.numero_operacion})`);
+    }
+  }
+
+  const transaction = await sequelize.transaction();
+
+  try {
+    const numeroOperacion = await generarNumeroOperacion();
+
+    const totalUnidades = detalles.reduce((sum, d) => sum + Math.abs(parseFloat(d.cantidad) || 0), 0);
+    const skusUnicos = new Set(detalles.map((d) => d.producto)).size;
+
+    // Crear operación tipo kardex
+    // Si no viene documento_origen, usar el motivo como documento_wms para que
+    // el listado de auditoría muestre algo significativo en la columna "Documento"
+    const documentoWms = documento_origen
+      ? documento_origen.toString().trim()
+      : motivo.trim();
+
+    const operacion = await Operacion.create({
+      numero_operacion: numeroOperacion,
+      tipo: 'kardex',
+      documento_wms: documentoWms,
+      cliente_id: cliente.id,
+      fecha_documento: fecha_ingreso || new Date(),
+      fecha_operacion: new Date(),
+      tipo_documento_wms: 'CR',
+      motivo_kardex: motivo,
+      total_referencias: skusUnicos,
+      total_unidades: totalUnidades,
+      estado: 'pendiente',
+      observaciones: observaciones || `Kardex WMS - ${motivo}`,
+    }, { transaction });
+
+    // Procesar cada línea de ajuste
+    let lineasProcesadas = 0;
+    let unidadesProcesadas = 0;
+
+    for (const linea of detalles) {
+      if (!linea.producto || linea.cantidad === undefined) continue;
+
+      const sku = linea.producto.toString().trim();
+      const cantidad = parseFloat(linea.cantidad) || 0;
+      const numeroCaja = linea.caja ? linea.caja.toString() : null;
+      const esSuma = cantidad > 0;
+
+      // Buscar inventario por referencia (antes de crear detalle)
+      const inventario = await Inventario.findOne({
+        where: { cliente_id: cliente.id, sku },
+        transaction,
+      });
+
+      if (!inventario) {
+        logger.warn(`[WMS Sync] Kardex: SKU ${sku} no encontrado en inventario para ${cliente.razon_social}. Omitiendo.`);
+        continue;
+      }
+
+      // Validar resta en caja despachada ANTES de crear el detalle
+      let cajaExistente = null;
+      if (numeroCaja) {
+        cajaExistente = await CajaInventario.findOne({
+          where: {
+            numero_caja: numeroCaja,
+            inventario_id: inventario.id,
+          },
+          order: [['created_at', 'DESC']],
+          transaction
+        });
+
+        if (cajaExistente && !esSuma && cajaExistente.estado === 'despachada') {
+          logger.warn(`[WMS Sync] Kardex: No se puede restar a caja ${numeroCaja} en estado 'despachada'. Omitiendo.`);
+          continue;
+        }
+      }
+
+      // Buscar descripción en el catálogo maestro
+      let descripcionProducto = (linea.descripcion || linea.producto || 'Producto S/D').toString().trim();
+      if (inventario.producto && (descripcionProducto === sku || !linea.descripcion)) {
+        descripcionProducto = inventario.producto;
+      }
+
+      // Crear detalle de operación (documento_asociado = motivo del kardex)
+      const detalle = await OperacionDetalle.create({
+        operacion_id: operacion.id,
+        sku,
+        producto: descripcionProducto,
+        cantidad: Math.abs(cantidad),
+        unidad_medida: linea.unidad_medida || 'UND',
+        lote: linea.lote || null,
+        lote_externo: linea.lote_externo || null,
+        fecha_vencimiento: linea.fecha_vencimiento || null,
+        documento_asociado: motivo, // El motivo va como documento
+        numero_caja: numeroCaja,
+        peso: linea.peso || null,
+        inventario_id: inventario.id,
+      }, { transaction });
+
+      lineasProcesadas++;
+      unidadesProcesadas += Math.abs(cantidad);
+
+      const stockAnterior = parseFloat(inventario.cantidad) || 0;
+
+      if (cajaExistente) {
+
+        const cantidadCajaAnterior = parseFloat(cajaExistente.cantidad) || 0;
+        const nuevaCantidadCaja = esSuma
+          ? cantidadCajaAnterior + Math.abs(cantidad)
+          : Math.max(0, cantidadCajaAnterior - Math.abs(cantidad));
+
+        // Determinar nuevo estado de la caja
+        let nuevoEstado = cajaExistente.estado;
+        let nuevaUbicacion = cajaExistente.ubicacion;
+
+        if (esSuma && (cajaExistente.estado === 'inactiva' || cajaExistente.estado === 'despachada')) {
+          // Reactivar caja → disponible, zona recepción
+          nuevoEstado = 'disponible';
+          nuevaUbicacion = 'RECEPCIÓN';
+        } else if (!esSuma && nuevaCantidadCaja <= 0) {
+          // Resta a 0 → inactiva, liberar ubicación
+          nuevoEstado = 'inactiva';
+          nuevaUbicacion = null;
+        }
+
+        await cajaExistente.update({
+          cantidad: nuevaCantidadCaja,
+          estado: nuevoEstado,
+          ubicacion: nuevaUbicacion,
+          operacion_id: operacion.id,
+          fecha_movimiento: new Date(),
+        }, { transaction });
+      }
+
+      // Actualizar inventario maestro
+      const nuevoStock = esSuma
+        ? stockAnterior + Math.abs(cantidad)
+        : Math.max(0, stockAnterior - Math.abs(cantidad));
+
+      await inventario.update({
+        cantidad: nuevoStock,
+        ultima_sincronizacion_wms: new Date(),
+        alertas_silenciadas: null,
+      }, { transaction });
+
+      // Registrar movimiento
+      await MovimientoInventario.create({
+        inventario_id: inventario.id,
+        operacion_id: operacion.id,
+        tipo: esSuma ? 'entrada' : 'salida',
+        motivo: `Kardex WMS - ${motivo}`,
+        cantidad: Math.abs(cantidad),
+        stock_anterior: stockAnterior,
+        stock_resultante: nuevoStock,
+        documento_referencia: documento_origen || motivo,
+        observaciones: `Sync WMS Kardex - ${esSuma ? 'Suma' : 'Resta'} - ${motivo}`,
+        fecha_movimiento: new Date(),
+      }, { transaction });
+    }
+
+    // Actualizar totales reales en la operación (descontando líneas omitidas)
+    if (lineasProcesadas !== detalles.length || unidadesProcesadas !== totalUnidades) {
+      await operacion.update({
+        total_unidades: unidadesProcesadas,
+        total_referencias: lineasProcesadas,
+      }, { transaction });
+    }
+
+    await transaction.commit();
+
+    logger.info(`[WMS Sync] Kardex creado: ${numeroOperacion} para ${cliente.razon_social} (${lineasProcesadas}/${detalles.length} líneas procesadas, motivo: ${motivo})`);
+
+    const resultado = {
+      operacion_id: operacion.id,
+      numero_operacion: numeroOperacion,
+      cliente_id: cliente.id,
+      cliente: cliente.razon_social,
+      motivo,
+      total_lineas: lineasProcesadas,
+      total_unidades: unidadesProcesadas,
+      lineas_omitidas: detalles.length - lineasProcesadas,
+      estado: 'pendiente',
+    };
+
+    // Notificar usuarios del cliente + admins
+    notificacionService.notificarEntradaWms({
+      ...resultado,
+      documento_wms: documento_origen || motivo,
+    }).catch(() => {});
+
+    return resultado;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+};
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -563,4 +801,5 @@ module.exports = {
   syncProductos,
   syncEntrada,
   syncSalida,
+  syncKardex,
 };

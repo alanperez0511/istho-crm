@@ -28,10 +28,11 @@ const logger = require('../utils/logger');
  */
 const listar = async (req, res) => {
   try {
-    const { tipo, activo } = req.query;
+    const { tipo, subtipo, activo } = req.query;
     const where = {};
 
     if (tipo) where.tipo = tipo;
+    if (subtipo) where.subtipo = subtipo;
     if (activo !== undefined) where.activo = activo === 'true';
 
     const plantillas = await PlantillaEmail.findAll({
