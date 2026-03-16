@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
+import { useSnackbar } from 'notistack';
 import useNotification from '../../hooks/useNotification';
 import { useNotificaciones } from '../../context/NotificacionesContext';
 
@@ -916,6 +917,7 @@ const FloatingHeader = () => {
   const { user, logout, hasPermission } = useAuth();
   const { isDark, toggleDark } = useThemeContext();
   const { isVisible, isAtTop } = useScrollBehavior();
+  const { enqueueSnackbar } = useSnackbar();
 
   // Menú filtrado por rol y permisos de portal
   const menuConfig = getMenuForRole(user?.rol, hasPermission);
@@ -926,9 +928,23 @@ const FloatingHeader = () => {
   const [activeMenu, setActiveMenu] = useState(null);
 
   // Notificaciones reales
-  const { unreadCount: notificationCount, notificaciones, fetchRecientes, marcarLeida, marcarTodasLeidas, loading: loadingNotifs } = useNotificaciones();
+  const { unreadCount: notificationCount, notificaciones, ultimaNotificacion, fetchRecientes, marcarLeida, marcarTodasLeidas, loading: loadingNotifs } = useNotificaciones();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const notifRef = useRef(null);
+  const lastNotifRef = useRef(null);
+
+  // Toast cuando llega notificación en tiempo real
+  useEffect(() => {
+    if (ultimaNotificacion && ultimaNotificacion !== lastNotifRef.current) {
+      lastNotifRef.current = ultimaNotificacion;
+      enqueueSnackbar(ultimaNotificacion.titulo || 'Nueva notificación', {
+        variant: ultimaNotificacion.prioridad === 'urgente' ? 'error'
+          : ultimaNotificacion.prioridad === 'alta' ? 'warning'
+          : 'info',
+        autoHideDuration: 5000,
+      });
+    }
+  }, [ultimaNotificacion, enqueueSnackbar]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {

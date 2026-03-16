@@ -12,6 +12,7 @@
 
 const { Notificacion, Usuario } = require('../models');
 const { Op } = require('sequelize');
+const socketService = require('./socketService');
 
 const logger = console;
 
@@ -53,7 +54,7 @@ const getUsuariosPorCliente = async (clienteId, { incluirAdmins = true } = {}) =
  */
 const notificar = async ({ usuario_id, tipo, titulo, mensaje, prioridad = 'normal', accion_url, accion_label, metadata }) => {
   try {
-    return await Notificacion.crear({
+    const notif = await Notificacion.crear({
       usuario_id,
       tipo,
       titulo,
@@ -63,6 +64,22 @@ const notificar = async ({ usuario_id, tipo, titulo, mensaje, prioridad = 'norma
       accion_label,
       metadata,
     });
+
+    // Emitir por WebSocket en tiempo real
+    if (notif) {
+      socketService.emitToUser(usuario_id, 'notificacion:nueva', {
+        id: notif.id,
+        tipo,
+        titulo,
+        mensaje,
+        prioridad,
+        accion_url,
+        accion_label,
+        created_at: notif.created_at,
+      });
+    }
+
+    return notif;
   } catch (err) {
     logger.error('[NotificacionService] Error al crear notificación:', err.message);
     return null;
@@ -84,6 +101,11 @@ const notificarPorCliente = async (clienteId, { tipo, titulo, mensaje, prioridad
     const result = await Notificacion.notificarMultiple(ids, {
       tipo, titulo, mensaje, prioridad, accion_url, accion_label, metadata,
     });
+    // Emitir por WebSocket a cada usuario
+    socketService.emitToUsers(ids, 'notificacion:nueva', {
+      tipo, titulo, mensaje, prioridad, accion_url, accion_label,
+      created_at: new Date(),
+    });
     logger.info('[NotificacionService] Notificaciones creadas:', { cantidad: result.length });
     return result;
   } catch (err) {
@@ -99,15 +121,15 @@ const notificarAdmins = async ({ tipo, titulo, mensaje, prioridad = 'normal', ac
   try {
     const ids = await getUsuariosPorRol(['admin', 'supervisor']);
     if (ids.length === 0) return [];
-    return await Notificacion.notificarMultiple(ids, {
-      tipo,
-      titulo,
-      mensaje,
-      prioridad,
-      accion_url,
-      accion_label,
-      metadata,
+    const result = await Notificacion.notificarMultiple(ids, {
+      tipo, titulo, mensaje, prioridad, accion_url, accion_label, metadata,
     });
+    // Emitir por WebSocket
+    socketService.emitToUsers(ids, 'notificacion:nueva', {
+      tipo, titulo, mensaje, prioridad, accion_url, accion_label,
+      created_at: new Date(),
+    });
+    return result;
   } catch (err) {
     logger.error('[NotificacionService] Error al notificar admins:', err.message);
     return [];

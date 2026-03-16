@@ -17,12 +17,15 @@ const {
   Inventario,
   Cliente,
   Contacto,
+  Auditoria,
   sequelize
 } = require('../models');
 const excelService = require('../services/excelService');
 const pdfService = require('../services/pdfService');
+const notificacionService = require('../services/notificacionService');
 const { serverError, notFound } = require('../utils/responses');
 const logger = require('../utils/logger');
+const { getClientIP } = require('../utils/helpers');
 
 /**
  * Parsear filtros de fecha
@@ -872,6 +875,25 @@ const crearProgramado = async (req, res) => {
     // Programar inmediatamente
     scheduler.programar(reporte);
 
+    // Auditoría
+    Auditoria.registrar({
+      tabla: 'reportes_programados', registro_id: reporte.id, accion: 'crear',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      datos_nuevos: { nombre, tipo_reporte, formato, cron_expresion, destinatarios },
+      ip_address: getClientIP(req),
+      descripcion: `Reporte programado "${nombre}" creado`
+    });
+
+    // Notificar admins
+    notificacionService.notificarAdmins({
+      tipo: 'sistema',
+      titulo: `Nuevo reporte programado: ${nombre}`,
+      mensaje: `Se creó el reporte "${nombre}" (${tipo_reporte}) programado: ${frecuencia_label || cron_expresion}.`,
+      prioridad: 'baja',
+      accion_url: '/reportes/programados',
+      accion_label: 'Ver programados',
+    });
+
     return res.json({ success: true, message: 'Reporte programado creado', data: reporte });
   } catch (error) {
     logger.error('Error al crear programado:', { message: error.message });
@@ -912,6 +934,14 @@ const actualizarProgramado = async (req, res) => {
       scheduler.cancelar(reporte.id);
     }
 
+    // Auditoría
+    Auditoria.registrar({
+      tabla: 'reportes_programados', registro_id: reporte.id, accion: 'actualizar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      datos_nuevos: req.body, ip_address: getClientIP(req),
+      descripcion: `Reporte programado "${reporte.nombre}" actualizado${activo !== undefined ? (activo ? ' (activado)' : ' (pausado)') : ''}`
+    });
+
     return res.json({ success: true, message: 'Reporte programado actualizado', data: reporte });
   } catch (error) {
     logger.error('Error al actualizar programado:', { message: error.message });
@@ -924,8 +954,17 @@ const eliminarProgramado = async (req, res) => {
     const reporte = await ReporteProgramado.findByPk(req.params.id);
     if (!reporte) return notFound(res, 'Reporte programado no encontrado');
 
+    const nombreReporte = reporte.nombre;
     scheduler.cancelar(reporte.id);
     await reporte.destroy();
+
+    // Auditoría
+    Auditoria.registrar({
+      tabla: 'reportes_programados', registro_id: req.params.id, accion: 'eliminar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      datos_anteriores: { nombre: nombreReporte }, ip_address: getClientIP(req),
+      descripcion: `Reporte programado "${nombreReporte}" eliminado`
+    });
 
     return res.json({ success: true, message: 'Reporte programado eliminado' });
   } catch (error) {

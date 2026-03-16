@@ -23,6 +23,7 @@ import useNotification from './hooks/useNotification';
 // ════════════════════════════════════════════════════════════════════════════
 import { AlertProvider } from './context/AlertContext';
 import { AuthProvider } from './context/AuthContext';
+import { SocketProvider } from './context/SocketContext';
 import PrivateRoute, {
   AdminRoute,
   SupervisorRoute,
@@ -192,6 +193,7 @@ function App() {
         <AlertProvider>
           {/* Provider de autenticación */}
           <AuthProvider>
+          <SocketProvider>
             <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* ══════════════════════════════════════════════════════════ */}
@@ -283,6 +285,7 @@ function App() {
               <Route path="*" element={<ComingSoon title="Página no encontrada" />} />
             </Routes>
           </Suspense>
+          </SocketProvider>
         </AuthProvider>
       </AlertProvider>
     </SnackbarProvider>

@@ -1083,7 +1083,47 @@ Sube un logo para la firma de email. Se convierte a base64 y se usa en todas las
 
 ---
 
-## 9. Auditoría de Acciones (`/auditoria-acciones`)
+## 9. WebSocket (Socket.IO)
+
+### Conexión
+
+```javascript
+// Frontend
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:5000', {
+  auth: { token: 'jwt_token_aqui' },
+  transports: ['websocket', 'polling'],
+});
+```
+
+**Autenticación:** JWT en `auth.token` durante el handshake. El servidor verifica issuer/audience.
+
+### Eventos del Servidor → Cliente
+
+| Evento | Datos | Cuándo se emite |
+|--------|-------|-----------------|
+| `notificacion:nueva` | `{ tipo, titulo, mensaje, prioridad, accion_url, created_at }` | Cada vez que se crea una notificación para el usuario |
+
+**Ejemplos de triggers:**
+- Sync WMS (entrada/salida/kardex) → notifica a usuarios del cliente + admins
+- Cierre de auditoría → notifica a usuarios del cliente
+- Stock bajo/agotado → notifica a admins/supervisores
+- Nuevo cliente/usuario portal → notifica a admins
+- Reporte programado creado → notifica a admins
+
+### Proxy en Desarrollo (Vite)
+
+```javascript
+// vite.config.js
+proxy: {
+  '/socket.io': { target: 'http://localhost:5000', ws: true }
+}
+```
+
+---
+
+## 10. Auditoría de Acciones (`/auditoria-acciones`)
 
 ### GET `/auditoria-acciones`
 **Acceso:** Admin

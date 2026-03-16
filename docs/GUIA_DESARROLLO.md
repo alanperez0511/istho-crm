@@ -701,10 +701,68 @@ const handleFiltersChange = (newFilters) => {
 
 ---
 
-## 11. Troubleshooting Común
+## 11. WebSocket (Notificaciones en Tiempo Real)
+
+### Emitir notificación desde un controller
+
+Las notificaciones se emiten automáticamente por WebSocket cuando usas `notificacionService`:
+
+```javascript
+const notificacionService = require('../services/notificacionService');
+
+// Notificar a un usuario específico
+await notificacionService.notificar({
+  usuario_id: 5,
+  tipo: 'sistema',
+  titulo: 'Título',
+  mensaje: 'Mensaje del evento',
+  prioridad: 'normal',  // baja, normal, alta, urgente
+  accion_url: '/ruta/en/el/sistema',
+});
+
+// Notificar a admins y supervisores
+await notificacionService.notificarAdmins({ tipo: 'sistema', titulo: '...', mensaje: '...' });
+
+// Notificar a usuarios de un cliente + admins
+await notificacionService.notificarPorCliente(clienteId, { tipo: 'despacho', titulo: '...', mensaje: '...' });
+```
+
+Cada llamada:
+1. Crea el registro en BD (tabla `notificaciones`)
+2. Emite `notificacion:nueva` por WebSocket a los usuarios afectados
+3. El frontend actualiza el badge y muestra un toast automáticamente
+
+### Escuchar eventos en el frontend
+
+```javascript
+import { useSocket } from '@context/SocketContext';
+
+const { on, off } = useSocket();
+
+useEffect(() => {
+  const handler = (data) => console.log('Nueva notificación:', data);
+  on('notificacion:nueva', handler);
+  return () => off('notificacion:nueva', handler);
+}, [on, off]);
+```
+
+### Arquitectura
+
+```
+server.js → http.createServer(app) → socketService.inicializar(server)
+notificacionService.notificar() → DB + socketService.emitToUser()
+Frontend: SocketContext → NotificacionesContext → FloatingHeader toast
+```
+
+---
+
+## 12. Troubleshooting Común
 
 | Problema | Solución |
 |----------|---------|
+| WebSocket 404 en desarrollo | Verificar proxy `/socket.io` en `vite.config.js` con `ws: true` |
+| WebSocket no conecta | Verificar que backend use `http.createServer(app)` + `socketService.inicializar(server)` |
+| Toast no aparece | Verificar que `SocketProvider` envuelva la app dentro de `AuthProvider` |
 | CORS bloqueado | Agregar URL a `CORS_ORIGIN` en `.env` |
 | Permisos no funcionan | Ejecutar `seedRolesPermisos.js`, verificar `rol_id` del usuario |
 | Caché de permisos desactualizado | Esperar 60s o reiniciar servidor |

@@ -81,13 +81,21 @@
 - **Reportes comparativos**: Tendencia de operaciones últimos 6 meses + variación mes actual vs anterior
 - **Reportes programados**: Envío automático con cron (diario, semanal, quincenal, mensual) a múltiples destinatarios
 
-### 9. Búsqueda Global (Ctrl+K)
+### 9. Notificaciones en Tiempo Real (WebSocket)
+- **Socket.IO** con autenticación JWT en el handshake
+- Notificación instantánea al navegador cuando ocurre: sync WMS, cierre de auditoría, stock bajo/agotado, nuevo cliente, nuevo usuario portal, reporte programado
+- Toast automático con color según prioridad (urgente=rojo, alta=naranja, normal=azul)
+- Badge del header se actualiza sin recargar la página
+- Reconexión automática (hasta 10 intentos)
+- Proxy WebSocket configurado en Vite para desarrollo
+
+### 10. Búsqueda Global (Ctrl+K)
 - Modal de búsqueda cross-módulo desde cualquier página
 - Busca en: Inventario, Clientes, Entradas, Salidas, Kardex
 - Resultados agrupados por módulo con navegación por teclado
 - Debounce 400ms, mínimo 2 caracteres
 
-### 10. Otros Módulos
+### 12. Otros Módulos
 - **Dashboard**: KPIs consolidados con gráficos (Recharts)
 - **Clientes CRUD**: Gestión de empresas con contactos y logo
 - **Despachos**: Gestión de envíos con transporte y documentos

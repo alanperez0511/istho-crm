@@ -6,9 +6,11 @@
  */
 
 require('dotenv').config();
+const http = require('http');
 const app = require('./src/app');
 const db = require('./src/models');
 const logger = require('./src/utils/logger');
+const socketService = require('./src/services/socketService');
 
 const PORT = process.env.PORT || 5000;
 
@@ -48,12 +50,17 @@ const startServer = async () => {
     const reporteScheduler = require('./src/services/reporteScheduler');
     await reporteScheduler.inicializar();
 
+    // Crear servidor HTTP y adjuntar Socket.IO
+    const server = http.createServer(app);
+    socketService.inicializar(server);
+
     // Iniciar servidor
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       logger.info(`🚀 Servidor iniciado exitosamente`);
       logger.info(`   📍 Puerto: ${PORT}`);
       logger.info(`   🌍 Ambiente: ${process.env.NODE_ENV}`);
       logger.info(`   📡 API URL: http://localhost:${PORT}${process.env.API_PREFIX || '/api/v1'}`);
+      logger.info(`   🔌 WebSocket: ws://localhost:${PORT}`);
       logger.info(`   ❤️  Health: http://localhost:${PORT}/health`);
       console.log('\n   Presiona Ctrl+C para detener el servidor\n');
     });

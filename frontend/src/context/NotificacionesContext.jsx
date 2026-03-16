@@ -18,6 +18,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { useSocket } from './SocketContext';
 import notificacionesService from '../api/notificacionesService';
 
 const NotificacionesContext = createContext();
@@ -35,9 +36,11 @@ export const useNotificaciones = () => {
 
 export const NotificacionesProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
+  const socket = useSocket();
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificaciones, setNotificaciones] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [ultimaNotificacion, setUltimaNotificacion] = useState(null);
   const intervalRef = useRef(null);
   const retryRef = useRef(null);
   const mountedRef = useRef(true);
@@ -199,12 +202,40 @@ export const NotificacionesProvider = ({ children }) => {
     };
   }, [user, isAuthenticated, fetchAll, fetchCount]);
 
+  // Escuchar notificaciones en tiempo real via WebSocket
+  useEffect(() => {
+    if (!socket?.on) return;
+
+    const handleNuevaNotificacion = (data) => {
+      if (!mountedRef.current) return;
+
+      // Actualizar contador
+      setUnreadCount(prev => prev + 1);
+
+      // Agregar al inicio de la lista
+      setNotificaciones(prev => [
+        { ...data, leida: false, id: data.id || Date.now() },
+        ...prev.slice(0, 4), // Mantener máximo 5
+      ]);
+
+      // Guardar última para toast
+      setUltimaNotificacion(data);
+    };
+
+    socket.on('notificacion:nueva', handleNuevaNotificacion);
+
+    return () => {
+      socket.off('notificacion:nueva', handleNuevaNotificacion);
+    };
+  }, [socket]);
+
   return (
     <NotificacionesContext.Provider
       value={{
         unreadCount,
         notificaciones,
         loading,
+        ultimaNotificacion,
         fetchCount,
         fetchRecientes,
         marcarLeida,

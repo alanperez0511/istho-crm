@@ -9,16 +9,18 @@
  * @version 1.1.0 - Corregido envío de emails
  */
 
-const { Usuario, Cliente } = require('../models');
+const { Usuario, Cliente, Auditoria } = require('../models');
 const { success, created, badRequest, notFound, serverError } = require('../utils/responses');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
+const { getClientIP } = require('../utils/helpers');
+const notificacionService = require('../services/notificacionService');
 
 // Importar servicio de email
-const { 
-  enviarBienvenidaUsuarioCliente, 
-  enviarReseteoPassword 
+const {
+  enviarBienvenidaUsuarioCliente,
+  enviarReseteoPassword
 } = require('../services/emailService');
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -247,13 +249,32 @@ const crear = async (req, res) => {
     const usuarioResponse = usuario.toJSON();
     delete usuarioResponse.password;
     
+    // Auditoría
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: usuario.id, accion: 'crear',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      datos_nuevos: { username, email, nombre_completo, rol: 'cliente', cliente_id: clienteId },
+      ip_address: getClientIP(req),
+      descripcion: `Usuario portal "${username}" creado para cliente ${cliente.razon_social}`
+    });
+
+    // Notificar admins
+    notificacionService.notificarAdmins({
+      tipo: 'cliente',
+      titulo: `Nuevo usuario portal: ${nombre_completo || username}`,
+      mensaje: `Se creó usuario "${username}" para el portal de ${cliente.razon_social}.`,
+      prioridad: 'baja',
+      accion_url: `/clientes/${clienteId}`,
+      accion_label: 'Ver cliente',
+    });
+
     return created(res, {
       usuario: usuarioResponse,
-      mensaje: enviar_email 
-        ? 'Usuario creado. Se envió email con credenciales.' 
+      mensaje: enviar_email
+        ? 'Usuario creado. Se envió email con credenciales.'
         : 'Usuario creado exitosamente.'
     });
-    
+
   } catch (error) {
     logger.error('Error al crear usuario de cliente:', { message: error.message, stack: error.stack });
     return serverError(res, 'Error al crear usuario');
@@ -309,11 +330,19 @@ const actualizar = async (req, res) => {
     const usuarioResponse = usuario.toJSON();
     delete usuarioResponse.password;
     
+    // Auditoría
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: id, accion: 'actualizar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      datos_nuevos: req.body, ip_address: getClientIP(req),
+      descripcion: `Usuario portal "${usuario.username}" actualizado`
+    });
+
     return success(res, {
       usuario: usuarioResponse,
       mensaje: 'Usuario actualizado exitosamente'
     });
-    
+
   } catch (error) {
     logger.error('Error al actualizar usuario:', { message: error.message });
     return serverError(res, 'Error al actualizar usuario');
@@ -337,9 +366,16 @@ const desactivar = async (req, res) => {
     }
     
     await usuario.update({ activo: false });
-    
+
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: id, accion: 'eliminar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      ip_address: getClientIP(req),
+      descripcion: `Usuario portal "${usuario.username}" desactivado`
+    });
+
     logger.info('Usuario desactivado:', { usuarioId: id, clienteId });
-    
+
     return success(res, { mensaje: 'Usuario desactivado exitosamente' });
     
   } catch (error) {
@@ -364,14 +400,21 @@ const reactivar = async (req, res) => {
       return notFound(res, 'Usuario no encontrado');
     }
     
-    await usuario.update({ 
+    await usuario.update({
       activo: true,
       intentos_fallidos: 0,
       bloqueado_hasta: null
     });
-    
+
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: id, accion: 'actualizar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      ip_address: getClientIP(req),
+      descripcion: `Usuario portal "${usuario.username}" reactivado`
+    });
+
     logger.info('Usuario reactivado:', { usuarioId: id, clienteId });
-    
+
     return success(res, { mensaje: 'Usuario reactivado exitosamente' });
     
   } catch (error) {
@@ -441,11 +484,18 @@ const resetearPassword = async (req, res) => {
       }
     }
     
+    Auditoria.registrar({
+      tabla: 'usuarios', registro_id: id, accion: 'actualizar',
+      usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
+      ip_address: getClientIP(req),
+      descripcion: `Contraseña de usuario portal "${usuario.username}" reseteada`
+    });
+
     logger.info('Contraseña reseteada:', { usuarioId: id, clienteId });
-    
-    return success(res, { 
-      mensaje: enviar_email 
-        ? 'Contraseña reseteada. Se envió email con las nuevas credenciales.' 
+
+    return success(res, {
+      mensaje: enviar_email
+        ? 'Contraseña reseteada. Se envió email con las nuevas credenciales.'
         : 'Contraseña reseteada exitosamente.',
       // Solo incluir contraseña en respuesta si NO se envió email
       ...(enviar_email ? {} : { passwordTemporal })
