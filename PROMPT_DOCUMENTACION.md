@@ -2,7 +2,6 @@
 
 > Usa este prompt para iniciar una nueva conversación con Claude y generar la documentación técnica del proyecto.
 
----
 
 ## Prompt
 

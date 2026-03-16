@@ -16,6 +16,7 @@ const authController = require('../controllers/authController');
 // Middleware
 const { verificarToken, verificarPermisoCliente } = require('../middleware/auth');
 const { soloAdmin } = require('../middleware/roles');
+const { uploadAvatar } = require('../config/multer');
 
 // Validadores
 const {
@@ -82,6 +83,20 @@ router.post('/logout', verificarToken, authController.logout);
  * @access  Privado
  */
 router.put('/cambiar-password', verificarToken, verificarPermisoCliente('perfil', 'cambiar_password'), cambiarPasswordValidator, authController.cambiarPassword);
+
+/**
+ * @route   POST /auth/me/avatar
+ * @desc    Subir foto de perfil
+ * @access  Privado
+ */
+router.post('/me/avatar', verificarToken, uploadAvatar.single('avatar'), authController.subirAvatar);
+
+/**
+ * @route   DELETE /auth/me/avatar
+ * @desc    Eliminar foto de perfil
+ * @access  Privado
+ */
+router.delete('/me/avatar', verificarToken, authController.eliminarAvatar);
 
 /**
  * @route   POST /auth/refresh

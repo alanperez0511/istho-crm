@@ -31,7 +31,6 @@ module.exports = (sequelize) => {
     codigo: {
       type: DataTypes.STRING(30),
       allowNull: false,
-      unique: { msg: 'Ya existe un rol con este código' },
       validate: {
         notEmpty: { msg: 'El código del rol es requerido' },
         is: { args: /^[a-z_]+$/, msg: 'El código solo puede contener minúsculas y guiones bajos' }

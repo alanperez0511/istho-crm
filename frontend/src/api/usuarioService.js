@@ -17,7 +17,7 @@
  * @date Enero 2026
  */
 
-import apiClient from './client';
+import apiClient, { createUploadClient } from './client';
 import { AUTH_ENDPOINTS } from './endpoints';
 
 // ============================================================================
@@ -296,6 +296,42 @@ const usuarioService = {
     return user?.rol || null;
   },
   
+  /**
+   * Subir foto de perfil
+   * @param {File} file - Archivo de imagen
+   * @returns {Promise<Object>}
+   */
+  subirAvatar: async (file) => {
+    try {
+      const uploadClient = createUploadClient();
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const response = await uploadClient.post(AUTH_ENDPOINTS.ME_AVATAR, formData);
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: error?.response?.data?.message || error.message || 'Error al subir la foto',
+      };
+    }
+  },
+
+  /**
+   * Eliminar foto de perfil
+   * @returns {Promise<Object>}
+   */
+  eliminarAvatar: async () => {
+    try {
+      const response = await apiClient.delete(AUTH_ENDPOINTS.ME_AVATAR);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || 'Error al eliminar la foto',
+      };
+    }
+  },
+
   /**
    * Verificar si es admin
    * @returns {boolean}

@@ -128,33 +128,33 @@ const ForceChangePasswordModal = () => {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-        {/* Header con icono */}
-        <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 text-center">
-          <div className="w-16 h-16 mx-auto mb-3 bg-white/20 rounded-full flex items-center justify-center">
-            <Lock className="w-8 h-8 text-white" />
+      <div className="relative w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+        {/* Header compacto */}
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-4 text-center flex-shrink-0">
+          <div className="w-10 h-10 mx-auto mb-2 bg-white/20 rounded-full flex items-center justify-center">
+            <Lock className="w-5 h-5 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-white">
+          <h2 className="text-base font-bold text-white">
             Cambio de contraseña requerido
           </h2>
-          <p className="text-orange-100 text-sm mt-1">
-            Por seguridad, debes cambiar tu contraseña temporal antes de continuar
+          <p className="text-orange-100 text-xs mt-0.5">
+            Debes cambiar tu contraseña temporal antes de continuar
           </p>
         </div>
 
-        {/* Formulario */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Formulario con scroll */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-3 overflow-y-auto">
           {/* Error */}
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <div className="flex items-center gap-2 p-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-700 dark:text-red-400">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
               {error}
             </div>
           )}
 
           {/* Contraseña actual */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Contraseña temporal actual
             </label>
             <div className="relative">
@@ -163,13 +163,13 @@ const ForceChangePasswordModal = () => {
                 value={form.password_actual}
                 onChange={(e) => handleChange('password_actual', e.target.value)}
                 placeholder="Ingresa la contraseña que recibiste"
-                className="w-full px-4 py-2.5 pr-10 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                className="w-full px-3 py-2 pr-9 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 autoFocus
               />
               <button
                 type="button"
                 onClick={() => toggleShow('actual')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               >
                 {showPasswords.actual ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -178,7 +178,7 @@ const ForceChangePasswordModal = () => {
 
           {/* Nueva contraseña */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Nueva contraseña
             </label>
             <div className="relative">
@@ -187,20 +187,20 @@ const ForceChangePasswordModal = () => {
                 value={form.password_nuevo}
                 onChange={(e) => handleChange('password_nuevo', e.target.value)}
                 placeholder="Mínimo 8 caracteres"
-                className="w-full px-4 py-2.5 pr-10 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                className="w-full px-3 py-2 pr-9 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
               <button
                 type="button"
                 onClick={() => toggleShow('nuevo')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               >
                 {showPasswords.nuevo ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
             {/* Indicador de fuerza */}
             {form.password_nuevo && (
-              <div className="mt-2">
-                <div className="flex gap-1 mb-1">
+              <div className="mt-1.5">
+                <div className="flex gap-1 mb-0.5">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <div
                       key={i}
@@ -210,7 +210,7 @@ const ForceChangePasswordModal = () => {
                     />
                   ))}
                 </div>
-                <p className={`text-xs ${
+                <p className={`text-[11px] ${
                   strength.level <= 2 ? 'text-red-500' :
                   strength.level <= 3 ? 'text-amber-500' : 'text-emerald-500'
                 }`}>
@@ -222,7 +222,7 @@ const ForceChangePasswordModal = () => {
 
           {/* Confirmar contraseña */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Confirmar nueva contraseña
             </label>
             <div className="relative">
@@ -231,12 +231,12 @@ const ForceChangePasswordModal = () => {
                 value={form.password_confirmar}
                 onChange={(e) => handleChange('password_confirmar', e.target.value)}
                 placeholder="Repite la nueva contraseña"
-                className="w-full px-4 py-2.5 pr-10 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                className="w-full px-3 py-2 pr-9 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
               <button
                 type="button"
                 onClick={() => toggleShow('confirmar')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               >
                 {showPasswords.confirmar ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -247,19 +247,19 @@ const ForceChangePasswordModal = () => {
           </div>
 
           {/* Requisitos */}
-          <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 space-y-1">
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Requisitos:</p>
+          <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-2.5 space-y-0.5">
+            <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-0.5">Requisitos:</p>
             {[
               { ok: form.password_nuevo.length >= 8, text: 'Mínimo 8 caracteres' },
               { ok: /[A-Z]/.test(form.password_nuevo), text: 'Al menos una mayúscula' },
               { ok: /[a-z]/.test(form.password_nuevo), text: 'Al menos una minúscula' },
               { ok: /[0-9]/.test(form.password_nuevo), text: 'Al menos un número' },
             ].map((req, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs">
-                <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${
+              <div key={i} className="flex items-center gap-1.5 text-[11px]">
+                <div className={`w-3 h-3 rounded-full flex items-center justify-center ${
                   req.ok ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
                 }`}>
-                  {req.ok && <span className="text-white text-[8px]">✓</span>}
+                  {req.ok && <span className="text-white text-[7px]">✓</span>}
                 </div>
                 <span className={req.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}>
                   {req.text}
@@ -272,7 +272,7 @@ const ForceChangePasswordModal = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-semibold rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>

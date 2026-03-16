@@ -19,6 +19,8 @@ import {
   ClipboardList,
   Eye,
   Search,
+  Download,
+  FileSpreadsheet,
   MoreVertical,
   Clock,
   Loader2,
@@ -28,6 +30,8 @@ import {
   FileText,
   RefreshCw,
 } from 'lucide-react';
+import { Pagination } from '../../../components/common';
+import { exportToCsv } from '../../../utils/exportCsv';
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN DE ESTADOS
@@ -151,19 +155,21 @@ const KardexList = () => {
   const [estadoFilter, setEstadoFilter] = useState('todos');
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [error, setError] = useState(null);
 
-  const fetchKardex = useCallback(async () => {
+  const fetchKardex = useCallback(async (page = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const params = {};
+      const params = { page, limit: 20 };
       if (estadoFilter !== 'todos') params.estado = estadoFilter;
       if (searchTerm) params.search = searchTerm;
 
       const response = await auditoriasService.getKardex(params);
       if (response.success && response.data) {
         setItems(Array.isArray(response.data) ? response.data : response.data.kardex || []);
+        if (response.pagination) setPagination(response.pagination);
       } else {
         setItems([]);
       }
@@ -176,19 +182,12 @@ const KardexList = () => {
   }, [estadoFilter, searchTerm]);
 
   useEffect(() => {
-    fetchKardex();
+    fetchKardex(1);
   }, [fetchKardex]);
 
-  const filtered = items.filter((e) => {
-    const matchSearch =
-      !searchTerm ||
-      e.documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.documento_wms?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.motivo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.cliente?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchEstado = estadoFilter === 'todos' || e.estado === estadoFilter;
-    return matchSearch && matchEstado;
-  });
+  const handlePageChange = (page) => fetchKardex(page);
+
+  const filtered = items;
 
   const totalPendientes = items.filter((e) => e.estado === 'pendiente').length;
   const totalEnProceso = items.filter((e) => e.estado === 'en_proceso').length;
@@ -196,6 +195,30 @@ const KardexList = () => {
 
   const handleView = (item) => {
     navigate(`/inventario/kardex/${item.id}`);
+  };
+
+  const handleExportCsv = () => {
+    exportToCsv(filtered, [
+      { key: 'documento_wms', label: 'Documento WMS' },
+      { key: 'documento', label: 'Operación' },
+      { key: 'cliente', label: 'Cliente' },
+      { key: 'motivo', label: 'Motivo' },
+      { key: 'tipo_documento_wms', label: 'Tipo Doc.' },
+      { key: 'fecha_kardex', label: 'Fecha' },
+      { key: 'lineas', label: 'Total Líneas' },
+      { key: 'lineas_verificadas', label: 'Líneas Verificadas' },
+      { key: 'estado', label: 'Estado' },
+    ], 'kardex_inventario');
+  };
+
+  const handleExportExcel = () => {
+    const baseUrl = import.meta.env.VITE_API_URL || '/api/v1';
+    const token = localStorage.getItem('istho_token');
+    const params = new URLSearchParams();
+    if (token) params.set('token', token);
+    if (estadoFilter !== 'todos') params.set('estado', estadoFilter);
+    if (searchTerm) params.set('search', searchTerm);
+    window.open(`${baseUrl}/auditorias/kardex/excel?${params.toString()}`, '_blank');
   };
 
   return (
@@ -213,6 +236,24 @@ const KardexList = () => {
               <p className="text-slate-500 dark:text-slate-400 mt-0.5">Auditoría de ajustes de unidades desde el WMS</p>
             </div>
           </div>
+          {filtered.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Excel
+              </button>
+              <button
+                onClick={handleExportCsv}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                CSV
+              </button>
+            </div>
+          )}
         </div>
 
         {/* KPI CARDS */}
@@ -371,6 +412,16 @@ const KardexList = () => {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {!loading && pagination.totalPages > 1 && (
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              itemsPerPage={20}
+              onPageChange={handlePageChange}
+            />
           )}
         </div>
 

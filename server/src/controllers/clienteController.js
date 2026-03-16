@@ -9,7 +9,7 @@
  */
 
 const { Op } = require('sequelize');
-const { Cliente, Contacto, Operacion, Usuario, Auditoria, sequelize } = require('../models');
+const { Cliente, Contacto, Operacion, Inventario, Usuario, Auditoria, sequelize } = require('../models');
 const notificacionService = require('../services/notificacionService');
 const {
   success,
@@ -87,6 +87,11 @@ const listar = async (req, res) => {
       order,
       limit,
       offset,
+      attributes: {
+        include: [
+          [sequelize.literal('(SELECT COUNT(*) FROM inventario WHERE inventario.cliente_id = Cliente.id)'), 'total_productos']
+        ]
+      },
       include: [{
         model: Contacto,
         as: 'contactos',
@@ -95,13 +100,13 @@ const listar = async (req, res) => {
         attributes: ['id', 'nombre', 'cargo', 'telefono', 'email']
       }]
     });
-    
-    logger.debug('Clientes listados:', { 
-      total: count, 
-      page, 
-      filtros: req.query 
+
+    logger.debug('Clientes listados:', {
+      total: count,
+      page,
+      filtros: req.query
     });
-    
+
     return paginated(res, rows, buildPaginacion(count, page, limit));
     
   } catch (error) {

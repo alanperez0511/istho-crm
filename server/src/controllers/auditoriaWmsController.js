@@ -32,6 +32,7 @@ const {
   serverError
 } = require('../utils/responses');
 const { parsePaginacion, getClientIP } = require('../utils/helpers');
+const excelService = require('../services/excelService');
 const logger = require('../utils/logger');
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -61,6 +62,7 @@ const listarEntradas = async (req, res) => {
     if (search) {
       where[Op.or] = [
         { numero_operacion: { [Op.like]: `%${search}%` } },
+        { documento_wms: { [Op.like]: `%${search}%` } },
         { '$cliente.razon_social$': { [Op.like]: `%${search}%` } }
       ];
     }
@@ -219,6 +221,7 @@ const listarSalidas = async (req, res) => {
     if (search) {
       where[Op.or] = [
         { numero_operacion: { [Op.like]: `%${search}%` } },
+        { documento_wms: { [Op.like]: `%${search}%` } },
         { '$cliente.razon_social$': { [Op.like]: `%${search}%` } }
       ];
     }
@@ -376,6 +379,7 @@ const listarKardex = async (req, res) => {
     if (search) {
       where[Op.or] = [
         { numero_operacion: { [Op.like]: `%${search}%` } },
+        { documento_wms: { [Op.like]: `%${search}%` } },
         { motivo_kardex: { [Op.like]: `%${search}%` } },
         { '$cliente.razon_social$': { [Op.like]: `%${search}%` } }
       ];
@@ -1032,6 +1036,47 @@ const recientes = async (req, res) => {
   }
 };
 
+/**
+ * GET /auditorias/:tipo/excel
+ * Exportar auditorías a Excel
+ */
+const exportarExcel = async (req, res) => {
+  try {
+    const { tipo } = req.params; // entradas, salidas, kardex
+    const tipoMap = { entradas: 'ingreso', salidas: 'salida', kardex: 'kardex' };
+    const tipoOp = tipoMap[tipo];
+    if (!tipoOp) return errorResponse(res, 'Tipo inválido', 400);
+
+    const where = { tipo: tipoOp };
+    if (req.query.estado && req.query.estado !== 'todos') where.estado = req.query.estado;
+    if (req.query.cliente_id) where.cliente_id = req.query.cliente_id;
+    if (req.query.fecha_desde) {
+      where.created_at = where.created_at || {};
+      where.created_at[Op.gte] = req.query.fecha_desde;
+    }
+    if (req.query.fecha_hasta) {
+      where.created_at = where.created_at || {};
+      where.created_at[Op.lte] = req.query.fecha_hasta + ' 23:59:59';
+    }
+
+    const operaciones = await Operacion.findAll({
+      where,
+      include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
+      order: [['created_at', 'DESC']]
+    });
+
+    const buffer = await excelService.exportarOperaciones(operaciones);
+    const filename = `auditorias_${tipo}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    logger.error('Error al exportar auditorías Excel:', { message: error.message });
+    return serverError(res, 'Error al generar el reporte', error);
+  }
+};
+
 module.exports = {
   listarEntradas,
   obtenerEntradaPorId,
@@ -1048,4 +1093,5 @@ module.exports = {
   cerrarAuditoria,
   estadisticas,
   recientes,
+  exportarExcel,
 };

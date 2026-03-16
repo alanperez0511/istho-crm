@@ -36,9 +36,9 @@ const EyeOffIcon = ({ className }) => (
     </svg>
 );
 
-const MailIcon = ({ className }) => (
+const UserIcon = ({ className }) => (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
     </svg>
 );
 
@@ -68,8 +68,7 @@ const SpinnerIcon = ({ className }) => (
 const loginSchema = yup.object({
     email: yup
         .string()
-        .required('El email es requerido')
-        .email('Ingresa un email válido'),
+        .required('El usuario o email es requerido'),
     password: yup
         .string()
         .required('La contraseña es requerida')
@@ -206,23 +205,23 @@ const LoginPage = () => {
 
                     {/* Formulario */}
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-                        {/* Campo Email */}
+                        {/* Campo Email / Username */}
                         <div>
                             <label
                                 htmlFor="email"
                                 className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
                             >
-                                Correo electrónico
+                                Usuario o correo electrónico
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <MailIcon className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+                                    <UserIcon className="w-5 h-5 text-gray-400 dark:text-slate-500" />
                                 </div>
                                 <input
                                     id="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    placeholder="usuario@istho.com.co"
+                                    type="text"
+                                    autoComplete="username"
+                                    placeholder="usuario o correo@istho.com.co"
                                     {...register('email')}
                                     className={`
                     w-full pl-12 pr-4 py-3 rounded-xl border bg-gray-50 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500

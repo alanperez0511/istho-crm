@@ -34,6 +34,9 @@ import PrivateRoute, {
 // Layout
 import FloatingHeader from './components/layout/FloatingHeader';
 import ForceChangePasswordModal from './components/auth/ForceChangePasswordModal';
+import GlobalSearch from './components/common/GlobalSearch';
+import apiClient from './api/client';
+import * as allEndpoints from './api/endpoints';
 
 // ════════════════════════════════════════════════════════════════════════════
 // LOADING COMPONENT
@@ -91,6 +94,7 @@ const ReportesList = lazy(() => import('./pages/Reportes/ReportesList'));
 const ReporteDespachos = lazy(() => import('./pages/Reportes/ReporteDespachos'));
 const ReporteInventario = lazy(() => import('./pages/Reportes/ReporteInventario'));
 const ReporteClientes = lazy(() => import('./pages/Reportes/ReporteClientes'));
+const ReportesProgramados = lazy(() => import('./pages/Reportes/ReportesProgramados'));
 
 // Plantillas de Email
 const PlantillasEmailList = lazy(() => import('./pages/PlantillasEmail/PlantillasEmailList'));
@@ -126,10 +130,17 @@ const ComingSoon = ({ title }) => (
 // ════════════════════════════════════════════════════════════════════════════
 // LAYOUT WRAPPER - Incluye Header en páginas protegidas
 // ════════════════════════════════════════════════════════════════════════════
+const SEARCH_ENDPOINTS = {
+  INVENTARIO: allEndpoints.INVENTARIO_ENDPOINTS,
+  CLIENTES: allEndpoints.CLIENTES_ENDPOINTS,
+  AUDITORIAS: allEndpoints.AUDITORIAS_ENDPOINTS,
+};
+
 const ProtectedLayout = () => (
   <>
     <FloatingHeader />
     <ForceChangePasswordModal />
+    <GlobalSearch apiClient={apiClient} endpoints={SEARCH_ENDPOINTS} />
     <Outlet />
   </>
 );
@@ -230,6 +241,7 @@ function App() {
                 <Route path="/reportes/despachos" element={<PortalPermissionRoute module="reportes" action="ver"><ReporteDespachos /></PortalPermissionRoute>} />
                 <Route path="/reportes/inventario" element={<PortalPermissionRoute module="reportes" action="ver"><ReporteInventario /></PortalPermissionRoute>} />
                 <Route path="/reportes/clientes" element={<OperadorRoute><ReporteClientes /></OperadorRoute>} />
+                <Route path="/reportes/programados" element={<SupervisorRoute><ReportesProgramados /></SupervisorRoute>} />
                 <Route path="/reportes/operativo" element={<ReporteDespachos />} />
                 <Route path="/reportes/kpis" element={<OperadorRoute><ReporteDespachos /></OperadorRoute>} />
                 <Route path="/reportes/financiero" element={<OperadorRoute><ReporteClientes /></OperadorRoute>} />

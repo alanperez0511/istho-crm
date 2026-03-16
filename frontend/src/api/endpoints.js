@@ -19,6 +19,7 @@ export const AUTH_ENDPOINTS = {
   LOGOUT: '/auth/logout',
   REFRESH: '/auth/refresh',
   ME: '/auth/me',
+  ME_AVATAR: '/auth/me/avatar',
   REGISTRO: '/auth/registro',
   CAMBIAR_PASSWORD: '/auth/cambiar-password',
   FORGOT_PASSWORD: '/auth/forgot-password',
@@ -122,6 +123,9 @@ export const AUDITORIAS_ENDPOINTS = {
   // KPIs y estadísticas
   STATS: '/auditorias/stats',
   RECIENTES: '/auditorias/recientes',
+
+  // Exportar Excel
+  EXPORT_EXCEL: (tipo) => `/auditorias/${tipo}/excel`,
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -152,12 +156,23 @@ export const DOCUMENTOS_ENDPOINTS = {
 export const REPORTES_ENDPOINTS = {
   // Dashboard consolidado
   DASHBOARD: '/reportes/dashboard',
-  
+
   // Reportes específicos
   DESPACHOS: '/reportes/despachos',
   INVENTARIO: '/reportes/inventario',
   CLIENTES: '/reportes/clientes',
   OPERACIONES: '/reportes/operaciones',
+
+  // Enviar por email
+  ENVIAR_EMAIL: '/reportes/enviar-email',
+
+  // Comparativos
+  COMPARATIVO: '/reportes/comparativo',
+
+  // Programados
+  PROGRAMADOS: '/reportes/programados',
+  PROGRAMADO_BY_ID: (id) => `/reportes/programados/${id}`,
+  PROGRAMADO_EJECUTAR: (id) => `/reportes/programados/${id}/ejecutar`,
 };
 
 // ════════════════════════════════════════════════════════════════════════════

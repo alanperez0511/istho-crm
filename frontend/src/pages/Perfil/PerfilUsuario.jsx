@@ -46,6 +46,7 @@ import { useAuth } from '../../context/AuthContext';
 import useNotification from '../../hooks/useNotification';
 import authService from '../../api/auth.service';
 import usuarioService from '../../api/usuarioService';
+import { getServerFileUrl } from '../../api/client';
 
 // ════════════════════════════════════════════════════════════════════════════
 // MODAL EDITAR PERFIL
@@ -364,6 +365,7 @@ const PerfilUsuario = () => {
   const [editModal, setEditModal] = useState(false);
   const [passwordModal, setPasswordModal] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
 
   // Cargar permisos
   useEffect(() => {
@@ -429,6 +431,56 @@ const PerfilUsuario = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo
+    if (!file.type.startsWith('image/')) {
+      apiError('Solo se permiten archivos de imagen');
+      return;
+    }
+
+    // Validar tamaño (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      apiError('La imagen no debe superar los 2MB');
+      return;
+    }
+
+    setAvatarLoading(true);
+    try {
+      const response = await usuarioService.subirAvatar(file);
+      if (response.success) {
+        updateUser({ avatar_url: response.data.avatar_url });
+        success('Foto de perfil actualizada');
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setAvatarLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    setAvatarLoading(true);
+    try {
+      const response = await usuarioService.eliminarAvatar();
+      if (response.success) {
+        updateUser({ avatar_url: null });
+        success('Foto de perfil eliminada');
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (err) {
+      apiError(err);
+    } finally {
+      setAvatarLoading(false);
+    }
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -536,13 +588,44 @@ const PerfilUsuario = () => {
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center gap-6">
             {/* Avatar */}
-            <div className="relative">
-              <div className="w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                {initials}
-              </div>
-              <button className="absolute -bottom-2 -right-2 p-2 bg-white dark:bg-slate-700 rounded-xl shadow-md hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">
-                <Camera className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-              </button>
+            <div className="relative group">
+              {user.avatar_url ? (
+                <img
+                  src={getServerFileUrl(user.avatar_url)}
+                  alt={displayName}
+                  className="w-24 h-24 rounded-2xl object-cover shadow-lg"
+                />
+              ) : (
+                <div className="w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg">
+                  {initials}
+                </div>
+              )}
+              {avatarLoading ? (
+                <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="absolute -bottom-2 -right-2 flex gap-1">
+                  <label className="p-2 bg-white dark:bg-slate-700 rounded-xl shadow-md hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors cursor-pointer">
+                    <Camera className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
+                  </label>
+                  {user.avatar_url && (
+                    <button
+                      onClick={handleAvatarDelete}
+                      className="p-2 bg-white dark:bg-slate-700 rounded-xl shadow-md hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                      title="Eliminar foto"
+                    >
+                      <X className="w-4 h-4 text-red-500" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Info */}

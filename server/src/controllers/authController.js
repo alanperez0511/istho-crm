@@ -86,11 +86,13 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Buscar usuario
-    const usuario = await Usuario.findByEmail(email);
+    // Buscar usuario por email o username
+    const usuario = email && email.includes('@')
+      ? await Usuario.findByEmail(email)
+      : await Usuario.findByEmailOrUsername(email);
 
     if (!usuario) {
-      logger.warn('Login fallido - email no registrado:', { email });
+      logger.warn('Login fallido - usuario no encontrado:', { identificador: email });
       return unauthorized(res, 'Credenciales inválidas');
     }
 
@@ -515,6 +517,88 @@ const refreshToken = async (req, res) => {
   }
 };
 
+/**
+ * POST /auth/me/avatar
+ * Subir foto de perfil
+ */
+const subirAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return errorResponse(res, 'No se proporcionó una imagen', 400);
+    }
+
+    const usuario = await Usuario.findByPk(req.user.id);
+    if (!usuario) {
+      return notFound(res, 'Usuario no encontrado');
+    }
+
+    // Eliminar avatar anterior si existe
+    if (usuario.avatar_url) {
+      const fs = require('fs');
+      const path = require('path');
+      const oldPath = path.join(__dirname, '../../uploads', usuario.avatar_url.replace('/uploads/', ''));
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    const avatar_url = `/uploads/avatars/${req.file.filename}`;
+    usuario.avatar_url = avatar_url;
+    await usuario.save();
+
+    await registrarAuditoria({
+      tabla: 'usuarios',
+      registro_id: usuario.id,
+      accion: 'actualizar',
+      usuario_id: usuario.id,
+      usuario_nombre: usuario.getNombreDisplay(),
+      ip_address: getClientIP(req),
+      descripcion: 'Foto de perfil actualizada'
+    });
+
+    logger.info('Avatar actualizado:', { userId: usuario.id });
+
+    return successMessage(res, 'Foto de perfil actualizada', { avatar_url });
+
+  } catch (error) {
+    logger.error('Error al subir avatar:', { message: error.message });
+    return serverError(res, 'Error al subir la foto de perfil', error);
+  }
+};
+
+/**
+ * DELETE /auth/me/avatar
+ * Eliminar foto de perfil
+ */
+const eliminarAvatar = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.user.id);
+    if (!usuario) {
+      return notFound(res, 'Usuario no encontrado');
+    }
+
+    if (usuario.avatar_url) {
+      const fs = require('fs');
+      const path = require('path');
+      const oldPath = path.join(__dirname, '../../uploads', usuario.avatar_url.replace('/uploads/', ''));
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    usuario.avatar_url = null;
+    await usuario.save();
+
+    logger.info('Avatar eliminado:', { userId: usuario.id });
+
+    return successMessage(res, 'Foto de perfil eliminada');
+
+  } catch (error) {
+    logger.error('Error al eliminar avatar:', { message: error.message });
+    return serverError(res, 'Error al eliminar la foto de perfil', error);
+  }
+};
+
 // ============================================================================
 // EXPORTS
 // ============================================================================
@@ -528,5 +612,7 @@ module.exports = {
   cambiarPassword,
   forgotPassword,
   resetPassword,
-  refreshToken
+  refreshToken,
+  subirAvatar,
+  eliminarAvatar
 };

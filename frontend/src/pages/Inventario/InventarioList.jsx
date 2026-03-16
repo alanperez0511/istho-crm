@@ -82,6 +82,7 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const stockActual = producto.stock_actual || producto.cantidad || 0;
+  const esWMS = !!(producto.codigo_wms);
 
   const handleClick = (event) => setAnchorEl(event.currentTarget);
   const handleClose = () => setAnchorEl(null);
@@ -131,19 +132,19 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
           Ver detalle
         </MenuItem>
 
-        {canEdit && (
+        {canEdit && !esWMS && (
           <MenuItem onClick={() => { onEdit(producto); handleClose(); }}>
             <Pencil className="w-4 h-4" />
             Editar
           </MenuItem>
         )}
 
-        {canEdit && (
+        {canEdit && !esWMS && (
           <div className="border-t border-gray-100 my-1" />
         )}
-        
-        {canEdit && (
-          <MenuItem 
+
+        {canEdit && !esWMS && (
+          <MenuItem
             onClick={() => { onEntrada(producto); handleClose(); }}
             sx={{ color: '#059669 !important', '&:hover': { backgroundColor: '#ecfdf5 !important' } }}
           >
@@ -151,14 +152,14 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
             Registrar Entrada
           </MenuItem>
         )}
-        
-        {canEdit && (
-          <MenuItem 
+
+        {canEdit && !esWMS && (
+          <MenuItem
             onClick={() => { onSalida(producto); handleClose(); }}
             disabled={stockActual === 0}
-            sx={{ 
-              color: stockActual === 0 ? '#cbd5e1 !important' : '#2563eb !important', 
-              '&:hover': { backgroundColor: stockActual === 0 ? 'transparent' : '#eff6ff !important' } 
+            sx={{
+              color: stockActual === 0 ? '#cbd5e1 !important' : '#2563eb !important',
+              '&:hover': { backgroundColor: stockActual === 0 ? 'transparent' : '#eff6ff !important' }
             }}
           >
             <PackageMinus className="w-4 h-4" />
@@ -166,12 +167,18 @@ const RowActions = ({ producto, onView, onEdit, onDelete, onEntrada, onSalida, c
           </MenuItem>
         )}
 
-        {canDelete && (
+        {esWMS && canEdit && (
+          <MenuItem disabled sx={{ fontSize: '0.75rem !important', color: '#94a3b8 !important' }}>
+            Producto gestionado por WMS
+          </MenuItem>
+        )}
+
+        {canDelete && !esWMS && (
           <div className="border-t border-gray-100 my-1" />
         )}
-        
-        {canDelete && (
-          <MenuItem 
+
+        {canDelete && !esWMS && (
+          <MenuItem
             onClick={() => { onDelete(producto); handleClose(); }}
             sx={{ color: '#dc2626 !important', '&:hover': { backgroundColor: '#fef2f2 !important' } }}
           >

@@ -1,13 +1,14 @@
 /**
  * ISTHO CRM - ReporteInventario Page
- * Reporte de inventario con datos reales del backend y filtros
+ * Reporte de inventario con datos reales, gráficos y filtros persistentes en URL
  *
  * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Marzo 2026
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Package,
@@ -16,15 +17,19 @@ import {
   DollarSign,
   FileSpreadsheet,
   RefreshCw,
+  Mail,
 } from 'lucide-react';
 
 // Components
 import { Button, KpiCard, ReportFilters } from '../../components/common';
+import { BarChart, PieChart } from '../../components/charts';
+import EnviarReporteModal from '../../components/common/EnviarReporteModal';
 
 // API
 import reportesService from '../../api/reportes.service';
 import inventarioService from '../../api/inventario.service';
 import { useAuth } from '../../context/AuthContext';
+import { useSnackbar } from 'notistack';
 
 // ============================================
 // ALERTA ITEM
@@ -32,7 +37,6 @@ import { useAuth } from '../../context/AuthContext';
 const AlertaItem = ({ alerta }) => {
   const isVencimiento = alerta.tipo === 'vencimiento';
 
-  // Generar titulo y mensaje desde los campos reales del backend
   const titulo = alerta.titulo || alerta.producto_nombre || alerta.nombre || 'Producto';
   let mensaje = alerta.mensaje;
   if (!mensaje) {
@@ -67,21 +71,40 @@ const AlertaItem = ({ alerta }) => {
 // ============================================
 const ReporteInventario = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
   const canDownload = hasPermission('reportes', 'exportar') || hasPermission('reportes', 'descargar');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [alertas, setAlertas] = useState([]);
+  const [productos, setProductos] = useState([]);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({ fecha_desde: '', fecha_hasta: '', cliente_id: '' });
+  const [emailModal, setEmailModal] = useState(false);
+
+  // Filtros desde URL
+  const [filters, setFilters] = useState({
+    fecha_desde: searchParams.get('fecha_desde') || '',
+    fecha_hasta: searchParams.get('fecha_hasta') || '',
+    cliente_id: searchParams.get('cliente_id') || '',
+  });
+
+  // Persistir filtros en URL
+  const handleFiltersChange = (newFilters) => {
+    setFilters(newFilters);
+    const params = new URLSearchParams();
+    Object.entries(newFilters).forEach(([k, v]) => { if (v) params.set(k, v); });
+    setSearchParams(params, { replace: true });
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [dashResponse, alertasResponse] = await Promise.all([
+      const [dashResponse, alertasResponse, inventarioResponse] = await Promise.all([
         reportesService.getDashboard(),
         inventarioService.getAlertas().catch(() => ({ data: [] })),
+        inventarioService.getAll({ limit: 100 }).catch(() => ({ data: [] })),
       ]);
 
       if (dashResponse?.success && dashResponse.data) {
@@ -91,6 +114,10 @@ const ReporteInventario = () => {
       if (alertasResponse?.data) {
         setAlertas(Array.isArray(alertasResponse.data) ? alertasResponse.data.slice(0, 8) : []);
       }
+
+      // Productos para gráficos
+      const prods = inventarioResponse?.data || [];
+      setProductos(Array.isArray(prods) ? prods : []);
     } catch (err) {
       setError(err.message || 'Error al cargar datos');
     } finally {
@@ -102,7 +129,6 @@ const ReporteInventario = () => {
     fetchData();
   }, [fetchData]);
 
-  // Construir query string con filtros
   const buildFilterParams = () => {
     const params = new URLSearchParams();
     const token = localStorage.getItem('istho_token');
@@ -115,9 +141,7 @@ const ReporteInventario = () => {
 
   const handleExport = (format) => {
     const baseUrl = import.meta.env.VITE_API_URL || '/api/v1';
-    const endpoint = format === 'excel'
-      ? '/reportes/inventario/excel'
-      : '/reportes/inventario/pdf';
+    const endpoint = format === 'excel' ? '/reportes/inventario/excel' : '/reportes/inventario/pdf';
     window.open(`${baseUrl}${endpoint}?${buildFilterParams()}`, '_blank');
   };
 
@@ -127,6 +151,28 @@ const ReporteInventario = () => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(0)}M`;
     return `$${value.toLocaleString()}`;
   };
+
+  // Datos para gráficos
+  const estadoData = (() => {
+    const counts = {};
+    productos.forEach(p => {
+      const estado = p.cantidad === 0 ? 'Agotado'
+        : (p.stock_minimo > 0 && p.cantidad <= p.stock_minimo) ? 'Stock Bajo'
+        : 'Disponible';
+      counts[estado] = (counts[estado] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  })();
+
+  const topProductos = (() => {
+    return [...productos]
+      .sort((a, b) => ((b.cantidad || 0) * (b.costo_unitario || 0)) - ((a.cantidad || 0) * (a.costo_unitario || 0)))
+      .slice(0, 8)
+      .map(p => ({
+        label: (p.producto || p.nombre || p.sku || '').substring(0, 20),
+        value1: (p.cantidad || 0) * (p.costo_unitario || 0),
+      }));
+  })();
 
   if (loading) {
     return (
@@ -176,6 +222,9 @@ const ReporteInventario = () => {
             </Button>
             {canDownload && (
               <>
+                <Button variant="outline" icon={Mail} onClick={() => setEmailModal(true)}>
+                  Enviar
+                </Button>
                 <Button variant="outline" icon={FileSpreadsheet} onClick={() => handleExport('excel')}>
                   Excel
                 </Button>
@@ -194,7 +243,7 @@ const ReporteInventario = () => {
         )}
 
         {/* Filtros */}
-        <ReportFilters filters={filters} onChange={setFilters} />
+        <ReportFilters filters={filters} onChange={handleFiltersChange} />
 
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -232,6 +281,25 @@ const ReporteInventario = () => {
           />
         </div>
 
+        {/* Gráficos */}
+        {productos.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <PieChart
+              title="Distribución por Estado"
+              subtitle="Estado del inventario actual"
+              data={estadoData}
+              size={180}
+            />
+            <BarChart
+              title="Top Productos por Valor"
+              subtitle="Mayor valorización en inventario"
+              data={topProductos}
+              legend={[{ label: 'Valor ($)', color: '#10b981' }]}
+              height={300}
+            />
+          </div>
+        )}
+
         {/* Alertas */}
         {alertas.length > 0 && (
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
@@ -249,7 +317,7 @@ const ReporteInventario = () => {
           </div>
         )}
 
-        {/* Info - Solo mostrar sección de exportar si tiene permiso */}
+        {/* Export Info */}
         {canDownload && (
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
           <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-3">Exportar Inventario Completo</h3>
@@ -268,6 +336,17 @@ const ReporteInventario = () => {
         </div>
         )}
       </main>
+
+      <EnviarReporteModal
+        isOpen={emailModal}
+        onClose={() => setEmailModal(false)}
+        tipoReporte="inventario"
+        onSend={async (data) => {
+          const res = await reportesService.enviarPorEmail({ ...data, cliente_id: filters.cliente_id });
+          if (res.success) enqueueSnackbar(res.message, { variant: 'success' });
+          else throw new Error(res.message);
+        }}
+      />
     </div>
   );
 };

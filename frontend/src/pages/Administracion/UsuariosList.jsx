@@ -12,6 +12,7 @@ import {
   Plus, Search, RefreshCw, UserCheck, UserX, KeyRound,
   MoreVertical, Pencil, Trash2, Eye, ChevronLeft, ChevronRight, Shield, Mail
 } from 'lucide-react';
+import { useSnackbar } from 'notistack';
 import adminService from '../../api/admin.service';
 import UsuarioForm from './UsuarioForm';
 import UsuarioPermisos from './UsuarioPermisos';
@@ -19,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const UsuariosList = () => {
   const { hasPermission } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
   const [usuarios, setUsuarios] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,7 @@ const UsuariosList = () => {
   const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
   const [showResetPassword, setShowResetPassword] = useState(null);
   const [newPassword, setNewPassword] = useState('');
+  const [enviarCorreoReset, setEnviarCorreoReset] = useState(false);
   const [showPermisos, setShowPermisos] = useState(null);
   const [sendingCredentials, setSendingCredentials] = useState(null);
   const [credentialsMsg, setCredentialsMsg] = useState(null);
@@ -87,11 +90,18 @@ const UsuariosList = () => {
   const handleResetPassword = async () => {
     if (!newPassword || newPassword.length < 6) return;
     try {
-      await adminService.resetearPassword(showResetPassword.id, { password: newPassword });
+      const response = await adminService.resetearPassword(showResetPassword.id, {
+        password: newPassword,
+        enviar_correo: enviarCorreoReset
+      });
+      const msg = response?.message || 'Contraseña reseteada exitosamente';
+      enqueueSnackbar(msg, { variant: 'success' });
       setShowResetPassword(null);
       setNewPassword('');
+      setEnviarCorreoReset(false);
     } catch (error) {
-      console.error('Error reseteando password:', error);
+      const msg = error?.response?.data?.message || error?.message || 'Error al resetear la contraseña';
+      enqueueSnackbar(msg, { variant: 'error' });
     }
   };
 
@@ -319,11 +329,11 @@ const UsuariosList = () => {
       {/* Modal: Reset Password */}
       {showResetPassword && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-1">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-sm w-full p-5">
+            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-0.5">
               Resetear Contraseña
             </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
               Usuario: <strong>{showResetPassword.nombre_completo || showResetPassword.username}</strong>
             </p>
             <input
@@ -331,11 +341,30 @@ const UsuariosList = () => {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Nueva contraseña (mínimo 6 caracteres)"
-              className="w-full px-4 py-2.5 text-sm border border-gray-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 mb-4"
+              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 mb-3"
             />
+            {/* Opción de enviar correo */}
+            {showResetPassword.email && (
+              <label className="flex items-start gap-2.5 p-2.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl mb-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enviarCorreoReset}
+                  onChange={(e) => setEnviarCorreoReset(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded border-gray-300 dark:border-slate-600 text-orange-500 focus:ring-orange-500 dark:bg-slate-700"
+                />
+                <div>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Enviar correo con nueva contraseña
+                  </span>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Se enviará a: {showResetPassword.email}
+                  </p>
+                </div>
+              </label>
+            )}
             <div className="flex gap-2 justify-end">
               <button
-                onClick={() => { setShowResetPassword(null); setNewPassword(''); }}
+                onClick={() => { setShowResetPassword(null); setNewPassword(''); setEnviarCorreoReset(false); }}
                 className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
               >
                 Cancelar

@@ -132,6 +132,49 @@ const reportesService = {
       throw error;
     }
   },
+
+  // Enviar reporte por email
+  enviarPorEmail: async (data) => {
+    try {
+      return await apiClient.post(REPORTES_ENDPOINTS.ENVIAR_EMAIL, data);
+    } catch (error) {
+      return { success: false, message: error.message || 'Error al enviar reporte' };
+    }
+  },
+
+  // Reportes comparativos
+  getComparativo: async (params = {}) => {
+    try {
+      return await apiClient.get(REPORTES_ENDPOINTS.COMPARATIVO, { params });
+    } catch (error) {
+      return { success: false, data: { meses: [], comparacion: {} } };
+    }
+  },
+
+  // Reportes programados
+  getProgramados: async () => {
+    try {
+      return await apiClient.get(REPORTES_ENDPOINTS.PROGRAMADOS);
+    } catch (error) {
+      return { success: false, data: [] };
+    }
+  },
+
+  crearProgramado: async (data) => {
+    return await apiClient.post(REPORTES_ENDPOINTS.PROGRAMADOS, data);
+  },
+
+  actualizarProgramado: async (id, data) => {
+    return await apiClient.put(REPORTES_ENDPOINTS.PROGRAMADO_BY_ID(id), data);
+  },
+
+  eliminarProgramado: async (id) => {
+    return await apiClient.delete(REPORTES_ENDPOINTS.PROGRAMADO_BY_ID(id));
+  },
+
+  ejecutarProgramado: async (id) => {
+    return await apiClient.post(REPORTES_ENDPOINTS.PROGRAMADO_EJECUTAR(id));
+  },
 };
 
 export default reportesService;

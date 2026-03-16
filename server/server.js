@@ -44,6 +44,10 @@ const startServer = async () => {
     // Crear usuario operador por defecto si no existe
     await crearOperadorPorDefecto();
 
+    // Inicializar reportes programados
+    const reporteScheduler = require('./src/services/reporteScheduler');
+    await reporteScheduler.inicializar();
+
     // Iniciar servidor
     app.listen(PORT, () => {
       logger.info(`🚀 Servidor iniciado exitosamente`);

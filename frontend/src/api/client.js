@@ -30,6 +30,18 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 /**
+ * Construir URL completa para archivos del servidor (uploads)
+ * @param {string} filePath - Ruta relativa (ej: /uploads/avatars/file.jpg)
+ * @returns {string|null} URL completa o null
+ */
+export const getServerFileUrl = (filePath) => {
+  if (!filePath) return null;
+  if (filePath.startsWith('http')) return filePath;
+  const serverBase = API_BASE_URL.replace('/api/v1', '');
+  return `${serverBase}${filePath}`;
+};
+
+/**
  * Tiempo máximo de espera para peticiones (30 segundos)
  */
 const TIMEOUT = 30000;

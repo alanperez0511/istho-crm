@@ -550,6 +550,7 @@ const exportarClientes = async (clientes) => {
       { header: 'Código', key: 'cod', width: 13, align: 'center' },
       { header: 'Razón Social', key: 'rs', width: 36, align: 'left' },
       { header: 'NIT', key: 'nit', width: 16, align: 'center' },
+      { header: 'Productos', key: 'productos', width: 12, align: 'center' },
       { header: 'Ciudad', key: 'ciudad', width: 16, align: 'left' },
       { header: 'Departamento', key: 'depto', width: 16, align: 'left' },
       { header: 'Teléfono', key: 'tel', width: 16, align: 'center' },
@@ -601,10 +602,13 @@ const exportarClientes = async (clientes) => {
 
       const contactoPrincipal = cliente.contactos?.find(c => c.es_principal) || cliente.contactos?.[0];
 
+      const totalProductos = parseInt(cliente.getDataValue?.('total_productos') || cliente.total_productos || 0);
+
       const vals = [
         cliente.codigo_cliente || '',
         cliente.razon_social || '',
         cliente.nit || '',
+        totalProductos,
         cliente.ciudad || '',
         cliente.departamento || '',
         cliente.telefono || cliente.celular || '',
@@ -621,8 +625,8 @@ const exportarClientes = async (clientes) => {
         cell.value = val;
         estiloCelda(cell, ci, idx, { align: COLS[ci].align });
 
-        // Estado con color
-        if (ci === 8) {
+        // Estado con color (ahora es columna 9, índice ci=9)
+        if (ci === 9) {
           const est = (cliente.estado || '').toLowerCase();
           if (est === 'activo') {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.verdeClaro } };

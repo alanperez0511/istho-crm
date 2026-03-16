@@ -26,6 +26,9 @@ router.use(filtrarPorCliente);
 router.get('/stats', auditoriaWmsController.estadisticas);
 router.get('/recientes', auditoriaWmsController.recientes);
 
+// Exportar a Excel
+router.get('/:tipo/excel', auditoriaWmsController.exportarExcel);
+
 // =============================================
 // ENTRADAS (Ingresos)
 // =============================================

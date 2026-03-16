@@ -169,6 +169,7 @@ const getMenuForRole = (rol, hasPermission) => {
 import { useThemeContext } from '../../context/ThemeContext';
 import logoNegro from '../../assets/logo-negro.png';
 import logoBlanco from '../../assets/logo-blanco.png';
+import { getServerFileUrl } from '../../api/client';
 
 /**
  * Hook para atajos de teclado
@@ -648,11 +649,15 @@ const MobileMenu = ({ isOpen, onClose, user, onNavigate, onLogout, currentPath, 
 
           {/* User Info */}
           <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-              <span className="text-white font-bold">
-                {getInitials(user?.nombre_completo)}
-              </span>
-            </div>
+            {user?.avatar_url ? (
+              <img src={getServerFileUrl(user.avatar_url)} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0 shadow-md" />
+            ) : (
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                <span className="text-white font-bold">
+                  {getInitials(user?.nombre_completo)}
+                </span>
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="font-medium text-slate-800 dark:text-white truncate text-sm">
                 {user?.nombre_completo || 'Usuario'}
@@ -819,9 +824,13 @@ const AvatarDropdown = ({ user, onNavigate, onLogout }) => {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-3 p-1 pr-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all"
       >
-        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-medium shadow-md text-sm">
-          {getInitials(user)}
-        </div>
+        {user?.avatar_url ? (
+          <img src={getServerFileUrl(user.avatar_url)} alt="" className="w-8 h-8 rounded-full object-cover shadow-md" />
+        ) : (
+          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-medium shadow-md text-sm">
+            {getInitials(user)}
+          </div>
+        )}
       </button>
 
       {isOpen && (
@@ -829,9 +838,13 @@ const AvatarDropdown = ({ user, onNavigate, onLogout }) => {
           {/* User Info */}
           <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
-                {getInitials(user)}
-              </div>
+              {user?.avatar_url ? (
+                <img src={getServerFileUrl(user.avatar_url)} alt="" className="w-10 h-10 rounded-full object-cover shadow-md" />
+              ) : (
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
+                  {getInitials(user)}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
                   {user?.nombre_completo || user?.username || 'Usuario'}
@@ -1048,17 +1061,15 @@ const FloatingHeader = () => {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Search */}
-              <div className="hidden lg:flex items-center w-64 max-w-[200px] xl:max-w-[300px]">
-                <div className="relative w-full group">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
-                  <input
-                    type="text"
-                    data-search-input
-                    placeholder="Buscar (⌘K)..."
-                    className="w-full pl-9 pr-4 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white border border-transparent focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-lg transition-all"
-                  />
-                </div>
+              {/* Search - abre GlobalSearch modal */}
+              <div className="hidden lg:flex items-center">
+                <button
+                  onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-400 bg-slate-100 dark:bg-slate-800 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 rounded-lg transition-all w-48 xl:w-56"
+                >
+                  <Search className="w-4 h-4" />
+                  <span className="flex-1 text-left">Buscar (⌘K)...</span>
+                </button>
               </div>
 
               <div className="flex items-center gap-1 sm:gap-2 border-l border-gray-200 dark:border-slate-700 pl-2 sm:pl-4">

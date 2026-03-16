@@ -20,11 +20,13 @@
 
 ### 1. Autenticación y Autorización
 - Login con JWT + refresh tokens (1h acceso / 30d refresh)
+- **Login con email o nombre de usuario**
 - 4 roles: **admin**, **supervisor**, **operador**, **cliente** (portal)
 - Sistema de permisos dual: Rol→Permiso (N:M) + override por usuario
 - Bloqueo de cuenta tras 5 intentos fallidos (15 min)
-- Forzar cambio de contraseña en primer login
+- Forzar cambio de contraseña en primer login (modal compacto)
 - Recuperación de contraseña por email
+- **Foto de perfil** (avatar) con upload/eliminación
 
 ### 2. Portal Cliente
 - Navegación filtrada por rol (menú `soloInternos`)
@@ -37,6 +39,7 @@
 - Alertas de stock bajo/agotado con gestión (atender/descartar/silenciar)
 - Movimientos históricos con trazabilidad completa
 - Estadísticas mensuales para gráficos
+- **Restricción WMS**: Productos con `codigo_wms` no permiten editar/eliminar/entrada/salida manual
 
 ### 4. Integración WMS (Copérnico)
 - API autenticada con `X-WMS-API-Key`
@@ -52,6 +55,9 @@
 - **Salidas** (azul): Datos de despacho (picking, sucursal, ciudad destino)
 - **Kardex** (púrpura): Flujo simplificado, logística opcional
 - Stepper de estado, KPIs, cierre con selección de plantilla de email
+- **Exportar a CSV y Excel** desde cada listado (Entradas, Salidas, Kardex)
+- **Búsqueda por documento WMS** en los 3 módulos
+- **Paginación** con 20 registros por página
 
 ### 6. Plantillas de Email
 - 3 plantillas predeterminadas (entrada, salida, kardex)
@@ -64,14 +70,28 @@
 - Snapshots antes/después de cada cambio
 - IP real del usuario y user agent
 
-### 8. Otros Módulos
+### 8. Reportes
+- **Reporte de Operaciones**: KPIs + gráficos (barras por estado, pie ingresos/salidas) + tendencia mensual + variaciones % + Excel/PDF
+- **Reporte de Inventario**: KPIs + gráficos (pie por estado, barras top productos por valor) + Excel/PDF
+- **Reporte de Clientes**: KPIs + gráficos (pie activos/inactivos, pie por tipo) + columna productos por cliente + Excel/PDF
+- **Filtros persistentes en URL** (fecha_desde, fecha_hasta, cliente_id)
+- **Enviar por email**: Modal para enviar cualquier reporte con adjuntos Excel, PDF o ambos
+- **Reportes comparativos**: Tendencia de operaciones últimos 6 meses + variación mes actual vs anterior
+- **Reportes programados**: Envío automático con cron (diario, semanal, quincenal, mensual) a múltiples destinatarios
+
+### 9. Búsqueda Global (Ctrl+K)
+- Modal de búsqueda cross-módulo desde cualquier página
+- Busca en: Inventario, Clientes, Entradas, Salidas, Kardex
+- Resultados agrupados por módulo con navegación por teclado
+- Debounce 400ms, mínimo 2 caracteres
+
+### 10. Otros Módulos
 - **Dashboard**: KPIs consolidados con gráficos (Recharts)
 - **Clientes CRUD**: Gestión de empresas con contactos y logo
-- **Reportes**: Exportación a Excel/PDF
 - **Despachos**: Gestión de envíos con transporte y documentos
 - **Notificaciones**: Sistema de notificaciones en tiempo real
 - **Documentos**: Gestión documental por operación
-- **Administración**: Gestión de usuarios, roles y permisos
+- **Administración**: Gestión de usuarios, roles y permisos con reseteo de contraseña + envío por email
 - **Modo Oscuro**: Toggle global con `Ctrl+B`
 
 ## Estructura del Proyecto
@@ -99,9 +119,9 @@ istho-crm/
 │   │   ├── App.jsx                  # Rutas con lazy loading
 │   │   ├── api/                     # Servicios API y endpoints
 │   │   ├── components/              # Componentes reutilizables
-│   │   │   ├── common/              # Modal, CierreAuditoriaModal, etc.
+│   │   │   ├── common/              # Modal, CierreAuditoriaModal, GlobalSearch
 │   │   │   ├── layout/              # FloatingHeader, ProtectedLayout
-│   │   │   └── auth/                # PrivateRoute, PortalPermissionRoute
+│   │   │   └── auth/                # PrivateRoute, ForceChangePasswordModal
 │   │   ├── context/                 # AuthContext, ThemeContext, AlertContext
 │   │   ├── pages/                   # Páginas por módulo
 │   │   ├── hooks/                   # Custom hooks

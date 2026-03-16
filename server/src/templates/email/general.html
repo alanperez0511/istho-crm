@@ -1,0 +1,57 @@
+{{!--
+  ============================================================================
+  ISTHO CRM - Plantilla General
+  ============================================================================
+
+  Variables disponibles:
+  - titulo: Título del mensaje
+  - mensaje: Contenido del mensaje
+  - urlAccion: URL del botón de acción (opcional)
+  - labelAccion: Texto del botón (opcional)
+
+  @author Coordinación TI - ISTHO S.A.S.
+  @version 1.0.0
+--}}
+
+<div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto;">
+
+  {{!-- Header --}}
+  <div style="background: linear-gradient(135deg, #1A237E 0%, #283593 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">
+      {{#if titulo}}{{titulo}}{{else}}ISTHO CRM{{/if}}
+    </h1>
+  </div>
+
+  {{!-- Body --}}
+  <div style="background-color: #ffffff; padding: 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+
+    {{#if mensaje}}
+    <p style="color: #374151; font-size: 15px; line-height: 1.6; margin: 0 0 20px;">
+      {{mensaje}}
+    </p>
+    {{/if}}
+
+    {{#if urlAccion}}
+    <div style="text-align: center; margin: 25px 0;">
+      <a href="{{urlAccion}}" style="display: inline-block; background-color: #E65100; color: #ffffff; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+        {{#if labelAccion}}{{labelAccion}}{{else}}Ver en el sistema{{/if}}
+      </a>
+    </div>
+    {{/if}}
+
+    <p style="color: #9ca3af; font-size: 12px; margin: 20px 0 0; padding-top: 15px; border-top: 1px solid #f3f4f6;">
+      Este es un mensaje automático del sistema ISTHO CRM. No responda a este correo.
+    </p>
+  </div>
+
+  {{!-- Footer --}}
+  <div style="background-color: #f8fafc; padding: 20px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb; border-top: none; text-align: center;">
+    <p style="color: #6b7280; font-size: 12px; margin: 0;">
+      ISTHO S.A.S. - Centro Logístico Industrial del Norte
+    </p>
+    <p style="color: #9ca3af; font-size: 11px; margin: 4px 0 0;">
+      Girardota, Antioquia - Colombia
+    </p>
+  </div>
+
+</div>

@@ -13,7 +13,7 @@ const { Usuario, Rol, Permiso, RolPermiso, Cliente, Auditoria, sequelize } = req
 const { success, successMessage, created, serverError, notFound, badRequest, forbidden } = require('../utils/responses');
 const { invalidarCachePermisos } = require('../middleware/auth');
 const logger = require('../utils/logger');
-const { enviarBienvenidaUsuarioCliente, enviarBienvenida } = require('../services/emailService');
+const { enviarBienvenidaUsuarioCliente, enviarBienvenida, enviarReseteoPassword } = require('../services/emailService');
 const { getClientIP } = require('../utils/helpers');
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -244,10 +244,15 @@ const actualizarUsuario = async (req, res) => {
  */
 const resetearPassword = async (req, res) => {
   try {
-    const usuario = await Usuario.findByPk(req.params.id);
+    const usuario = await Usuario.findByPk(req.params.id, {
+      include: [
+        { model: Rol, as: 'rolInfo', attributes: ['id', 'nombre', 'codigo', 'es_cliente'] },
+        { model: Cliente, as: 'cliente', attributes: ['id', 'razon_social'], required: false }
+      ]
+    });
     if (!usuario) return notFound(res, 'Usuario no encontrado');
 
-    const { password } = req.body;
+    const { password, enviar_correo } = req.body;
     if (!password || password.length < 6) {
       return badRequest(res, 'La contraseña debe tener al menos 6 caracteres');
     }
@@ -256,13 +261,36 @@ const resetearPassword = async (req, res) => {
     usuario.requiere_cambio_password = true;
     await usuario.save();
 
-    logger.info('Password reseteado:', { id: usuario.id, por: req.user.id });
+    // Enviar correo con la nueva contraseña si se solicita
+    let correoEnviado = false;
+    if (enviar_correo && usuario.email) {
+      try {
+        await enviarReseteoPassword({
+          email: usuario.email,
+          nombre: usuario.nombre_completo || usuario.getNombreDisplay(),
+          username: usuario.username,
+          password,
+          cliente: usuario.cliente?.razon_social || null,
+          reseteadoPor: req.user.nombre_completo || req.user.username
+        });
+        correoEnviado = true;
+        logger.info('Correo de reseteo enviado:', { usuarioId: usuario.id, email: usuario.email });
+      } catch (emailError) {
+        logger.error('Error al enviar correo de reseteo:', { message: emailError.message });
+      }
+    }
+
+    logger.info('Password reseteado:', { id: usuario.id, por: req.user.id, correoEnviado });
     Auditoria.registrar({
       tabla: 'usuarios', registro_id: usuario.id, accion: 'actualizar',
       usuario_id: req.user.id, usuario_nombre: req.user.nombre_completo || req.user.username,
-      ip_address: getClientIP(req), descripcion: `Contraseña de "${usuario.username}" reseteada`
+      ip_address: getClientIP(req), descripcion: `Contraseña de "${usuario.username}" reseteada${correoEnviado ? ' (correo enviado)' : ''}`
     });
-    return successMessage(res, 'Contraseña reseteada exitosamente. El usuario deberá cambiarla al iniciar sesión.');
+
+    const mensaje = correoEnviado
+      ? 'Contraseña reseteada exitosamente. Se envió un correo con las nuevas credenciales.'
+      : 'Contraseña reseteada exitosamente. El usuario deberá cambiarla al iniciar sesión.';
+    return successMessage(res, mensaje, { correo_enviado: correoEnviado });
   } catch (error) {
     logger.error('Error al resetear password:', { message: error.message });
     return serverError(res, 'Error al resetear contraseña', error);

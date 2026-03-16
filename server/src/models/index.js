@@ -27,6 +27,7 @@ const PlantillaEmailModel = require('./PlantillaEmail');
 const RolModel = require('./Rol');
 const PermisoModel = require('./Permiso');
 const RolPermisoModel = require('./RolPermiso');
+const ReporteProgramadoModel = require('./ReporteProgramado');
 const Notificacion = require('./Notificacion')(sequelize);
 
 // Inicializar modelos
@@ -46,6 +47,7 @@ const PlantillaEmail = PlantillaEmailModel(sequelize);
 const Rol = RolModel(sequelize);
 const Permiso = PermisoModel(sequelize);
 const RolPermiso = RolPermisoModel(sequelize);
+const ReporteProgramado = ReporteProgramadoModel(sequelize);
 
 // ============================================
 // DEFINIR ASOCIACIONES
@@ -296,6 +298,10 @@ Rol.hasMany(Usuario, {
   as: 'usuarios'
 });
 
+// ReporteProgramado <-> Usuario y Cliente
+ReporteProgramado.belongsTo(Usuario, { foreignKey: 'creado_por', as: 'creador' });
+ReporteProgramado.belongsTo(Cliente, { foreignKey: 'cliente_id', as: 'cliente' });
+
 // ============================================
 // EXPORTAR MODELOS
 // ============================================
@@ -321,7 +327,8 @@ const db = {
   Notificacion,
   Rol,
   Permiso,
-  RolPermiso
+  RolPermiso,
+  ReporteProgramado
 };
 
 /**

@@ -46,5 +46,28 @@ router.get('/inventario/pdf', reporteController.exportarInventarioPDF);
 // =============================================
 
 router.get('/clientes/excel', requiereRolMinimo('operador'), reporteController.exportarClientesExcel);
+router.get('/clientes/pdf', requiereRolMinimo('operador'), reporteController.exportarClientesPDF);
+
+// =============================================
+// ENVIAR REPORTE POR EMAIL
+// =============================================
+
+router.post('/enviar-email', requiereRolMinimo('supervisor'), reporteController.enviarReportePorEmail);
+
+// =============================================
+// REPORTES COMPARATIVOS
+// =============================================
+
+router.get('/comparativo', reporteController.getComparativo);
+
+// =============================================
+// REPORTES PROGRAMADOS (CRUD)
+// =============================================
+
+router.get('/programados', requiereRolMinimo('supervisor'), reporteController.listarProgramados);
+router.post('/programados', requiereRolMinimo('supervisor'), reporteController.crearProgramado);
+router.put('/programados/:id', requiereRolMinimo('supervisor'), reporteController.actualizarProgramado);
+router.delete('/programados/:id', requiereRolMinimo('supervisor'), reporteController.eliminarProgramado);
+router.post('/programados/:id/ejecutar', requiereRolMinimo('supervisor'), reporteController.ejecutarProgramadoManual);
 
 module.exports = router;

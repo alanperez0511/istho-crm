@@ -139,9 +139,38 @@ const uploadLogo = multer({
   }
 });
 
+/**
+ * Configuración de almacenamiento para avatares de usuarios
+ */
+const AVATAR_DIR = path.join(__dirname, '../../uploads/avatars');
+createDir(AVATAR_DIR);
+
+const storageAvatars = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, AVATAR_DIR);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const filename = `avatar_${req.user.id}_${Date.now()}${ext}`;
+    cb(null, filename);
+  }
+});
+
+/**
+ * Upload para avatares de usuarios
+ */
+const uploadAvatar = multer({
+  storage: storageAvatars,
+  fileFilter: imageFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024 // 2MB
+  }
+});
+
 module.exports = {
   uploadAveria,
   uploadCumplido,
   uploadLogo,
+  uploadAvatar,
   UPLOAD_DIRS
 };

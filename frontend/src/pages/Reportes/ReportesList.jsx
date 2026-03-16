@@ -14,7 +14,7 @@ import {
   Users,
   Truck,
   Download,
-  BarChart3,
+  Calendar,
   Activity,
   Eye,
 } from 'lucide-react';
@@ -160,11 +160,30 @@ const ReportesList = () => {
         </div>
 
         {/* Reportes Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           {REPORTES_DISPONIBLES.map((reporte) => (
             <ReporteCard key={reporte.id} reporte={reporte} canExport={canExport} />
           ))}
         </div>
+
+        {/* Reportes Programados - Solo supervisor+ */}
+        {(hasPermission('reportes', 'exportar')) && (
+          <div className="mb-8">
+            <button
+              onClick={() => navigate('/reportes/programados')}
+              className="w-full bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md hover:border-orange-200 dark:hover:border-orange-800 transition-all flex items-center gap-4 text-left"
+            >
+              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-slate-800 dark:text-slate-100">Reportes Programados</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Configura el envío automático de reportes por email</p>
+              </div>
+              <Eye className="w-5 h-5 text-slate-400" />
+            </button>
+          </div>
+        )}
 
         {/* Footer */}
         <footer className="text-center py-6 mt-8 text-slate-500 dark:text-slate-400 text-sm border-t border-gray-200 dark:border-slate-700">

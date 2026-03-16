@@ -21,6 +21,8 @@ import {
   Search,
   Filter,
   RefreshCw,
+  Download,
+  FileSpreadsheet,
   MoreVertical,
   Clock,
   Loader2,
@@ -31,6 +33,8 @@ import {
   FileText,
   ArrowDownCircle,
 } from 'lucide-react';
+import { Pagination } from '../../../components/common';
+import { exportToCsv } from '../../../utils/exportCsv';
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN DE ESTADOS
@@ -180,26 +184,32 @@ const KpiMini = ({ icon: Icon, label, value, color }) => (
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
+const PAGE_SIZE = 20;
+
 const EntradasList = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('todos');
   const [loading, setLoading] = useState(true);
   const [entradas, setEntradas] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [error, setError] = useState(null);
 
   // Cargar datos desde API
-  const fetchEntradas = useCallback(async () => {
+  const fetchEntradas = useCallback(async (page = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const params = {};
+      const params = { page, limit: PAGE_SIZE };
       if (estadoFilter !== 'todos') params.estado = estadoFilter;
       if (searchTerm) params.search = searchTerm;
 
       const response = await auditoriasService.getEntradas(params);
       if (response.success && response.data) {
         setEntradas(Array.isArray(response.data) ? response.data : response.data.entradas || []);
+        if (response.pagination) {
+          setPagination(response.pagination);
+        }
       } else {
         setEntradas([]);
       }
@@ -212,19 +222,14 @@ const EntradasList = () => {
   }, [estadoFilter, searchTerm]);
 
   useEffect(() => {
-    fetchEntradas();
+    fetchEntradas(1);
   }, [fetchEntradas]);
 
-  // Filtrar datos localmente (complementa filtro del servidor)
-  const filtered = entradas.filter((e) => {
-    const matchSearch =
-      !searchTerm ||
-      e.documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.documento_wms?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.cliente?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchEstado = estadoFilter === 'todos' || e.estado === estadoFilter;
-    return matchSearch && matchEstado;
-  });
+  const handlePageChange = (page) => {
+    fetchEntradas(page);
+  };
+
+  const filtered = entradas;
 
   // KPIs
   const totalPendientes = entradas.filter((e) => e.estado === 'pendiente').length;
@@ -233,6 +238,29 @@ const EntradasList = () => {
 
   const handleView = (entrada) => {
     navigate(`/inventario/entradas/${entrada.id}`);
+  };
+
+  const handleExportCsv = () => {
+    exportToCsv(filtered, [
+      { key: 'documento_wms', label: 'Documento WMS' },
+      { key: 'documento', label: 'Operación' },
+      { key: 'cliente', label: 'Cliente' },
+      { key: 'tipo_documento_wms', label: 'Tipo Doc.' },
+      { key: 'fecha_ingreso', label: 'Fecha Ingreso' },
+      { key: 'lineas', label: 'Total Líneas' },
+      { key: 'lineas_verificadas', label: 'Líneas Verificadas' },
+      { key: 'estado', label: 'Estado' },
+    ], 'entradas_inventario');
+  };
+
+  const handleExportExcel = () => {
+    const baseUrl = import.meta.env.VITE_API_URL || '/api/v1';
+    const token = localStorage.getItem('istho_token');
+    const params = new URLSearchParams();
+    if (token) params.set('token', token);
+    if (estadoFilter !== 'todos') params.set('estado', estadoFilter);
+    if (searchTerm) params.set('search', searchTerm);
+    window.open(`${baseUrl}/auditorias/entradas/excel?${params.toString()}`, '_blank');
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -254,6 +282,24 @@ const EntradasList = () => {
               <p className="text-slate-500 dark:text-slate-400 mt-0.5">Auditoría y verificación de ingresos desde el WMS</p>
             </div>
           </div>
+          {filtered.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Excel
+              </button>
+              <button
+                onClick={handleExportCsv}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                CSV
+              </button>
+            </div>
+          )}
         </div>
 
         {/* KPI CARDS */}
@@ -451,6 +497,16 @@ const EntradasList = () => {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {!loading && pagination.totalPages > 1 && (
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              itemsPerPage={PAGE_SIZE}
+              onPageChange={handlePageChange}
+            />
           )}
         </div>
 

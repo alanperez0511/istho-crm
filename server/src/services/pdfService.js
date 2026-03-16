@@ -371,8 +371,74 @@ const generarPDFDetalleOperacion = async (operacion) => {
   });
 };
 
+/**
+ * Generar PDF de clientes
+ */
+const generarPDFClientes = async (clientes, filtros = {}) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'LETTER',
+        layout: 'landscape',
+        margin: 50
+      });
+
+      const chunks = [];
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      agregarEncabezado(doc, 'REPORTE DE CLIENTES');
+
+      // Resumen
+      const activos = clientes.filter(c => c.estado === 'activo').length;
+      const inactivos = clientes.length - activos;
+
+      doc.fontSize(11)
+         .fillColor(COLORES.texto)
+         .text(`Total de clientes: ${clientes.length}`)
+         .text(`Activos: ${activos} | Inactivos: ${inactivos}`)
+         .moveDown();
+
+      // Total productos
+      const totalProductos = clientes.reduce((sum, c) => sum + (parseInt(c.getDataValue?.('total_productos') || c.total_productos || 0)), 0);
+
+      doc.text(`Total productos registrados: ${totalProductos.toLocaleString('es-CO')}`)
+         .moveDown();
+
+      // Tabla (ancho disponible LETTER landscape: ~692pt)
+      const headers = ['Código', 'Razón Social', 'NIT', 'Prod.', 'Ciudad', 'Teléfono', 'Email', 'Estado'];
+      const rows = clientes.map(c => [
+        c.codigo_cliente || '',
+        (c.razon_social || '').substring(0, 28),
+        c.nit || '',
+        String(parseInt(c.getDataValue?.('total_productos') || c.total_productos || 0)),
+        (c.ciudad || '').substring(0, 14),
+        c.telefono || '',
+        (c.email || '').substring(0, 24),
+        (c.estado || '').toUpperCase()
+      ]);
+
+      generarTabla(doc, headers, rows, {
+        anchoColumnas: [60, 165, 85, 40, 72, 75, 135, 60],
+        alineacion: ['left', 'left', 'left', 'center', 'left', 'left', 'left', 'center']
+      });
+
+      agregarPiePagina(doc, 1);
+
+      doc.end();
+
+      logger.info('PDF de clientes generado:', { registros: clientes.length });
+
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
 module.exports = {
   generarPDFOperaciones,
   generarPDFInventario,
-  generarPDFDetalleOperacion
+  generarPDFDetalleOperacion,
+  generarPDFClientes
 };

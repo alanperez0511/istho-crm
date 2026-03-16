@@ -40,9 +40,8 @@ const validar = (req, res, next) => {
 const loginValidator = [
   body('email')
     .trim()
-    .notEmpty().withMessage('El email es requerido')
-    .isEmail().withMessage('Debe ser un email válido')
-    .normalizeEmail(),
+    .notEmpty().withMessage('El usuario o email es requerido')
+    .isLength({ min: 3 }).withMessage('Debe tener al menos 3 caracteres'),
   
   body('password')
     .notEmpty().withMessage('La contraseña es requerida')

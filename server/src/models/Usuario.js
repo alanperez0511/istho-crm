@@ -512,8 +512,7 @@ module.exports = (sequelize) => {
         [Op.or]: [
           { email: identificador.toLowerCase() },
           { username: identificador }
-        ],
-        activo: true
+        ]
       }
     });
   };

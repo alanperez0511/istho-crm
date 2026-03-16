@@ -321,14 +321,19 @@ const exportarClientesExcel = async (req, res) => {
 
     const clientes = await Cliente.findAll({
       where,
+      attributes: {
+        include: [
+          [sequelize.literal('(SELECT COUNT(*) FROM inventario WHERE inventario.cliente_id = Cliente.id)'), 'total_productos']
+        ]
+      },
       include: [
         { model: Contacto, as: 'contactos', where: { activo: true }, required: false }
       ],
       order: [['razon_social', 'ASC']]
     });
-    
+
     const buffer = await excelService.exportarClientes(clientes);
-    
+
     const filename = `clientes_${new Date().toISOString().split('T')[0]}.xlsx`;
     
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -337,6 +342,56 @@ const exportarClientesExcel = async (req, res) => {
     
   } catch (error) {
     logger.error('Error al exportar clientes Excel:', { message: error.message });
+    return serverError(res, 'Error al generar el reporte', error);
+  }
+};
+
+/**
+ * GET /reportes/clientes/pdf
+ * Exportar clientes a PDF
+ */
+const exportarClientesPDF = async (req, res) => {
+  try {
+    const where = {};
+
+    if (req.query.estado && req.query.estado !== 'todos') {
+      where.estado = req.query.estado;
+    }
+    if (req.query.tipo_cliente) {
+      where.tipo_cliente = req.query.tipo_cliente;
+    }
+    if (req.query.fecha_desde) {
+      where.created_at = where.created_at || {};
+      where.created_at[Op.gte] = req.query.fecha_desde;
+    }
+    if (req.query.fecha_hasta) {
+      where.created_at = where.created_at || {};
+      where.created_at[Op.lte] = req.query.fecha_hasta + ' 23:59:59';
+    }
+
+    const clientes = await Cliente.findAll({
+      where,
+      attributes: {
+        include: [
+          [sequelize.literal('(SELECT COUNT(*) FROM inventario WHERE inventario.cliente_id = Cliente.id)'), 'total_productos']
+        ]
+      },
+      include: [
+        { model: Contacto, as: 'contactos', where: { activo: true }, required: false }
+      ],
+      order: [['razon_social', 'ASC']]
+    });
+
+    const buffer = await pdfService.generarPDFClientes(clientes);
+
+    const filename = `clientes_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+
+  } catch (error) {
+    logger.error('Error al exportar clientes PDF:', { message: error.message });
     return serverError(res, 'Error al generar el reporte', error);
   }
 };
@@ -570,6 +625,328 @@ const getDashboard = async (req, res) => {
   }
 };
 
+// =============================================
+// #8 - ENVIAR REPORTE POR EMAIL
+// =============================================
+
+const enviarReportePorEmail = async (req, res) => {
+  try {
+    const { tipo_reporte, formato = 'excel', formatos, destinatarios, cliente_id, filtros = {} } = req.body;
+
+    if (!tipo_reporte || !destinatarios || destinatarios.length === 0) {
+      return serverError(res, 'tipo_reporte y destinatarios son requeridos');
+    }
+
+    const emailService = require('../services/emailService');
+    const pdfServiceMod = require('../services/pdfService');
+    const path = require('path');
+    const fs = require('fs');
+    const hoy = new Date();
+    const fechaStr = hoy.toISOString().split('T')[0];
+    const tmpDir = path.join(__dirname, '../../uploads/temp');
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+
+    // Determinar qué formatos generar
+    const formatosAGenerar = formatos && Array.isArray(formatos)
+      ? formatos
+      : formato === 'ambos' ? ['excel', 'pdf'] : [formato];
+
+    // Consultar datos una sola vez
+    const where = {};
+    if (cliente_id) where.cliente_id = cliente_id;
+    let datos;
+
+    switch (tipo_reporte) {
+      case 'operaciones': {
+        if (filtros?.estado) where.estado = filtros.estado;
+        if (filtros?.tipo) where.tipo = filtros.tipo;
+        datos = await Operacion.findAll({
+          where,
+          include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
+          order: [['created_at', 'DESC']]
+        });
+        break;
+      }
+      case 'inventario': {
+        datos = await Inventario.findAll({
+          where,
+          include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
+          order: [['producto', 'ASC']]
+        });
+        break;
+      }
+      case 'clientes': {
+        datos = await Cliente.findAll({
+          attributes: {
+            include: [[sequelize.literal('(SELECT COUNT(*) FROM inventario WHERE inventario.cliente_id = Cliente.id)'), 'total_productos']]
+          },
+          include: [{ model: Contacto, as: 'contactos', where: { activo: true }, required: false }],
+          order: [['razon_social', 'ASC']]
+        });
+        break;
+      }
+      default:
+        return serverError(res, 'Tipo de reporte no válido');
+    }
+
+    // Generar archivos por formato
+    const adjuntos = [];
+    const tmpFiles = [];
+
+    const generadores = {
+      operaciones: { excel: () => excelService.exportarOperaciones(datos), pdf: () => pdfServiceMod.generarPDFOperaciones(datos) },
+      inventario: { excel: () => excelService.exportarInventario(datos), pdf: () => pdfServiceMod.generarPDFInventario(datos) },
+      clientes: { excel: () => excelService.exportarClientes(datos), pdf: () => pdfServiceMod.generarPDFClientes(datos) },
+    };
+
+    for (const fmt of formatosAGenerar) {
+      const gen = generadores[tipo_reporte]?.[fmt];
+      if (!gen) continue;
+
+      const buffer = await gen();
+      const ext = fmt === 'pdf' ? 'pdf' : 'xlsx';
+      const mime = fmt === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const fname = `${tipo_reporte}_${fechaStr}.${ext}`;
+      const tmpPath = path.join(tmpDir, `${Date.now()}_${fname}`);
+
+      fs.writeFileSync(tmpPath, buffer);
+      adjuntos.push({ nombre: fname, path: tmpPath, tipo: mime });
+      tmpFiles.push(tmpPath);
+    }
+
+    // Enviar email
+    try {
+      const emailDest = Array.isArray(destinatarios) ? destinatarios : destinatarios.split(',').map(e => e.trim());
+      const tipoLabel = tipo_reporte.charAt(0).toUpperCase() + tipo_reporte.slice(1);
+      const formatoLabel = formatosAGenerar.map(f => f.toUpperCase()).join(' + ');
+
+      await emailService.enviarCorreo({
+        para: emailDest,
+        asunto: `[ISTHO CRM] Reporte de ${tipoLabel}`,
+        templateName: 'general',
+        datos: {
+          titulo: `Reporte de ${tipoLabel}`,
+          mensaje: `Se adjunta el reporte de ${tipo_reporte} en formato ${formatoLabel}, generado el ${hoy.toLocaleDateString('es-CO')}.`,
+          asunto: `Reporte de ${tipoLabel}`
+        },
+        adjuntos
+      });
+
+      return res.json({ success: true, message: `Reporte enviado en formato ${formatoLabel} a ${emailDest.length} destinatario(s)` });
+    } finally {
+      tmpFiles.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
+    }
+  } catch (error) {
+    logger.error('Error al enviar reporte por email:', { message: error.message });
+    return serverError(res, 'Error al enviar el reporte', error);
+  }
+};
+
+// =============================================
+// #10 - REPORTES COMPARATIVOS
+// =============================================
+
+const getComparativo = async (req, res) => {
+  try {
+    const { meses = 6 } = req.query;
+    const clienteFilter = req.query.cliente_id ? { cliente_id: req.query.cliente_id } : {};
+    const numMeses = Math.min(parseInt(meses) || 6, 12);
+
+    const hoy = new Date();
+    const resultado = [];
+
+    for (let i = numMeses - 1; i >= 0; i--) {
+      const inicio = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+      const fin = new Date(hoy.getFullYear(), hoy.getMonth() - i + 1, 0, 23, 59, 59);
+      const mesLabel = inicio.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' });
+
+      const [entradas, salidas, kardex, productosNuevos, valorInventario] = await Promise.all([
+        Operacion.count({ where: { ...clienteFilter, tipo: 'ingreso', created_at: { [Op.between]: [inicio, fin] } } }),
+        Operacion.count({ where: { ...clienteFilter, tipo: 'salida', created_at: { [Op.between]: [inicio, fin] } } }),
+        Operacion.count({ where: { ...clienteFilter, tipo: 'kardex', created_at: { [Op.between]: [inicio, fin] } } }),
+        Inventario.count({ where: { ...clienteFilter, created_at: { [Op.between]: [inicio, fin] } } }),
+        Inventario.findAll({
+          attributes: [[sequelize.literal('SUM(cantidad * COALESCE(costo_unitario, 0))'), 'valor']],
+          where: { ...clienteFilter },
+          raw: true
+        }),
+      ]);
+
+      resultado.push({
+        mes: mesLabel,
+        entradas,
+        salidas,
+        kardex,
+        total_operaciones: entradas + salidas + kardex,
+        productos_nuevos: productosNuevos,
+      });
+    }
+
+    // Mes actual vs anterior
+    const mesActual = resultado[resultado.length - 1] || {};
+    const mesAnterior = resultado[resultado.length - 2] || {};
+
+    const calcVariacion = (actual, anterior) => {
+      if (!anterior || anterior === 0) return actual > 0 ? 100 : 0;
+      return Math.round(((actual - anterior) / anterior) * 100);
+    };
+
+    return res.json({
+      success: true,
+      data: {
+        meses: resultado,
+        comparacion: {
+          operaciones: {
+            actual: mesActual.total_operaciones || 0,
+            anterior: mesAnterior.total_operaciones || 0,
+            variacion: calcVariacion(mesActual.total_operaciones, mesAnterior.total_operaciones),
+          },
+          entradas: {
+            actual: mesActual.entradas || 0,
+            anterior: mesAnterior.entradas || 0,
+            variacion: calcVariacion(mesActual.entradas, mesAnterior.entradas),
+          },
+          salidas: {
+            actual: mesActual.salidas || 0,
+            anterior: mesAnterior.salidas || 0,
+            variacion: calcVariacion(mesActual.salidas, mesAnterior.salidas),
+          },
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Error al obtener comparativo:', { message: error.message });
+    return serverError(res, 'Error al obtener datos comparativos', error);
+  }
+};
+
+// =============================================
+// #9 - REPORTES PROGRAMADOS (CRUD)
+// =============================================
+
+const { ReporteProgramado } = require('../models');
+const scheduler = require('../services/reporteScheduler');
+
+const listarProgramados = async (req, res) => {
+  try {
+    const reportes = await ReporteProgramado.findAll({
+      include: [
+        { model: require('../models').Usuario, as: 'creador', attributes: ['id', 'nombre_completo', 'username'] },
+        { model: Cliente, as: 'cliente', attributes: ['id', 'razon_social'] }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+    return res.json({ success: true, data: reportes });
+  } catch (error) {
+    logger.error('Error al listar programados:', { message: error.message });
+    return serverError(res, 'Error al listar reportes programados', error);
+  }
+};
+
+const crearProgramado = async (req, res) => {
+  try {
+    const { nombre, tipo_reporte, formato, cron_expresion, frecuencia_label, destinatarios, cliente_id, filtros } = req.body;
+
+    if (!nombre || !tipo_reporte || !cron_expresion || !destinatarios) {
+      return serverError(res, 'nombre, tipo_reporte, cron_expresion y destinatarios son requeridos');
+    }
+
+    const cron = require('node-cron');
+    if (!cron.validate(cron_expresion)) {
+      return serverError(res, 'Expresión cron inválida');
+    }
+
+    const reporte = await ReporteProgramado.create({
+      nombre,
+      tipo_reporte,
+      formato: formato || 'excel',
+      cron_expresion,
+      frecuencia_label,
+      destinatarios: Array.isArray(destinatarios) ? destinatarios.join(',') : destinatarios,
+      cliente_id,
+      filtros,
+      creado_por: req.user.id,
+      activo: true
+    });
+
+    // Programar inmediatamente
+    scheduler.programar(reporte);
+
+    return res.json({ success: true, message: 'Reporte programado creado', data: reporte });
+  } catch (error) {
+    logger.error('Error al crear programado:', { message: error.message });
+    return serverError(res, 'Error al crear reporte programado', error);
+  }
+};
+
+const actualizarProgramado = async (req, res) => {
+  try {
+    const reporte = await ReporteProgramado.findByPk(req.params.id);
+    if (!reporte) return notFound(res, 'Reporte programado no encontrado');
+
+    const { nombre, tipo_reporte, formato, cron_expresion, frecuencia_label, destinatarios, cliente_id, filtros, activo } = req.body;
+
+    if (cron_expresion) {
+      const cron = require('node-cron');
+      if (!cron.validate(cron_expresion)) {
+        return serverError(res, 'Expresión cron inválida');
+      }
+    }
+
+    await reporte.update({
+      ...(nombre !== undefined && { nombre }),
+      ...(tipo_reporte !== undefined && { tipo_reporte }),
+      ...(formato !== undefined && { formato }),
+      ...(cron_expresion !== undefined && { cron_expresion }),
+      ...(frecuencia_label !== undefined && { frecuencia_label }),
+      ...(destinatarios !== undefined && { destinatarios: Array.isArray(destinatarios) ? destinatarios.join(',') : destinatarios }),
+      ...(cliente_id !== undefined && { cliente_id }),
+      ...(filtros !== undefined && { filtros }),
+      ...(activo !== undefined && { activo }),
+    });
+
+    // Re-programar o cancelar
+    if (reporte.activo) {
+      scheduler.programar(reporte);
+    } else {
+      scheduler.cancelar(reporte.id);
+    }
+
+    return res.json({ success: true, message: 'Reporte programado actualizado', data: reporte });
+  } catch (error) {
+    logger.error('Error al actualizar programado:', { message: error.message });
+    return serverError(res, 'Error al actualizar reporte programado', error);
+  }
+};
+
+const eliminarProgramado = async (req, res) => {
+  try {
+    const reporte = await ReporteProgramado.findByPk(req.params.id);
+    if (!reporte) return notFound(res, 'Reporte programado no encontrado');
+
+    scheduler.cancelar(reporte.id);
+    await reporte.destroy();
+
+    return res.json({ success: true, message: 'Reporte programado eliminado' });
+  } catch (error) {
+    logger.error('Error al eliminar programado:', { message: error.message });
+    return serverError(res, 'Error al eliminar reporte programado', error);
+  }
+};
+
+const ejecutarProgramadoManual = async (req, res) => {
+  try {
+    const reporte = await ReporteProgramado.findByPk(req.params.id);
+    if (!reporte) return notFound(res, 'Reporte programado no encontrado');
+
+    await scheduler.ejecutarReporte(reporte);
+    return res.json({ success: true, message: `Reporte "${reporte.nombre}" ejecutado y enviado exitosamente` });
+  } catch (error) {
+    logger.error('Error al ejecutar programado manual:', { message: error.message });
+    return serverError(res, 'Error al ejecutar el reporte', error);
+  }
+};
+
 module.exports = {
   exportarOperacionesExcel,
   exportarOperacionesPDF,
@@ -578,5 +955,14 @@ module.exports = {
   exportarInventarioExcel,
   exportarInventarioPDF,
   exportarClientesExcel,
-  getDashboard
+  exportarClientesPDF,
+  getDashboard,
+  enviarReportePorEmail,
+  getComparativo,
+  // Reportes programados
+  listarProgramados,
+  crearProgramado,
+  actualizarProgramado,
+  eliminarProgramado,
+  ejecutarProgramadoManual,
 };

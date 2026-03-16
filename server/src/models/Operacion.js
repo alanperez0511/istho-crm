@@ -30,7 +30,6 @@ module.exports = (sequelize) => {
     numero_operacion: {
       type: DataTypes.STRING(20),
       allowNull: false,
-      unique: true,
       comment: 'Número interno CRM (ej: OP-2026-0001)'
     },
     

@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Truck,
@@ -20,36 +20,57 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Activity,
+  Mail,
 } from 'lucide-react';
 
 // Components
 import { Button, KpiCard, ReportFilters } from '../../components/common';
 import { BarChart, PieChart } from '../../components/charts';
+import EnviarReporteModal from '../../components/common/EnviarReporteModal';
 
 // API
 import reportesService from '../../api/reportes.service';
 import { useAuth } from '../../context/AuthContext';
+import { useSnackbar } from 'notistack';
 
 // ============================================
 // MAIN COMPONENT
 // ============================================
 const ReporteDespachos = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = useAuth();
   const canDownload = hasPermission('reportes', 'exportar') || hasPermission('reportes', 'descargar');
+  const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
+  const [comparativo, setComparativo] = useState(null);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({ fecha_desde: '', fecha_hasta: '', cliente_id: '' });
+  const [emailModal, setEmailModal] = useState(false);
+
+  const [filters, setFilters] = useState({
+    fecha_desde: searchParams.get('fecha_desde') || '',
+    fecha_hasta: searchParams.get('fecha_hasta') || '',
+    cliente_id: searchParams.get('cliente_id') || '',
+  });
+
+  const handleFiltersChange = (newFilters) => {
+    setFilters(newFilters);
+    const params = new URLSearchParams();
+    Object.entries(newFilters).forEach(([k, v]) => { if (v) params.set(k, v); });
+    setSearchParams(params, { replace: true });
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await reportesService.getDashboard();
-      if (response?.success && response.data) {
-        setStats(response.data);
-      }
+      const [dashRes, compRes] = await Promise.all([
+        reportesService.getDashboard(),
+        reportesService.getComparativo({ meses: 6 }),
+      ]);
+      if (dashRes?.success && dashRes.data) setStats(dashRes.data);
+      if (compRes?.success && compRes.data) setComparativo(compRes.data);
     } catch (err) {
       setError(err.message || 'Error al cargar datos');
     } finally {
@@ -145,6 +166,9 @@ const ReporteDespachos = () => {
             </Button>
             {canDownload && (
               <>
+                <Button variant="outline" icon={Mail} onClick={() => setEmailModal(true)}>
+                  Enviar
+                </Button>
                 <Button variant="outline" icon={FileSpreadsheet} onClick={() => handleExport('excel')}>
                   Excel
                 </Button>
@@ -163,7 +187,7 @@ const ReporteDespachos = () => {
         )}
 
         {/* Filtros */}
-        <ReportFilters filters={filters} onChange={setFilters} />
+        <ReportFilters filters={filters} onChange={handleFiltersChange} />
 
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -218,6 +242,50 @@ const ReporteDespachos = () => {
           />
         </div>
 
+        {/* Tendencia mensual */}
+        {comparativo?.meses?.length > 0 && (
+          <div className="mb-6">
+            <BarChart
+              title="Tendencia de Operaciones (últimos 6 meses)"
+              subtitle="Entradas vs Salidas por mes"
+              data={comparativo.meses.map(m => ({
+                label: m.mes,
+                value1: m.entradas,
+                value2: m.salidas,
+              }))}
+              legend={[
+                { label: 'Entradas', color: '#10b981' },
+                { label: 'Salidas', color: '#3b82f6' },
+              ]}
+              height={280}
+            />
+          </div>
+        )}
+
+        {/* Variaciones mes vs anterior */}
+        {comparativo?.comparacion && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {[
+              { label: 'Operaciones', ...comparativo.comparacion.operaciones },
+              { label: 'Entradas', ...comparativo.comparacion.entradas },
+              { label: 'Salidas', ...comparativo.comparacion.salidas },
+            ].map(({ label, actual, anterior, variacion }) => (
+              <div key={label} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{label} vs mes anterior</p>
+                <div className="flex items-end justify-between">
+                  <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{actual}</p>
+                  <div className={`flex items-center gap-1 text-sm font-medium ${
+                    variacion > 0 ? 'text-emerald-600' : variacion < 0 ? 'text-red-600' : 'text-slate-400'
+                  }`}>
+                    {variacion > 0 ? '↑' : variacion < 0 ? '↓' : '='} {Math.abs(variacion)}%
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Anterior: {anterior}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Resumen */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
           <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">Resumen por Estado</h3>
@@ -243,6 +311,17 @@ const ReporteDespachos = () => {
           </div>
         </div>
       </main>
+
+      <EnviarReporteModal
+        isOpen={emailModal}
+        onClose={() => setEmailModal(false)}
+        tipoReporte="operaciones"
+        onSend={async (data) => {
+          const res = await reportesService.enviarPorEmail({ ...data, cliente_id: filters.cliente_id });
+          if (res.success) enqueueSnackbar(res.message, { variant: 'success' });
+          else throw new Error(res.message);
+        }}
+      />
     </div>
   );
 };
