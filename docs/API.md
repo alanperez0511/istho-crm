@@ -1050,6 +1050,39 @@ Si `enviar_correo` es `true` y el usuario tiene email, se envía un correo con l
 
 ---
 
+### GET `/plantillas-email/logo-firma`
+**Acceso:** Autenticado
+
+Obtiene el logo de firma en base64 (data URI).
+
+**Respuesta (200):**
+```json
+{
+  "success": true,
+  "data": { "logoDataUri": "data:image/png;base64,iVBORw0KGgo..." }
+}
+```
+
+---
+
+### POST `/plantillas-email/logo-firma`
+**Acceso:** Supervisor+ (multipart/form-data)
+
+Sube un logo para la firma de email. Se convierte a base64 y se usa en todas las firmas y en el header de los correos.
+
+**Body:** `logo` (file, max 5MB, PNG/JPEG/WEBP)
+
+**Respuesta (200):**
+```json
+{
+  "success": true,
+  "message": "Logo de firma actualizado",
+  "data": { "logoDataUri": "data:image/png;base64,..." }
+}
+```
+
+---
+
 ## 9. Auditoría de Acciones (`/auditoria-acciones`)
 
 ### GET `/auditoria-acciones`

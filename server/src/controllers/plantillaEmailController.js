@@ -284,7 +284,9 @@ const preview = async (req, res) => {
 
     // Agregar firma si está habilitada
     if (plantilla.firma_habilitada) {
-      cuerpoRenderizado += plantilla.firma_html || PlantillaEmail.FIRMA_DEFAULT;
+      const firmaHtml = plantilla.firma_html || PlantillaEmail.FIRMA_DEFAULT;
+      const firmaCompiled = Handlebars.compile(firmaHtml);
+      cuerpoRenderizado += firmaCompiled({ logoFirmaDataUri: PlantillaEmail.getLogoFirmaDataUri() });
     }
 
     return success(res, {
@@ -340,7 +342,9 @@ const previewRaw = async (req, res) => {
     let cuerpoRenderizado = cuerpoCompiled(datosEjemplo);
 
     if (firma_habilitada !== false) {
-      cuerpoRenderizado += firma_html || PlantillaEmail.FIRMA_DEFAULT;
+      const firmaSource = firma_html || PlantillaEmail.FIRMA_DEFAULT;
+      const firmaCompiled = Handlebars.compile(firmaSource);
+      cuerpoRenderizado += firmaCompiled({ logoFirmaDataUri: PlantillaEmail.getLogoFirmaDataUri() });
     }
 
     return success(res, {
@@ -353,6 +357,74 @@ const previewRaw = async (req, res) => {
   }
 };
 
+/**
+ * POST /plantillas-email/logo-firma
+ * Subir logo para la firma de email (se convierte a base64)
+ */
+const subirLogoFirma = async (req, res) => {
+  try {
+    if (!req.file) {
+      return errorResponse(res, 'No se proporcionó una imagen', 400);
+    }
+
+    const fs = require('fs');
+    const path = require('path');
+
+    // Leer archivo y convertir a base64
+    const buffer = fs.readFileSync(req.file.path);
+    const base64 = buffer.toString('base64');
+    const mimeType = req.file.mimetype;
+    const dataUri = `data:${mimeType};base64,${base64}`;
+
+    // Guardar en archivo de configuración
+    const configPath = path.join(__dirname, '../../uploads/assets/logo-firma.json');
+    fs.writeFileSync(configPath, JSON.stringify({ dataUri, updatedAt: new Date() }));
+
+    // También actualizar el logo PNG para CID en emails
+    const logoPath = path.join(__dirname, '../../uploads/assets/logo.png');
+    fs.copyFileSync(req.file.path, logoPath);
+
+    // Limpiar temporal
+    fs.unlinkSync(req.file.path);
+
+    logger.info('Logo de firma actualizado');
+
+    return successMessage(res, 'Logo de firma actualizado', { logoDataUri: dataUri });
+  } catch (error) {
+    logger.error('Error al subir logo firma:', { message: error.message });
+    return serverError(res, 'Error al subir el logo', error);
+  }
+};
+
+/**
+ * GET /plantillas-email/logo-firma
+ * Obtener logo de firma en base64
+ */
+const obtenerLogoFirma = async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, '../../uploads/assets/logo-firma.json');
+
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      return success(res, { logoDataUri: config.dataUri });
+    }
+
+    // Fallback: intentar leer logo.png
+    const logoPath = path.join(__dirname, '../../uploads/assets/logo.png');
+    if (fs.existsSync(logoPath)) {
+      const buffer = fs.readFileSync(logoPath);
+      const dataUri = `data:image/png;base64,${buffer.toString('base64')}`;
+      return success(res, { logoDataUri: dataUri });
+    }
+
+    return success(res, { logoDataUri: null });
+  } catch (error) {
+    return serverError(res, 'Error al obtener logo', error);
+  }
+};
+
 module.exports = {
   listar,
   camposPorTipo,
@@ -362,4 +434,6 @@ module.exports = {
   eliminar,
   preview,
   previewRaw,
+  subirLogoFirma,
+  obtenerLogoFirma,
 };

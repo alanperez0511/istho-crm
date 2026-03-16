@@ -217,6 +217,7 @@ export const PLANTILLAS_EMAIL_ENDPOINTS = {
   CAMPOS: (tipo) => `/plantillas-email/campos/${tipo}`,
   PREVIEW: (id) => `/plantillas-email/${id}/preview`,
   PREVIEW_RAW: '/plantillas-email/preview-raw',
+  LOGO_FIRMA: '/plantillas-email/logo-firma',
 };
 
 // ════════════════════════════════════════════════════════════════════════════

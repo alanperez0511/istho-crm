@@ -21,6 +21,9 @@ import {
   Check,
   ToggleLeft,
   ToggleRight,
+  Upload,
+  Image,
+  Loader2,
 } from 'lucide-react';
 
 import { Button } from '../../components/common';
@@ -95,6 +98,8 @@ const PlantillaEmailEditor = () => {
 
   const [campos, setCampos] = useState([]);
   const [firmaDefault, setFirmaDefault] = useState('');
+  const [logoFirma, setLogoFirma] = useState(null);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -144,6 +149,11 @@ const PlantillaEmailEditor = () => {
     } else {
       loadCampos('operacion_cierre');
     }
+
+    // Cargar logo de firma
+    plantillasEmailService.getLogoFirma()
+      .then(res => { if (res?.success && res.data?.logoDataUri) setLogoFirma(res.data.logoDataUri); })
+      .catch(() => {});
   }, [id, isEdit, loadCampos, notifyError]);
 
   const handleChange = (field, value) => {
@@ -455,20 +465,70 @@ const PlantillaEmailEditor = () => {
                   ) : (
                     <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-600">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                          <Mail className="w-6 h-6 text-white" />
-                        </div>
+                        {logoFirma ? (
+                          <img src={logoFirma} alt="Logo" className="w-12 h-12 rounded-xl object-cover" />
+                        ) : (
+                          <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">IS</div>
+                        )}
                         <div>
                           <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">ISTHO S.A.S.</p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">Centro Logístico Industrial del Norte</p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">Girardota, Antioquia - Colombia</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Tel: (604) 405 2000 | info@istho.com.co</p>
                         </div>
                       </div>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-                        Este es un mensaje automático del sistema ISTHO CRM.
-                      </p>
                     </div>
                   )}
+
+                  {/* Upload Logo de Firma */}
+                  <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-300 dark:border-slate-600">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0">
+                        {logoFirma ? (
+                          <img src={logoFirma} alt="Logo firma" className="w-10 h-10 rounded-lg object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
+                            <Image className="w-5 h-5 text-slate-400" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                          {logoFirma ? 'Logo de firma cargado' : 'Sin logo de firma'}
+                        </p>
+                        <p className="text-[11px] text-slate-400">Se usara en todas las firmas de correo (max 5MB)</p>
+                      </div>
+                      <label className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer transition-colors ${
+                        logoUploading ? 'bg-slate-100 text-slate-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-100'
+                      }`}>
+                        {logoUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                        {logoUploading ? 'Subiendo...' : 'Subir Logo'}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          disabled={logoUploading}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setLogoUploading(true);
+                            try {
+                              const res = await plantillasEmailService.uploadLogoFirma(file);
+                              if (res.success && res.data?.logoDataUri) {
+                                setLogoFirma(res.data.logoDataUri);
+                                success('Logo de firma actualizado');
+                              }
+                            } catch (err) {
+                              notifyError('Error al subir el logo');
+                            } finally {
+                              setLogoUploading(false);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </>
               )}
             </div>

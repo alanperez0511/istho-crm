@@ -1,153 +1,95 @@
-{{!-- 
-  ============================================================================
-  ISTHO CRM - Plantilla de Bienvenida
-  ============================================================================
-  
-  Variables disponibles:
-  - nombre: Nombre del usuario
-  - username: Nombre de usuario
-  - email: Correo electrónico
-  - rol: Rol del usuario
-  - passwordTemporal: Contraseña temporal (si aplica)
-  - urlLogin: URL para iniciar sesión
-  - cliente: Nombre del cliente (para usuarios de cliente)
-  - invitadoPor: Nombre de quien invitó
-  - esReenvio: Boolean si es reenvío de credenciales
-  
-  @author Coordinación TI - ISTHO S.A.S.
-  @version 1.0.0
+{{!--
+  ISTHO CRM - Plantilla de Bienvenida (v2.0)
+  Variables: nombre, username, email, rol, passwordTemporal, urlLogin, cliente, invitadoPor, esReenvio
 --}}
 
 <div style="padding: 0;">
-  {{!-- Título dinámico --}}
   {{#if esReenvio}}
-    <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 24px; font-weight: 600;">
-      📧 Reenvío de Credenciales
-    </h2>
+  <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 22px; font-weight: 700;">
+    Reenvio de Credenciales
+  </h2>
   {{else}}
-    <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 24px; font-weight: 600;">
-      🎉 ¡Bienvenido a ISTHO!
-    </h2>
+  <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 22px; font-weight: 700;">
+    Bienvenido a ISTHO CRM
+  </h2>
   {{/if}}
-  
-  {{!-- Saludo --}}
-  <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+
+  <p style="color: #475569; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
     Hola <strong style="color: #1e293b;">{{nombre}}</strong>,
   </p>
-  
-  {{!-- Mensaje de bienvenida --}}
+
   {{#if esReenvio}}
-    <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
-      Te reenviamos tus credenciales de acceso al sistema ISTHO CRM.
-      {{#if cliente}}
-      para el portal de <strong>{{cliente}}</strong>.
-      {{/if}}
-    </p>
+  <p style="color: #475569; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+    Te reenviamos tus credenciales de acceso al sistema ISTHO CRM{{#if cliente}} para el portal de <strong>{{cliente}}</strong>{{/if}}.
+  </p>
   {{else}}
-    <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
-      Se ha creado una cuenta para ti en el sistema ISTHO CRM
-      {{#if cliente}}
-      para el portal de clientes de <strong>{{cliente}}</strong>.
-      {{/if}}
-      A continuación encontrarás tus credenciales de acceso:
-    </p>
+  <p style="color: #475569; font-size: 15px; line-height: 1.7; margin: 0 0 25px 0;">
+    Se ha creado una cuenta para ti en el sistema ISTHO CRM{{#if cliente}} para el portal de clientes de <strong>{{cliente}}</strong>{{/if}}. A continuacion encontraras tus credenciales de acceso:
+  </p>
   {{/if}}
-  
-  {{!-- Caja de credenciales --}}
-  <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin: 25px 0;">
-    <h3 style="color: #1e293b; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">
-      📋 Credenciales de Acceso
-    </h3>
-    
-    <table style="width: 100%; border-collapse: collapse;">
-      <tr>
-        <td style="padding: 8px 0; color: #64748b; font-size: 14px; width: 140px;">
-          <strong>Usuario:</strong>
-        </td>
-        <td style="padding: 8px 0; color: #1e293b; font-size: 14px; font-family: 'Courier New', monospace;">
-          {{username}}
-        </td>
-      </tr>
-      <tr>
-        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">
-          <strong>Email:</strong>
-        </td>
-        <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">
-          {{email}}
-        </td>
-      </tr>
-      {{#if passwordTemporal}}
-      <tr>
-        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">
-          <strong>Contraseña:</strong>
-        </td>
-        <td style="padding: 8px 0;">
-          <span style="background-color: #fff7ed; color: #c2410c; padding: 6px 12px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 15px; font-weight: 600; letter-spacing: 1px;">
-            {{passwordTemporal}}
-          </span>
-        </td>
-      </tr>
-      {{/if}}
-      <tr>
-        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">
-          <strong>Rol:</strong>
-        </td>
-        <td style="padding: 8px 0;">
-          <span style="background-color: #dbeafe; color: #1e40af; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 500;">
-            {{rol}}
-          </span>
-        </td>
-      </tr>
-    </table>
-  </div>
-  
-  {{!-- Alerta de seguridad --}}
+
+  <!-- Credenciales -->
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin: 25px 0;">
+    <tr>
+      <td style="padding: 20px 25px; border-bottom: 1px solid #e2e8f0;">
+        <p style="margin: 0 0 3px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Usuario</p>
+        <p style="margin: 0; color: #1e293b; font-size: 16px; font-weight: 600; font-family: 'Courier New', monospace;">{{username}}</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 20px 25px; border-bottom: 1px solid #e2e8f0;">
+        <p style="margin: 0 0 3px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Email</p>
+        <p style="margin: 0; color: #1e293b; font-size: 15px;">{{email}}</p>
+      </td>
+    </tr>
+    {{#if passwordTemporal}}
+    <tr>
+      <td style="padding: 20px 25px; border-bottom: 1px solid #e2e8f0; background-color: #fff7ed;">
+        <p style="margin: 0 0 3px 0; color: #c2410c; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Contrasena Temporal</p>
+        <p style="margin: 0; color: #c2410c; font-size: 18px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 2px;">{{passwordTemporal}}</p>
+      </td>
+    </tr>
+    {{/if}}
+    <tr>
+      <td style="padding: 15px 25px;">
+        <p style="margin: 0 0 3px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Rol</p>
+        <span style="display: inline-block; background-color: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">{{rol}}</span>
+      </td>
+    </tr>
+  </table>
+
   {{#if passwordTemporal}}
-  <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px 20px; margin: 25px 0; border-radius: 0 10px 10px 0;">
-    <p style="color: #92400e; margin: 0; font-size: 14px; line-height: 1.5;">
-      <strong>⚠️ Importante:</strong> Esta contraseña es temporal. Por seguridad, 
-      deberás cambiarla en tu primer inicio de sesión.
-    </p>
+  <div class="info-box warning">
+    <strong>Importante:</strong> Esta contrasena es temporal. Por seguridad, deberas cambiarla en tu primer inicio de sesion.
   </div>
   {{/if}}
-  
-  {{!-- Qué puedes hacer (solo para usuarios de cliente) --}}
+
   {{#if cliente}}
-  <div style="background-color: #fff7ed; border-left: 4px solid #E65100; padding: 20px; margin: 25px 0; border-radius: 0 12px 12px 0;">
-    <h3 style="color: #E65100; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">
-      📦 Tu acceso al portal incluye:
-    </h3>
-    <ul style="color: #78350f; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8;">
+  <div class="info-box info">
+    <p style="margin: 0 0 10px 0; font-weight: 600;">Tu acceso al portal incluye:</p>
+    <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
       <li>Consulta de inventario en tiempo real</li>
       <li>Seguimiento de despachos y entregas</li>
       <li>Descarga de documentos y cumplidos</li>
-      <li>Reportes y estadísticas de operaciones</li>
+      <li>Reportes y estadisticas de operaciones</li>
     </ul>
   </div>
   {{/if}}
-  
-  {{!-- Botón de acceso --}}
+
+  <!-- Boton -->
   <div style="text-align: center; margin: 30px 0;">
-    <a href="{{urlLogin}}" 
-       style="display: inline-block; background: linear-gradient(135deg, #E65100 0%, #F57C00 100%); color: #ffffff; padding: 14px 40px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(230, 81, 0, 0.3);">
-      {{#if cliente}}
-      Acceder al Portal
-      {{else}}
-      Iniciar Sesión
-      {{/if}}
+    <a href="{{urlLogin}}" class="btn">
+      {{#if cliente}}Acceder al Portal{{else}}Iniciar Sesion{{/if}}
     </a>
   </div>
-  
-  {{!-- Invitado por --}}
+
   {{#if invitadoPor}}
   <p style="color: #64748b; font-size: 13px; text-align: center; margin: 20px 0 0 0;">
-    Invitación enviada por: <strong>{{invitadoPor}}</strong>
+    Invitacion enviada por: <strong>{{invitadoPor}}</strong>
   </p>
   {{/if}}
-  
-  {{!-- Nota final --}}
-  <p style="color: #94a3b8; font-size: 13px; line-height: 1.5; margin: 25px 0 0 0; padding-top: 20px; border-top: 1px solid #e2e8f0;">
-    Si no solicitaste esta cuenta o tienes alguna pregunta, 
-    contacta al administrador del sistema o responde a este correo.
+
+  <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 25px 0 0 0; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+    Si no solicitaste esta cuenta o tienes alguna pregunta, contacta al administrador del sistema.
   </p>
 </div>

@@ -60,10 +60,12 @@
 - **Paginación** con 20 registros por página
 
 ### 6. Plantillas de Email
-- 3 plantillas predeterminadas (entrada, salida, kardex)
+- 3 plantillas predeterminadas (entrada, salida, kardex) + plantilla general
 - Variables Handlebars dinámicas
-- Firma configurable por plantilla
+- Firma configurable por plantilla con **logo de empresa** (upload → base64)
 - Editor CRUD con preview en tiempo real
+- Diseño corporativo: header oscuro con logo, barra naranja, footer con datos de contacto
+- Logo incrustado como base64 para compatibilidad con todos los clientes de email
 
 ### 7. Auditoría de Acciones
 - Registro de todas las acciones del sistema (crear, actualizar, eliminar, login, logout)

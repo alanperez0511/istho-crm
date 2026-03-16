@@ -143,16 +143,39 @@ module.exports = (sequelize) => {
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 30px; border-top: 2px solid #E65100; padding-top: 20px;">
   <tr>
     <td style="vertical-align: top; padding-right: 15px; width: 60px;">
-      <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #E65100, #F57C00); border-radius: 12px; text-align: center; line-height: 50px; font-size: 24px;">🏢</div>
+      {{#if logoFirmaDataUri}}
+      <img src="{{logoFirmaDataUri}}" alt="ISTHO" width="50" height="50" style="width: 50px; height: 50px; border-radius: 12px; display: block;" />
+      {{else}}
+      <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #E65100, #F57C00); border-radius: 12px; text-align: center; line-height: 50px; font-size: 20px; font-weight: 800; color: #fff;">IS</div>
+      {{/if}}
     </td>
     <td style="vertical-align: top;">
       <p style="margin: 0 0 2px 0; color: #1e293b; font-size: 14px; font-weight: 700;">ISTHO S.A.S.</p>
       <p style="margin: 0 0 2px 0; color: #64748b; font-size: 12px;">Centro Logístico Industrial del Norte</p>
       <p style="margin: 0 0 2px 0; color: #64748b; font-size: 12px;">Girardota, Antioquia - Colombia</p>
-      <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 11px;">Este es un mensaje automático del sistema ISTHO CRM.</p>
+      <p style="margin: 0 0 2px 0; color: #64748b; font-size: 12px;">Tel: (604) 405 2000 | info@istho.com.co</p>
     </td>
   </tr>
 </table>`;
+
+  /**
+   * Obtener el logo de firma en base64 (si existe)
+   */
+  PlantillaEmail.getLogoFirmaDataUri = () => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const configPath = path.join(__dirname, '../../uploads/assets/logo-firma.json');
+      if (fs.existsSync(configPath)) {
+        return JSON.parse(fs.readFileSync(configPath, 'utf8')).dataUri;
+      }
+      const logoPath = path.join(__dirname, '../../uploads/assets/logo.png');
+      if (fs.existsSync(logoPath)) {
+        return `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`;
+      }
+    } catch { /* ignore */ }
+    return null;
+  };
 
   return PlantillaEmail;
 };

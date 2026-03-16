@@ -6,7 +6,7 @@
  * @version 1.0.0
  */
 
-import apiClient from './client';
+import apiClient, { createUploadClient } from './client';
 import { PLANTILLAS_EMAIL_ENDPOINTS } from './endpoints';
 
 const plantillasEmailService = {
@@ -40,6 +40,18 @@ const plantillasEmailService = {
 
   previewRaw: async (data) => {
     return apiClient.post(PLANTILLAS_EMAIL_ENDPOINTS.PREVIEW_RAW, data);
+  },
+  // Logo de firma
+  getLogoFirma: async () => {
+    return apiClient.get(PLANTILLAS_EMAIL_ENDPOINTS.LOGO_FIRMA);
+  },
+
+  uploadLogoFirma: async (file) => {
+    const uploadClient = createUploadClient();
+    const formData = new FormData();
+    formData.append('logo', file);
+    const response = await uploadClient.post(PLANTILLAS_EMAIL_ENDPOINTS.LOGO_FIRMA, formData);
+    return response.data;
   },
 };
 

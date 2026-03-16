@@ -11,9 +11,14 @@ const router = express.Router();
 const plantillaEmailController = require('../controllers/plantillaEmailController');
 const { verificarToken } = require('../middleware/auth');
 const { requiereRolMinimo } = require('../middleware/roles');
+const { uploadLogo } = require('../config/multer');
 
 // Todas las rutas requieren autenticación
 router.use(verificarToken);
+
+// Logo de firma (debe ir ANTES de /:id para no confundir rutas)
+router.get('/logo-firma', plantillaEmailController.obtenerLogoFirma);
+router.post('/logo-firma', requiereRolMinimo('supervisor'), uploadLogo.single('logo'), plantillaEmailController.subirLogoFirma);
 
 // Solo admin y supervisor pueden gestionar plantillas
 router.get('/', plantillaEmailController.listar);

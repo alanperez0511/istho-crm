@@ -660,7 +660,28 @@ const url = getServerFileUrl(user.avatar_url);
 
 El componente `GlobalSearch` se abre con `Ctrl+K` / `Cmd+K` desde cualquier página protegida. Busca en 5 módulos en paralelo (Inventario, Clientes, Entradas, Salidas, Kardex). Integrado en `ProtectedLayout` de `App.jsx`.
 
-### 10.4 Persistir Filtros en URL
+### 10.4 Logo de Email (Base64)
+
+El sistema de email usa logos en base64 para máxima compatibilidad:
+
+```javascript
+// Obtener logo (servidor)
+const { PlantillaEmail } = require('../models');
+const logoDataUri = PlantillaEmail.getLogoFirmaDataUri();
+// Retorna: 'data:image/png;base64,iVBORw0KGgo...' o null
+
+// Subir logo (frontend)
+await plantillasEmailService.uploadLogoFirma(file);
+```
+
+El logo se sube desde **Plantillas de Email > Firma > Subir Logo** y se usa automáticamente en:
+- Header de todos los correos (`base.html` → `{{logoUrl}}`)
+- Firma default (`FIRMA_DEFAULT` → `{{logoFirmaDataUri}}`)
+- Footer de todos los correos
+
+Almacenamiento: `server/uploads/assets/logo-firma.json` (data URI en JSON)
+
+### 10.5 Persistir Filtros en URL
 
 Para reportes y listados, usar `useSearchParams` de React Router:
 

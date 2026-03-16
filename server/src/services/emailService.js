@@ -16,14 +16,14 @@ const nodemailer = require('nodemailer');
 const { getTransporter, defaultFrom } = require('../config/email');
 const logger = require('../utils/logger');
 
-// Cache de plantillas compiladas
+// Cache de plantillas compiladas (deshabilitado en desarrollo para recargar cambios)
 const templateCache = {};
 
 /**
  * Cargar y compilar plantilla
  */
 const loadTemplate = (templateName) => {
-  if (templateCache[templateName]) {
+  if (templateCache[templateName] && process.env.NODE_ENV !== 'development') {
     return templateCache[templateName];
   }
 
@@ -53,14 +53,21 @@ const loadTemplate = (templateName) => {
  */
 const renderEmail = (templateName, data) => {
   const { contentTemplate, baseTemplate } = loadTemplate(templateName);
-  
+
+  // Logo en base64 para máxima compatibilidad con clientes de email
+  const { PlantillaEmail } = require('../models');
+  const logoUrl = PlantillaEmail.getLogoFirmaDataUri() || '';
+  const logoFirmaDataUri = logoUrl;
+
   // Renderizar contenido
-  const contenido = contentTemplate(data);
-  
+  const contenido = contentTemplate({ ...data, logoUrl, logoFirmaDataUri });
+
   // Insertar en plantilla base
   const html = baseTemplate({
     asunto: data.asunto || 'Notificación ISTHO CRM',
-    contenido
+    contenido,
+    logoUrl,
+    logoFirmaDataUri
   });
 
   return html;
@@ -282,14 +289,18 @@ const enviarCierreOperacion = async (operacion, correosDestino, plantillaId = nu
 
         let cuerpoHtml = cuerpoCompiled(datos);
         if (plantillaCustom.firma_habilitada) {
-          cuerpoHtml += plantillaCustom.firma_html || PlantillaEmail.FIRMA_DEFAULT;
+          const firmaSource = plantillaCustom.firma_html || PlantillaEmail.FIRMA_DEFAULT;
+          const firmaCompiled = Handlebars.compile(firmaSource);
+          cuerpoHtml += firmaCompiled({ logoFirmaDataUri: PlantillaEmail.getLogoFirmaDataUri() });
         }
 
         // Usar base template del filesystem
         const { baseTemplate } = loadTemplate('operacion-cierre');
+        const logoUrl = PlantillaEmail.getLogoFirmaDataUri() || '';
         const htmlFinal = baseTemplate({
           asunto: asuntoCompiled(datos),
-          contenido: cuerpoHtml
+          contenido: cuerpoHtml,
+          logoUrl
         });
 
         const transporter = await getTransporter();
