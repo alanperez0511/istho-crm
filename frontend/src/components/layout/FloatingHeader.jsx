@@ -176,6 +176,23 @@ const getMenuForRole = (rol, hasPermission) => {
   if (rol === 'admin') {
     return allMenuConfig;
   }
+  // Conductor: solo Dashboard + Viajes
+  if (rol === 'conductor') {
+    return allMenuConfig.filter(menu =>
+      menu.id === 'dashboard' || menu.id === 'viajes'
+    ).map(menu => {
+      if (menu.id === 'dashboard') {
+        return { ...menu, items: menu.items.filter(item => item.href === '/dashboard') };
+      }
+      return menu;
+    });
+  }
+  // Financiera: Dashboard + Viajes + Reportes
+  if (rol === 'financiera') {
+    return allMenuConfig.filter(menu =>
+      menu.id === 'dashboard' || menu.id === 'viajes'
+    );
+  }
   // Internos no-admin: ocultar menús soloAdmin
   return allMenuConfig.filter(menu => !menu.soloAdmin);
 };

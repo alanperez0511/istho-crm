@@ -118,6 +118,7 @@ const CajaMenorList = lazy(() => import('./pages/Viajes/CajaMenorList'));
 const CajaMenorDetail = lazy(() => import('./pages/Viajes/CajaMenorDetail'));
 const ViajesList = lazy(() => import('./pages/Viajes/ViajesList'));
 const ViajeForm = lazy(() => import('./pages/Viajes/ViajeForm'));
+const ViajeDetail = lazy(() => import('./pages/Viajes/ViajeDetail'));
 const MovimientosList = lazy(() => import('./pages/Viajes/MovimientosList'));
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -278,6 +279,7 @@ function App() {
                 <Route path="/viajes/cajas-menores/:id" element={<CajaMenorDetail />} />
                 <Route path="/viajes/viajes" element={<ViajesList />} />
                 <Route path="/viajes/viajes/nuevo" element={<ViajeForm />} />
+                <Route path="/viajes/viajes/:id" element={<ViajeDetail />} />
                 <Route path="/viajes/viajes/:id/editar" element={<ViajeForm />} />
                 <Route path="/viajes/movimientos" element={<MovimientosList />} />
 

@@ -169,6 +169,10 @@ export const REPORTES_ENDPOINTS = {
   // Comparativos
   COMPARATIVO: '/reportes/comparativo',
 
+  // Viajes
+  VIAJES_EXCEL: '/reportes/viajes/excel',
+  CAJA_MENOR_EXCEL: (id) => `/reportes/cajas-menores/${id}/excel`,
+
   // Programados
   PROGRAMADOS: '/reportes/programados',
   PROGRAMADO_BY_ID: (id) => `/reportes/programados/${id}`,

@@ -18,6 +18,11 @@ const {
   Cliente,
   Contacto,
   Auditoria,
+  Vehiculo,
+  CajaMenor,
+  Viaje,
+  MovimientoCajaMenor,
+  Usuario,
   sequelize
 } = require('../models');
 const excelService = require('../services/excelService');
@@ -986,6 +991,211 @@ const ejecutarProgramadoManual = async (req, res) => {
   }
 };
 
+// =============================================
+// EXPORTAR VIAJES A EXCEL
+// =============================================
+
+const exportarViajesExcel = async (req, res) => {
+  try {
+    const where = {};
+    if (req.query.conductor_id) where.conductor_id = req.query.conductor_id;
+    if (req.query.vehiculo_id) where.vehiculo_id = req.query.vehiculo_id;
+    if (req.query.caja_menor_id) where.caja_menor_id = req.query.caja_menor_id;
+    if (req.query.estado && req.query.estado !== 'todos') where.estado = req.query.estado;
+    if (req.query.fecha_desde || req.query.fecha_hasta) {
+      where.fecha = {};
+      if (req.query.fecha_desde) where.fecha[Op.gte] = req.query.fecha_desde;
+      if (req.query.fecha_hasta) where.fecha[Op.lte] = req.query.fecha_hasta;
+    }
+    if (req.user.esConductor) where.conductor_id = req.user.id;
+
+    const viajes = await Viaje.findAll({
+      where,
+      include: [
+        { model: Vehiculo, as: 'vehiculo', attributes: ['id', 'placa', 'tipo_vehiculo'] },
+        { model: Usuario, as: 'conductor', attributes: ['id', 'nombre_completo'] },
+        { model: CajaMenor, as: 'cajaMenor', attributes: ['id', 'numero'] }
+      ],
+      order: [['fecha', 'DESC']]
+    });
+
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Viajes');
+
+    sheet.columns = [
+      { header: 'Número', key: 'numero', width: 12 },
+      { header: 'Fecha', key: 'fecha', width: 12 },
+      { header: 'Origen', key: 'origen', width: 18 },
+      { header: 'Destino', key: 'destino', width: 18 },
+      { header: 'Cliente', key: 'cliente_nombre', width: 25 },
+      { header: 'Doc. Cliente', key: 'documento_cliente', width: 15 },
+      { header: 'Vehículo', key: 'vehiculo', width: 12 },
+      { header: 'Conductor', key: 'conductor', width: 25 },
+      { header: 'Peso (kg)', key: 'peso', width: 12 },
+      { header: 'Valor Viaje', key: 'valor_viaje', width: 15 },
+      { header: 'Facturado', key: 'facturado', width: 10 },
+      { header: 'No. Factura', key: 'no_factura', width: 15 },
+      { header: 'Caja Menor', key: 'caja_menor', width: 12 },
+      { header: 'Estado', key: 'estado', width: 12 },
+    ];
+
+    // Header style
+    sheet.getRow(1).eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1B3A5C' } };
+    });
+
+    viajes.forEach(v => {
+      sheet.addRow({
+        numero: v.numero,
+        fecha: v.fecha,
+        origen: v.origen,
+        destino: v.destino,
+        cliente_nombre: v.cliente_nombre || '',
+        documento_cliente: v.documento_cliente || '',
+        vehiculo: v.vehiculo?.placa || '',
+        conductor: v.conductor?.nombre_completo || '',
+        peso: parseFloat(v.peso) || 0,
+        valor_viaje: parseFloat(v.valor_viaje) || 0,
+        facturado: v.facturado ? 'Sí' : 'No',
+        no_factura: v.no_factura || '',
+        caja_menor: v.cajaMenor?.numero || '',
+        estado: v.estado,
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const filename = `viajes_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+
+    logger.info('Excel viajes generado:', { registros: viajes.length });
+  } catch (error) {
+    logger.error('Error al exportar viajes Excel:', { message: error.message });
+    return serverError(res, 'Error al generar reporte de viajes', error);
+  }
+};
+
+// =============================================
+// EXPORTAR CAJA MENOR A EXCEL
+// =============================================
+
+const exportarCajaMenorExcel = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const caja = await CajaMenor.findByPk(id, {
+      include: [
+        { model: Usuario, as: 'conductor', attributes: ['id', 'nombre_completo'] },
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre_completo'] },
+        {
+          model: MovimientoCajaMenor, as: 'movimientos',
+          include: [
+            { model: Usuario, as: 'conductor', attributes: ['id', 'nombre_completo'] },
+            { model: Viaje, as: 'viaje', attributes: ['id', 'numero', 'destino'] }
+          ],
+          order: [['consecutivo', 'ASC']]
+        },
+        {
+          model: Viaje, as: 'viajes',
+          include: [{ model: Vehiculo, as: 'vehiculo', attributes: ['id', 'placa'] }]
+        }
+      ]
+    });
+
+    if (!caja) return res.status(404).json({ success: false, message: 'Caja menor no encontrada' });
+
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+
+    // Hoja 1: Resumen
+    const resumen = workbook.addWorksheet('Resumen');
+    resumen.columns = [{ header: 'Campo', key: 'campo', width: 25 }, { header: 'Valor', key: 'valor', width: 30 }];
+    resumen.getRow(1).eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1B3A5C' } }; });
+    [
+      ['Número', caja.numero],
+      ['Conductor', caja.conductor?.nombre_completo || ''],
+      ['Estado', caja.estado],
+      ['Fecha Apertura', caja.fecha_apertura],
+      ['Fecha Cierre', caja.fecha_cierre || 'N/A'],
+      ['Saldo Inicial', `$${Number(caja.saldo_inicial).toLocaleString('es-CO')}`],
+      ['Saldo Trasladado', `$${Number(caja.saldo_trasladado || 0).toLocaleString('es-CO')}`],
+      ['Total Ingresos', `$${Number(caja.total_ingresos).toLocaleString('es-CO')}`],
+      ['Total Egresos', `$${Number(caja.total_egresos).toLocaleString('es-CO')}`],
+      ['Saldo Actual', `$${Number(caja.saldo_actual).toLocaleString('es-CO')}`],
+      ['Creado por', caja.creador?.nombre_completo || ''],
+      ['Total Viajes', caja.viajes?.length || 0],
+      ['Total Movimientos', caja.movimientos?.length || 0],
+    ].forEach(([campo, valor]) => resumen.addRow({ campo, valor }));
+
+    // Hoja 2: Movimientos
+    const movSheet = workbook.addWorksheet('Movimientos');
+    movSheet.columns = [
+      { header: '#', key: 'consecutivo', width: 8 },
+      { header: 'Tipo', key: 'tipo', width: 10 },
+      { header: 'Concepto', key: 'concepto', width: 20 },
+      { header: 'Valor', key: 'valor', width: 15 },
+      { header: 'Aprobado', key: 'aprobado', width: 10 },
+      { header: 'Valor Aprobado', key: 'valor_aprobado', width: 15 },
+      { header: 'Viaje', key: 'viaje', width: 15 },
+      { header: 'Descripción', key: 'descripcion', width: 30 },
+      { header: 'Fecha', key: 'fecha', width: 18 },
+    ];
+    movSheet.getRow(1).eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1B3A5C' } }; });
+
+    (caja.movimientos || []).forEach(m => {
+      movSheet.addRow({
+        consecutivo: m.consecutivo,
+        tipo: m.tipo_movimiento === 'ingreso' ? 'Ingreso' : 'Egreso',
+        concepto: m.concepto,
+        valor: parseFloat(m.valor) || 0,
+        aprobado: m.aprobado ? 'Sí' : m.rechazado ? 'Rechazado' : 'Pendiente',
+        valor_aprobado: parseFloat(m.valor_aprobado) || 0,
+        viaje: m.viaje ? `#${m.viaje.numero} - ${m.viaje.destino}` : 'Directo',
+        descripcion: m.descripcion || '',
+        fecha: m.created_at,
+      });
+    });
+
+    // Hoja 3: Viajes
+    const viajesSheet = workbook.addWorksheet('Viajes');
+    viajesSheet.columns = [
+      { header: '#', key: 'numero', width: 10 },
+      { header: 'Fecha', key: 'fecha', width: 12 },
+      { header: 'Destino', key: 'destino', width: 20 },
+      { header: 'Vehículo', key: 'vehiculo', width: 12 },
+      { header: 'Cliente', key: 'cliente', width: 25 },
+      { header: 'Valor', key: 'valor', width: 15 },
+      { header: 'Estado', key: 'estado', width: 12 },
+    ];
+    viajesSheet.getRow(1).eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1B3A5C' } }; });
+
+    (caja.viajes || []).forEach(v => {
+      viajesSheet.addRow({
+        numero: v.numero,
+        fecha: v.fecha,
+        destino: v.destino,
+        vehiculo: v.vehiculo?.placa || '',
+        cliente: v.cliente_nombre || '',
+        valor: parseFloat(v.valor_viaje) || 0,
+        estado: v.estado,
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const filename = `caja_menor_${caja.numero}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+
+    logger.info('Excel caja menor generado:', { numero: caja.numero, movimientos: caja.movimientos?.length });
+  } catch (error) {
+    logger.error('Error al exportar caja menor Excel:', { message: error.message });
+    return serverError(res, 'Error al generar reporte de caja menor', error);
+  }
+};
+
 module.exports = {
   exportarOperacionesExcel,
   exportarOperacionesPDF,
@@ -998,6 +1208,8 @@ module.exports = {
   getDashboard,
   enviarReportePorEmail,
   getComparativo,
+  exportarViajesExcel,
+  exportarCajaMenorExcel,
   // Reportes programados
   listarProgramados,
   crearProgramado,

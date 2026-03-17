@@ -49,6 +49,13 @@ router.get('/clientes/excel', requiereRolMinimo('operador'), reporteController.e
 router.get('/clientes/pdf', requiereRolMinimo('operador'), reporteController.exportarClientesPDF);
 
 // =============================================
+// REPORTES DE VIAJES
+// =============================================
+
+router.get('/viajes/excel', reporteController.exportarViajesExcel);
+router.get('/cajas-menores/:id/excel', reporteController.exportarCajaMenorExcel);
+
+// =============================================
 // ENVIAR REPORTE POR EMAIL
 // =============================================
 
