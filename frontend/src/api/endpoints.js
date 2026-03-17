@@ -251,6 +251,49 @@ export const AUDITORIA_ACCIONES_ENDPOINTS = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// VEHÍCULOS
+// ════════════════════════════════════════════════════════════════════════════
+
+export const VEHICULOS_ENDPOINTS = {
+  BASE: '/vehiculos',
+  BY_ID: (id) => `/vehiculos/${id}`,
+  CONDUCTORES: '/vehiculos/conductores',
+  ALERTAS: '/vehiculos/alertas-vencimiento',
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// CAJAS MENORES
+// ════════════════════════════════════════════════════════════════════════════
+
+export const CAJAS_MENORES_ENDPOINTS = {
+  BASE: '/cajas-menores',
+  BY_ID: (id) => `/cajas-menores/${id}`,
+  STATS: '/cajas-menores/stats',
+  CERRAR: (id) => `/cajas-menores/${id}/cerrar`,
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// VIAJES
+// ════════════════════════════════════════════════════════════════════════════
+
+export const VIAJES_ENDPOINTS = {
+  BASE: '/viajes',
+  BY_ID: (id) => `/viajes/${id}`,
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// MOVIMIENTOS CAJA MENOR
+// ════════════════════════════════════════════════════════════════════════════
+
+export const MOVIMIENTOS_ENDPOINTS = {
+  BASE: '/movimientos-caja-menor',
+  BY_ID: (id) => `/movimientos-caja-menor/${id}`,
+  APROBAR: (id) => `/movimientos-caja-menor/${id}/aprobar`,
+  APROBAR_MASIVO: '/movimientos-caja-menor/aprobar-masivo',
+  CONCEPTOS: '/movimientos-caja-menor/conceptos',
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // EXPORT UNIFICADO
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -269,6 +312,10 @@ export const ENDPOINTS = {
   PLANTILLAS_EMAIL: PLANTILLAS_EMAIL_ENDPOINTS,
   ADMIN: ADMIN_ENDPOINTS,
   AUDITORIA_ACCIONES: AUDITORIA_ACCIONES_ENDPOINTS,
+  VEHICULOS: VEHICULOS_ENDPOINTS,
+  CAJAS_MENORES: CAJAS_MENORES_ENDPOINTS,
+  VIAJES: VIAJES_ENDPOINTS,
+  MOVIMIENTOS: MOVIMIENTOS_ENDPOINTS,
 };
 
 export default ENDPOINTS;

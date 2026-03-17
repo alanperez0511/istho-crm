@@ -28,6 +28,10 @@ const RolModel = require('./Rol');
 const PermisoModel = require('./Permiso');
 const RolPermisoModel = require('./RolPermiso');
 const ReporteProgramadoModel = require('./ReporteProgramado');
+const VehiculoModel = require('./Vehiculo');
+const CajaMenorModel = require('./CajaMenor');
+const ViajeModel = require('./Viaje');
+const MovimientoCajaMenorModel = require('./MovimientoCajaMenor');
 const Notificacion = require('./Notificacion')(sequelize);
 
 // Inicializar modelos
@@ -48,6 +52,10 @@ const Rol = RolModel(sequelize);
 const Permiso = PermisoModel(sequelize);
 const RolPermiso = RolPermisoModel(sequelize);
 const ReporteProgramado = ReporteProgramadoModel(sequelize);
+const Vehiculo = VehiculoModel(sequelize);
+const CajaMenor = CajaMenorModel(sequelize);
+const Viaje = ViajeModel(sequelize);
+const MovimientoCajaMenor = MovimientoCajaMenorModel(sequelize);
 
 // ============================================
 // DEFINIR ASOCIACIONES
@@ -303,6 +311,53 @@ ReporteProgramado.belongsTo(Usuario, { foreignKey: 'creado_por', as: 'creador' }
 ReporteProgramado.belongsTo(Cliente, { foreignKey: 'cliente_id', as: 'cliente' });
 
 // ============================================
+// ASOCIACIONES - Módulo de Viajes
+// ============================================
+
+// Vehículo <-> Usuario (conductor asignado)
+Vehiculo.belongsTo(Usuario, { foreignKey: 'conductor_id', as: 'conductor' });
+Usuario.hasMany(Vehiculo, { foreignKey: 'conductor_id', as: 'vehiculos' });
+
+// CajaMenor <-> Usuario (conductor)
+CajaMenor.belongsTo(Usuario, { foreignKey: 'conductor_id', as: 'conductor' });
+Usuario.hasMany(CajaMenor, { foreignKey: 'conductor_id', as: 'cajas_menores' });
+
+// CajaMenor <-> Usuario (creador)
+CajaMenor.belongsTo(Usuario, { foreignKey: 'creado_por', as: 'creador' });
+
+// CajaMenor <-> Usuario (cerrador)
+CajaMenor.belongsTo(Usuario, { foreignKey: 'cerrada_por', as: 'cerrador' });
+
+// CajaMenor <-> CajaMenor (caja anterior - traslado de sobrante)
+CajaMenor.belongsTo(CajaMenor, { foreignKey: 'caja_anterior_id', as: 'cajaAnterior' });
+CajaMenor.hasOne(CajaMenor, { foreignKey: 'caja_anterior_id', as: 'cajaSiguiente' });
+
+// CajaMenor <-> Viaje (1:N)
+CajaMenor.hasMany(Viaje, { foreignKey: 'caja_menor_id', as: 'viajes', onDelete: 'SET NULL' });
+Viaje.belongsTo(CajaMenor, { foreignKey: 'caja_menor_id', as: 'cajaMenor' });
+
+// Viaje <-> Vehículo (N:1)
+Viaje.belongsTo(Vehiculo, { foreignKey: 'vehiculo_id', as: 'vehiculo' });
+Vehiculo.hasMany(Viaje, { foreignKey: 'vehiculo_id', as: 'viajes' });
+
+// Viaje <-> Usuario (conductor)
+Viaje.belongsTo(Usuario, { foreignKey: 'conductor_id', as: 'conductor' });
+
+// CajaMenor <-> MovimientoCajaMenor (1:N)
+CajaMenor.hasMany(MovimientoCajaMenor, { foreignKey: 'caja_menor_id', as: 'movimientos', onDelete: 'CASCADE' });
+MovimientoCajaMenor.belongsTo(CajaMenor, { foreignKey: 'caja_menor_id', as: 'cajaMenor' });
+
+// Viaje <-> MovimientoCajaMenor (1:N - gastos del viaje)
+Viaje.hasMany(MovimientoCajaMenor, { foreignKey: 'viaje_id', as: 'gastos', onDelete: 'SET NULL' });
+MovimientoCajaMenor.belongsTo(Viaje, { foreignKey: 'viaje_id', as: 'viaje' });
+
+// MovimientoCajaMenor <-> Usuario (conductor que registró)
+MovimientoCajaMenor.belongsTo(Usuario, { foreignKey: 'conductor_id', as: 'conductor' });
+
+// MovimientoCajaMenor <-> Usuario (aprobado por)
+MovimientoCajaMenor.belongsTo(Usuario, { foreignKey: 'aprobado_por', as: 'aprobador' });
+
+// ============================================
 // EXPORTAR MODELOS
 // ============================================
 
@@ -328,7 +383,11 @@ const db = {
   Rol,
   Permiso,
   RolPermiso,
-  ReporteProgramado
+  ReporteProgramado,
+  Vehiculo,
+  CajaMenor,
+  Viaje,
+  MovimientoCajaMenor
 };
 
 /**

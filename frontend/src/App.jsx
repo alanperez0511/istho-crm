@@ -112,6 +112,14 @@ const Administracion = lazy(() => import('./pages/Administracion'));
 // Auditoría de Acciones
 const AuditoriaAcciones = lazy(() => import('./pages/AuditoriaAcciones'));
 
+// Módulo de Viajes
+const VehiculosList = lazy(() => import('./pages/Viajes/VehiculosList'));
+const CajaMenorList = lazy(() => import('./pages/Viajes/CajaMenorList'));
+const CajaMenorDetail = lazy(() => import('./pages/Viajes/CajaMenorDetail'));
+const ViajesList = lazy(() => import('./pages/Viajes/ViajesList'));
+const ViajeForm = lazy(() => import('./pages/Viajes/ViajeForm'));
+const MovimientosList = lazy(() => import('./pages/Viajes/MovimientosList'));
+
 // ════════════════════════════════════════════════════════════════════════════
 // PLACEHOLDER PARA PÁGINAS EN DESARROLLO
 // ════════════════════════════════════════════════════════════════════════════
@@ -261,6 +269,17 @@ function App() {
                 {/* ────────────────────────────────────────────────────────── */}
                 <Route path="/administracion" element={<AdminRoute><Administracion /></AdminRoute>} />
                 <Route path="/auditoria-acciones" element={<AdminRoute><AuditoriaAcciones /></AdminRoute>} />
+
+                {/* ────────────────────────────────────────────────────────── */}
+                {/* MÓDULO DE VIAJES */}
+                {/* ────────────────────────────────────────────────────────── */}
+                <Route path="/viajes/vehiculos" element={<VehiculosList />} />
+                <Route path="/viajes/cajas-menores" element={<CajaMenorList />} />
+                <Route path="/viajes/cajas-menores/:id" element={<CajaMenorDetail />} />
+                <Route path="/viajes/viajes" element={<ViajesList />} />
+                <Route path="/viajes/viajes/nuevo" element={<ViajeForm />} />
+                <Route path="/viajes/viajes/:id/editar" element={<ViajeForm />} />
+                <Route path="/viajes/movimientos" element={<MovimientosList />} />
 
                 {/* ────────────────────────────────────────────────────────── */}
                 {/* PERFIL Y CONFIGURACIÓN */}

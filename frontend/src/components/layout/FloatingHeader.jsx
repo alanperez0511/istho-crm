@@ -46,6 +46,10 @@ import {
   Mail,
   Activity,
   RefreshCw,
+  MapPin,
+  Wallet,
+  Receipt,
+  CarFront,
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
@@ -106,6 +110,19 @@ const allMenuConfig = [
       { icon: Truck, label: 'Salidas (Despachos)', href: '/inventario/salidas', shortcut: 'G S' },
       { icon: RefreshCw, label: 'Kardex (Ajustes)', href: '/inventario/kardex', shortcut: 'G K' },
       { icon: AlertCircle, label: 'Alertas de Stock', href: '/inventario/alertas' },
+    ],
+  },
+  {
+    id: 'viajes',
+    label: 'Viajes',
+    basePath: '/viajes',
+    shortcut: 'V',
+    soloInternos: true,
+    items: [
+      { icon: CarFront, label: 'Vehículos', href: '/viajes/vehiculos', shortcut: 'G V' },
+      { icon: Wallet, label: 'Cajas Menores', href: '/viajes/cajas-menores' },
+      { icon: MapPin, label: 'Viajes', href: '/viajes/viajes' },
+      { icon: Receipt, label: 'Movimientos', href: '/viajes/movimientos' },
     ],
   },
   {

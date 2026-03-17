@@ -21,7 +21,9 @@ const { sequelize, Rol, Permiso, RolPermiso, Usuario } = require('../models');
 const ROLES_BASE = [
   { codigo: 'admin', nombre: 'Administrador', descripcion: 'Acceso total al sistema', nivel_jerarquia: 100, es_sistema: true, es_cliente: false, color: '#EF4444' },
   { codigo: 'supervisor', nombre: 'Supervisor', descripcion: 'Gestión operativa completa', nivel_jerarquia: 75, es_sistema: true, es_cliente: false, color: '#F59E0B' },
+  { codigo: 'financiera', nombre: 'Financiera', descripcion: 'Gestión financiera, cajas menores y aprobación de gastos', nivel_jerarquia: 70, es_sistema: true, es_cliente: false, color: '#10B981' },
   { codigo: 'operador', nombre: 'Operador', descripcion: 'Operaciones diarias de bodega', nivel_jerarquia: 50, es_sistema: true, es_cliente: false, color: '#3B82F6' },
+  { codigo: 'conductor', nombre: 'Conductor', descripcion: 'Registro de viajes, gastos y soportes', nivel_jerarquia: 30, es_sistema: true, es_cliente: false, color: '#F97316' },
   { codigo: 'cliente', nombre: 'Portal Cliente', descripcion: 'Acceso limitado a información propia', nivel_jerarquia: 10, es_sistema: true, es_cliente: true, color: '#8B5CF6' },
 ];
 
@@ -98,6 +100,35 @@ const PERMISOS_CATALOGO = [
   { modulo: 'despachos', accion: 'editar', descripcion: 'Modificar despachos', grupo: 'Operaciones' },
   { modulo: 'despachos', accion: 'eliminar', descripcion: 'Eliminar despachos', grupo: 'Operaciones' },
   { modulo: 'despachos', accion: 'exportar', descripcion: 'Exportar despachos', grupo: 'Operaciones' },
+
+  // Vehículos
+  { modulo: 'vehiculos', accion: 'ver', descripcion: 'Ver listado de vehículos', grupo: 'Viajes' },
+  { modulo: 'vehiculos', accion: 'crear', descripcion: 'Registrar vehículos', grupo: 'Viajes' },
+  { modulo: 'vehiculos', accion: 'editar', descripcion: 'Modificar datos de vehículos', grupo: 'Viajes' },
+  { modulo: 'vehiculos', accion: 'eliminar', descripcion: 'Eliminar vehículos', grupo: 'Viajes' },
+
+  // Viajes
+  { modulo: 'viajes', accion: 'ver', descripcion: 'Ver listado de viajes', grupo: 'Viajes' },
+  { modulo: 'viajes', accion: 'crear', descripcion: 'Registrar viajes', grupo: 'Viajes' },
+  { modulo: 'viajes', accion: 'editar', descripcion: 'Modificar viajes', grupo: 'Viajes' },
+  { modulo: 'viajes', accion: 'eliminar', descripcion: 'Eliminar viajes', grupo: 'Viajes' },
+  { modulo: 'viajes', accion: 'exportar', descripcion: 'Exportar viajes Excel/PDF', grupo: 'Viajes' },
+
+  // Caja Menor
+  { modulo: 'caja_menor', accion: 'ver', descripcion: 'Ver cajas menores', grupo: 'Viajes' },
+  { modulo: 'caja_menor', accion: 'crear', descripcion: 'Crear cajas menores', grupo: 'Viajes' },
+  { modulo: 'caja_menor', accion: 'editar', descripcion: 'Modificar cajas menores', grupo: 'Viajes' },
+  { modulo: 'caja_menor', accion: 'cerrar', descripcion: 'Cerrar/cuadrar cajas menores', grupo: 'Viajes' },
+  { modulo: 'caja_menor', accion: 'aprobar', descripcion: 'Aprobar/rechazar gastos de caja menor', grupo: 'Viajes' },
+  { modulo: 'caja_menor', accion: 'eliminar', descripcion: 'Eliminar cajas menores', grupo: 'Viajes' },
+  { modulo: 'caja_menor', accion: 'exportar', descripcion: 'Exportar cajas menores', grupo: 'Viajes' },
+
+  // Movimientos Caja Menor
+  { modulo: 'movimientos', accion: 'ver', descripcion: 'Ver movimientos de caja menor', grupo: 'Viajes' },
+  { modulo: 'movimientos', accion: 'crear', descripcion: 'Registrar gastos/ingresos', grupo: 'Viajes' },
+  { modulo: 'movimientos', accion: 'editar', descripcion: 'Modificar movimientos', grupo: 'Viajes' },
+  { modulo: 'movimientos', accion: 'eliminar', descripcion: 'Eliminar movimientos', grupo: 'Viajes' },
+  { modulo: 'movimientos', accion: 'aprobar', descripcion: 'Aprobar/rechazar movimientos', grupo: 'Viajes' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -120,6 +151,21 @@ const PERMISOS_POR_ROL = {
     kardex: ['ver', 'exportar'],
     configuracion: ['ver'],
     notificaciones: ['ver', 'editar'],
+    vehiculos: ['ver', 'crear', 'editar', 'eliminar'],
+    viajes: ['ver', 'crear', 'editar', 'eliminar', 'exportar'],
+    caja_menor: ['ver', 'crear', 'editar', 'cerrar', 'aprobar', 'eliminar', 'exportar'],
+    movimientos: ['ver', 'crear', 'editar', 'eliminar', 'aprobar'],
+  },
+
+  financiera: {
+    dashboard: ['ver'],
+    clientes: ['ver'],
+    reportes: ['ver', 'exportar'],
+    notificaciones: ['ver'],
+    vehiculos: ['ver'],
+    viajes: ['ver', 'exportar'],
+    caja_menor: ['ver', 'crear', 'editar', 'cerrar', 'aprobar', 'exportar'],
+    movimientos: ['ver', 'crear', 'editar', 'aprobar'],
   },
 
   operador: {
@@ -132,6 +178,15 @@ const PERMISOS_POR_ROL = {
     auditoria: ['ver'],
     kardex: ['ver'],
     notificaciones: ['ver'],
+  },
+
+  conductor: {
+    dashboard: ['ver'],
+    notificaciones: ['ver'],
+    vehiculos: ['ver'],
+    viajes: ['ver', 'crear', 'editar'],
+    caja_menor: ['ver'],
+    movimientos: ['ver', 'crear', 'editar'],
   },
 
   cliente: {

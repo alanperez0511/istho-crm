@@ -11,7 +11,9 @@ module.exports = {
   ROLES: {
     ADMIN: 'admin',
     SUPERVISOR: 'supervisor',
+    FINANCIERA: 'financiera',
     OPERADOR: 'operador',
+    CONDUCTOR: 'conductor',
     CLIENTE: 'cliente'
   },
   

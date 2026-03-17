@@ -360,6 +360,20 @@ module.exports = (sequelize) => {
   Usuario.prototype.esAdmin = function() {
     return this.rol === 'admin';
   };
+
+  /**
+   * Verificar si es conductor
+   */
+  Usuario.prototype.esConductor = function() {
+    return this.rol === 'conductor';
+  };
+
+  /**
+   * Verificar si es financiera
+   */
+  Usuario.prototype.esFinanciera = function() {
+    return this.rol === 'financiera';
+  };
   
   /**
    * Verificar si tiene un permiso específico

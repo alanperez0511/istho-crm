@@ -20,6 +20,10 @@ const wmsSyncRoutes = require('./wmsSync.routes');
 const plantillaEmailRoutes = require('./plantillaEmail.routes');
 const adminRoutes = require('./admin.routes');
 const auditoriaAccionesRoutes = require('./auditoriaAcciones.routes');
+const vehiculoRoutes = require('./vehiculo.routes');
+const cajaMenorRoutes = require('./cajaMenor.routes');
+const viajeRoutes = require('./viaje.routes');
+const movimientoCajaMenorRoutes = require('./movimientoCajaMenor.routes');
 
 // Info de la API
 router.get('/', (req, res) => {
@@ -35,7 +39,11 @@ router.get('/', (req, res) => {
       auditorias: '/auditorias - Auditorías WMS (entradas y salidas)',
       reportes: '/reportes - Reportes y exportación',
       notificaciones: '/notificaciones - Notificaciones',
-      wms: '/wms/sync - Sincronización con WMS Copérnico'
+      wms: '/wms/sync - Sincronización con WMS Copérnico',
+      vehiculos: '/vehiculos - Gestión de vehículos',
+      cajaMenor: '/cajas-menores - Gestión de cajas menores',
+      viajes: '/viajes - Registro de viajes',
+      movimientos: '/movimientos-caja-menor - Gastos e ingresos'
     }
   });
 });
@@ -52,5 +60,9 @@ router.use('/wms/sync', wmsSyncRoutes);
 router.use('/plantillas-email', plantillaEmailRoutes);
 router.use('/admin', adminRoutes);
 router.use('/auditoria-acciones', auditoriaAccionesRoutes);
+router.use('/vehiculos', vehiculoRoutes);
+router.use('/cajas-menores', cajaMenorRoutes);
+router.use('/viajes', viajeRoutes);
+router.use('/movimientos-caja-menor', movimientoCajaMenorRoutes);
 
 module.exports = router;

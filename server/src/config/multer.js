@@ -24,6 +24,7 @@ const UPLOAD_DIRS = {
   averias: path.join(__dirname, '../../uploads/averias'),
   cumplidos: path.join(__dirname, '../../uploads/cumplidos'),
   logos: path.join(__dirname, '../../uploads/logos'),
+  soportes: path.join(__dirname, '../../uploads/soportes'),
   temp: path.join(__dirname, '../../uploads/temp')
 };
 
@@ -167,10 +168,36 @@ const uploadAvatar = multer({
   }
 });
 
+/**
+ * Configuración de almacenamiento para soportes de gastos (caja menor)
+ */
+const storageSoportes = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOAD_DIRS.soportes);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const filename = `soporte_${Date.now()}_${uuidv4()}${ext}`;
+    cb(null, filename);
+  }
+});
+
+/**
+ * Upload para soportes de gastos (facturas, recibos, fotos)
+ */
+const uploadSoporte = multer({
+  storage: storageSoportes,
+  fileFilter: documentFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB
+  }
+});
+
 module.exports = {
   uploadAveria,
   uploadCumplido,
   uploadLogo,
   uploadAvatar,
+  uploadSoporte,
   UPLOAD_DIRS
 };

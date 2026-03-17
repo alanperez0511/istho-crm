@@ -16,7 +16,9 @@ const { ROLES } = require('../utils/constants');
  */
 const JERARQUIA_ROLES = {
   [ROLES.CLIENTE]: 10,
+  [ROLES.CONDUCTOR]: 30,
   [ROLES.OPERADOR]: 50,
+  [ROLES.FINANCIERA]: 70,
   [ROLES.SUPERVISOR]: 75,
   [ROLES.ADMIN]: 100
 };
@@ -103,6 +105,7 @@ const requierePermiso = (modulo, accion) => {
 
 const soloAdmin = requiereRol(ROLES.ADMIN);
 const supervisorOAdmin = requiereRol(ROLES.ADMIN, ROLES.SUPERVISOR);
+const financieraOAdmin = requiereRol(ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.FINANCIERA);
 
 const noClientes = (req, res, next) => {
   if (!req.user) {
@@ -122,6 +125,7 @@ module.exports = {
   requierePermiso,
   soloAdmin,
   supervisorOAdmin,
+  financieraOAdmin,
   noClientes,
   JERARQUIA_ROLES,
   getNivelUsuario
