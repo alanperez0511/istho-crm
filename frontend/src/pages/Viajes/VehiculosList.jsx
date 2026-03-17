@@ -634,11 +634,13 @@ const VehiculosList = () => {
 
       {/* MODALS */}
       <VehiculoForm
-        isOpen={formModal.isOpen}
+        open={formModal.isOpen}
         onClose={() => setFormModal({ isOpen: false, vehiculo: null })}
-        onSubmit={handleFormSubmit}
-        vehiculo={formModal.vehiculo}
-        loading={formLoading}
+        onSuccess={() => {
+          setFormModal({ isOpen: false, vehiculo: null });
+          refresh();
+        }}
+        vehiculoId={formModal.vehiculo?.id}
       />
 
       <ConfirmDialog

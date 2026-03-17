@@ -4,32 +4,17 @@
  * ============================================================================
  * Formulario modal para crear y editar cajas menores.
  * Soporta traslado de saldo desde cajas cerradas anteriores.
+ * Sigue el mismo patrón de diseño que ClienteForm y VehiculoForm.
  *
  * @author Coordinacion TI ISTHO
- * @version 1.0.0
+ * @version 2.0.0
  * @date Marzo 2026
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  MenuItem,
-  Autocomplete,
-  Button,
-  CircularProgress,
-  InputAdornment,
-  Alert,
-  Box,
-  Typography,
-  Divider,
-} from '@mui/material';
-import { Wallet, Info } from 'lucide-react';
-
+import { Wallet, User, DollarSign, FileText, ArrowLeftRight, Info } from 'lucide-react';
+import { Button, Modal } from '../../../components/common/index';
 import { cajasMenoresService, vehiculosService } from '../../../api/viajes.service';
 import useNotification from '../../../hooks/useNotification';
 
@@ -49,125 +34,118 @@ const formatMoney = (value) => {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// INPUT FIELD (mismo patrón que ClienteForm / VehiculoForm)
+// ════════════════════════════════════════════════════════════════════════════
+
+const InputField = ({ label, icon: Icon, required, error, children }) => (
+  <div className="space-y-1">
+    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+      {label}
+      {required && <span className="text-red-500 ml-1">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Icon className="h-5 w-5 text-slate-400" />
+        </div>
+      )}
+      {children}
+    </div>
+    {error && <p className="text-xs text-red-500">{error}</p>}
+  </div>
+);
+
+// ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
 const CajaMenorForm = ({ open, onClose, onSuccess, cajaId }) => {
-  // ──────────────────────────────────────────────────────────────────────────
-  // ESTADOS
-  // ──────────────────────────────────────────────────────────────────────────
+  const { success: notifySuccess, error: notifyError, apiError } = useNotification();
 
   const [formData, setFormData] = useState({
     conductor_id: '',
     saldo_inicial: '',
-    caja_anterior_id: null,
+    caja_anterior_id: '',
     observaciones: '',
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   // Datos para selects
   const [conductores, setConductores] = useState([]);
   const [cajasCerradas, setCajasCerradas] = useState([]);
-  const [cajaAnteriorSeleccionada, setCajaAnteriorSeleccionada] = useState(null);
 
   const isEditing = !!cajaId;
-  const { success, error: notifyError, apiError } = useNotification();
 
   // ──────────────────────────────────────────────────────────────────────────
   // CARGA DE DATOS
   // ──────────────────────────────────────────────────────────────────────────
 
-  const fetchConductores = useCallback(async () => {
-    try {
-      const response = await vehiculosService.getConductores();
-      if (response.success || response.data) {
-        setConductores(response.data || []);
-      }
-    } catch (err) {
-      console.error('Error cargando conductores:', err);
-      notifyError('No se pudieron cargar los conductores');
-    }
-  }, [notifyError]);
-
-  const fetchCajasCerradas = useCallback(async () => {
-    try {
-      const response = await cajasMenoresService.getAll({ estado: 'cerrada' });
-      if (response.success || response.data) {
-        setCajasCerradas(response.data || []);
-      }
-    } catch (err) {
-      console.error('Error cargando cajas cerradas:', err);
-    }
-  }, []);
-
-  const fetchCajaExistente = useCallback(async (id) => {
-    setLoading(true);
-    try {
-      const response = await cajasMenoresService.getById(id);
-      if (response.success || response.data) {
-        const caja = response.data;
-        setFormData({
-          conductor_id: caja.conductor_id || '',
-          saldo_inicial: caja.saldo_inicial || '',
-          caja_anterior_id: caja.caja_anterior_id || null,
-          observaciones: caja.observaciones || '',
-        });
-
-        // Si tiene caja anterior, buscarla en las cerradas
-        if (caja.caja_anterior_id) {
-          const cajaAnterior = cajasCerradas.find(
-            (c) => c.id === caja.caja_anterior_id
-          );
-          setCajaAnteriorSeleccionada(cajaAnterior || null);
-        }
-      }
-    } catch (err) {
-      console.error('Error cargando caja menor:', err);
-      apiError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiError, cajasCerradas]);
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // EFECTOS
-  // ──────────────────────────────────────────────────────────────────────────
-
   useEffect(() => {
-    if (open) {
-      setLoadingData(true);
-      setErrors({});
+    if (!open) return;
 
-      Promise.all([fetchConductores(), fetchCajasCerradas()]).finally(() => {
-        setLoadingData(false);
-      });
+    setErrors({});
+    setLoadingData(true);
 
-      // Reset si es creacion
-      if (!cajaId) {
+    const fetchData = async () => {
+      try {
+        const [conductoresRes, cajasRes] = await Promise.all([
+          vehiculosService.getConductores(),
+          cajasMenoresService.getAll({ estado: 'cerrada' }),
+        ]);
+
+        if (conductoresRes.success || conductoresRes.data) {
+          setConductores(conductoresRes.data || []);
+        }
+        if (cajasRes.success || cajasRes.data) {
+          setCajasCerradas(cajasRes.data || []);
+        }
+      } catch (err) {
+        console.error('Error cargando datos:', err);
+        notifyError('No se pudieron cargar los datos del formulario');
+      }
+
+      // Cargar caja existente en modo edición
+      if (cajaId) {
+        try {
+          const response = await cajasMenoresService.getById(cajaId);
+          if (response.success || response.data) {
+            const caja = response.data;
+            setFormData({
+              conductor_id: caja.conductor_id || '',
+              saldo_inicial: caja.saldo_inicial || '',
+              caja_anterior_id: caja.caja_anterior_id || '',
+              observaciones: caja.observaciones || '',
+            });
+          }
+        } catch (err) {
+          console.error('Error cargando caja menor:', err);
+          apiError(err);
+        }
+      } else {
         setFormData({
           conductor_id: '',
           saldo_inicial: '',
-          caja_anterior_id: null,
+          caja_anterior_id: '',
           observaciones: '',
         });
-        setCajaAnteriorSeleccionada(null);
       }
-    }
-  }, [open, cajaId, fetchConductores, fetchCajasCerradas]);
 
-  // Cargar datos de caja existente en modo edicion
-  useEffect(() => {
-    if (open && cajaId && !loadingData) {
-      fetchCajaExistente(cajaId);
-    }
-  }, [open, cajaId, loadingData, fetchCajaExistente]);
+      setLoadingData(false);
+    };
+
+    fetchData();
+  }, [open, cajaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ──────────────────────────────────────────────────────────────────────────
   // CALCULOS
   // ──────────────────────────────────────────────────────────────────────────
+
+  const cajaAnteriorSeleccionada = useMemo(() => {
+    if (!formData.caja_anterior_id) return null;
+    return cajasCerradas.find((c) => c.id === Number(formData.caja_anterior_id)) || null;
+  }, [formData.caja_anterior_id, cajasCerradas]);
 
   const saldoTrasladado = useMemo(() => {
     if (!cajaAnteriorSeleccionada) return 0;
@@ -188,11 +166,6 @@ const CajaMenorForm = ({ open, onClose, onSuccess, cajaId }) => {
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: null }));
     }
-  };
-
-  const handleCajaAnteriorChange = (_event, newValue) => {
-    setCajaAnteriorSeleccionada(newValue);
-    handleChange('caja_anterior_id', newValue?.id || null);
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -225,7 +198,7 @@ const CajaMenorForm = ({ open, onClose, onSuccess, cajaId }) => {
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    setSubmitting(true);
+    setLoading(true);
     try {
       const payload = isEditing
         ? {
@@ -235,7 +208,7 @@ const CajaMenorForm = ({ open, onClose, onSuccess, cajaId }) => {
         : {
             conductor_id: formData.conductor_id,
             saldo_inicial: parseFloat(formData.saldo_inicial) || 0,
-            caja_anterior_id: formData.caja_anterior_id || null,
+            caja_anterior_id: formData.caja_anterior_id ? Number(formData.caja_anterior_id) : null,
             observaciones: formData.observaciones || null,
           };
 
@@ -247,7 +220,7 @@ const CajaMenorForm = ({ open, onClose, onSuccess, cajaId }) => {
       }
 
       if (response.success !== false) {
-        success(
+        notifySuccess(
           isEditing
             ? 'Caja menor actualizada correctamente'
             : 'Caja menor creada correctamente'
@@ -259,207 +232,185 @@ const CajaMenorForm = ({ open, onClose, onSuccess, cajaId }) => {
       console.error('Error guardando caja menor:', err);
       apiError(err);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // CLASES COMPARTIDAS
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const baseInputClasses = (hasIcon, hasError) => `
+    w-full px-4 py-2.5
+    bg-white dark:bg-slate-800 border rounded-xl
+    text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500
+    focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500
+    transition-all duration-200
+    ${hasError ? 'border-red-300' : 'border-slate-200 dark:border-slate-600'}
+    ${hasIcon ? 'pl-10' : ''}
+  `;
 
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
 
-  const isLoading = loading || loadingData;
-
   return (
-    <Dialog
-      open={open}
+    <Modal
+      isOpen={open}
       onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: { borderRadius: '16px' },
-      }}
+      title={isEditing ? 'Editar Caja Menor' : 'Nueva Caja Menor'}
+      subtitle={isEditing ? 'Modifique los datos de la caja menor' : 'Complete la información para crear una caja menor'}
+      size="lg"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={handleSubmit} loading={loading} disabled={loadingData}>
+            {isEditing ? 'Guardar Cambios' : 'Crear Caja Menor'}
+          </Button>
+        </>
+      }
     >
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Wallet size={22} />
-        <span>{isEditing ? 'Editar Caja Menor' : 'Nueva Caja Menor'}</span>
-      </DialogTitle>
-
-      <Divider />
-
-      <DialogContent sx={{ pt: 3 }}>
-        {isLoading ? (
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              py: 6,
-            }}
+      {loadingData ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          <span className="ml-3 text-sm text-slate-500 dark:text-slate-400">Cargando datos...</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Conductor */}
+          <InputField
+            label="Conductor"
+            icon={User}
+            required
+            error={errors.conductor_id}
           >
-            <CircularProgress size={40} />
-            <Typography sx={{ ml: 2, color: 'text.secondary' }}>
-              Cargando datos...
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            {/* Conductor */}
-            <TextField
-              select
-              label="Conductor"
+            <select
+              name="conductor_id"
               value={formData.conductor_id}
               onChange={(e) => handleChange('conductor_id', e.target.value)}
-              error={!!errors.conductor_id}
-              helperText={errors.conductor_id}
-              required
-              fullWidth
-              disabled={isLoading}
+              className={baseInputClasses(true, errors.conductor_id)}
+              disabled={loadingData}
             >
-              <MenuItem value="" disabled>
-                Seleccionar conductor...
-              </MenuItem>
+              <option value="">Seleccionar conductor...</option>
               {conductores.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.nombre} {c.apellido ? `${c.apellido}` : ''}{' '}
+                <option key={c.id} value={c.id}>
+                  {c.nombre} {c.apellido ? c.apellido : ''}{' '}
                   {c.cedula ? `- CC ${c.cedula}` : ''}
-                </MenuItem>
+                </option>
               ))}
-            </TextField>
+            </select>
+          </InputField>
 
-            {/* Saldo Inicial */}
-            <TextField
-              label="Saldo Inicial"
+          {/* Saldo Inicial */}
+          <InputField
+            label="Saldo Inicial"
+            icon={DollarSign}
+            required
+            error={errors.saldo_inicial}
+          >
+            <input
               type="number"
+              name="saldo_inicial"
               value={formData.saldo_inicial}
               onChange={(e) => handleChange('saldo_inicial', e.target.value)}
-              error={!!errors.saldo_inicial}
-              helperText={
-                errors.saldo_inicial ||
-                (formData.saldo_inicial
-                  ? formatMoney(formData.saldo_inicial)
-                  : '')
-              }
-              required
-              fullWidth
-              disabled={isEditing || isLoading}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">$</InputAdornment>
-                ),
-              }}
-              inputProps={{ min: 0, step: 1000 }}
+              placeholder="$0"
+              min={0}
+              step={1000}
+              disabled={isEditing || loadingData}
+              className={`${baseInputClasses(true, errors.saldo_inicial)} ${isEditing ? 'opacity-60 cursor-not-allowed' : ''}`}
             />
-
-            {/* Caja Anterior (traslado de saldo) */}
-            {!isEditing && (
-              <Autocomplete
-                options={cajasCerradas}
-                value={cajaAnteriorSeleccionada}
-                onChange={handleCajaAnteriorChange}
-                getOptionLabel={(option) =>
-                  option
-                    ? `Caja #${option.id} - ${option.conductor_nombre || 'Sin conductor'} - ${formatMoney(option.saldo_actual)}`
-                    : ''
-                }
-                isOptionEqualToValue={(option, value) =>
-                  option?.id === value?.id
-                }
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Caja Anterior (Traslado de saldo)"
-                    placeholder="Buscar caja cerrada..."
-                    helperText="Opcional. Seleccione una caja cerrada para trasladar su saldo."
-                  />
-                )}
-                noOptionsText="No hay cajas cerradas disponibles"
-                disabled={isLoading}
-                fullWidth
-              />
+            {formData.saldo_inicial && !errors.saldo_inicial && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {formatMoney(formData.saldo_inicial)}
+              </p>
             )}
+          </InputField>
 
-            {/* Saldo a Trasladar (info) */}
-            {cajaAnteriorSeleccionada && !isEditing && (
-              <Alert
-                severity="info"
-                icon={<Info size={20} />}
-                sx={{ borderRadius: '12px' }}
+          {/* Caja Anterior (traslado de saldo) - solo en creación */}
+          {!isEditing && (
+            <InputField
+              label="Caja Anterior (Traslado de saldo)"
+              icon={ArrowLeftRight}
+              error={null}
+            >
+              <select
+                name="caja_anterior_id"
+                value={formData.caja_anterior_id}
+                onChange={(e) => handleChange('caja_anterior_id', e.target.value)}
+                className={baseInputClasses(true, false)}
+                disabled={loadingData}
               >
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  Saldo a trasladar:{' '}
-                  <strong>{formatMoney(saldoTrasladado)}</strong>
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{ mt: 0.5, color: 'text.secondary' }}
-                >
+                <option value="">Sin traslado (opcional)</option>
+                {cajasCerradas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    Caja #{c.id} - {c.conductor_nombre || 'Sin conductor'} - {formatMoney(c.saldo_actual)}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Opcional. Seleccione una caja cerrada para trasladar su saldo.
+              </p>
+            </InputField>
+          )}
+
+          {/* Observaciones - ocupa 2 columnas */}
+          <div className="md:col-span-2">
+            <InputField
+              label="Observaciones"
+              icon={FileText}
+              error={null}
+            >
+              <textarea
+                name="observaciones"
+                value={formData.observaciones}
+                onChange={(e) => handleChange('observaciones', e.target.value)}
+                placeholder="Notas adicionales sobre la caja menor..."
+                rows={3}
+                disabled={loadingData}
+                className={baseInputClasses(true, false)}
+              />
+            </InputField>
+          </div>
+
+          {/* Info box: Saldo a trasladar */}
+          {cajaAnteriorSeleccionada && !isEditing && (
+            <div className="md:col-span-2 flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+              <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                  Saldo a trasladar: <strong>{formatMoney(saldoTrasladado)}</strong>
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
                   De la caja #{cajaAnteriorSeleccionada.id}
                   {cajaAnteriorSeleccionada.conductor_nombre
                     ? ` (${cajaAnteriorSeleccionada.conductor_nombre})`
                     : ''}
-                </Typography>
-              </Alert>
-            )}
+                </p>
+              </div>
+            </div>
+          )}
 
-            {/* Saldo Total Calculado */}
-            {!isEditing && (parseFloat(formData.saldo_inicial) > 0 || saldoTrasladado > 0) && (
-              <Alert
-                severity="success"
-                sx={{ borderRadius: '12px' }}
-              >
-                <Typography variant="body2">
-                  <strong>Saldo total de la caja:</strong>{' '}
-                  {formatMoney(saldoTotal)}
-                </Typography>
+          {/* Info box: Saldo total calculado */}
+          {!isEditing && (parseFloat(formData.saldo_inicial) > 0 || saldoTrasladado > 0) && (
+            <div className="md:col-span-2 flex items-start gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl">
+              <Wallet className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                  <strong>Saldo total de la caja:</strong> {formatMoney(saldoTotal)}
+                </p>
                 {saldoTrasladado > 0 && (
-                  <Typography
-                    variant="caption"
-                    sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}
-                  >
-                    ({formatMoney(formData.saldo_inicial || 0)} inicial +{' '}
-                    {formatMoney(saldoTrasladado)} trasladado)
-                  </Typography>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    ({formatMoney(formData.saldo_inicial || 0)} inicial + {formatMoney(saldoTrasladado)} trasladado)
+                  </p>
                 )}
-              </Alert>
-            )}
-
-            {/* Observaciones */}
-            <TextField
-              label="Observaciones"
-              value={formData.observaciones}
-              onChange={(e) => handleChange('observaciones', e.target.value)}
-              multiline
-              rows={3}
-              fullWidth
-              disabled={isLoading}
-              placeholder="Notas adicionales sobre la caja menor..."
-            />
-          </Box>
-        )}
-      </DialogContent>
-
-      <Divider />
-
-      <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
-        <Button onClick={onClose} disabled={submitting} color="inherit">
-          Cancelar
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          disabled={submitting || isLoading}
-          startIcon={
-            submitting ? <CircularProgress size={18} color="inherit" /> : null
-          }
-        >
-          {submitting
-            ? 'Guardando...'
-            : isEditing
-              ? 'Guardar Cambios'
-              : 'Crear Caja Menor'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 };
 

@@ -904,11 +904,13 @@ const MovimientosList = () => {
 
       {/* MODALS */}
       <MovimientoForm
-        isOpen={formModal.isOpen}
+        open={formModal.isOpen}
         onClose={() => setFormModal({ isOpen: false, movimiento: null })}
-        onSubmit={handleFormSubmit}
-        movimiento={formModal.movimiento}
-        loading={formLoading}
+        onSuccess={() => {
+          setFormModal({ isOpen: false, movimiento: null });
+          refresh();
+        }}
+        movimientoId={formModal.movimiento?.id}
       />
 
       <ConfirmDialog

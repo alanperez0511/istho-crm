@@ -692,11 +692,13 @@ const CajaMenorList = () => {
 
       {/* MODALS */}
       <CajaMenorForm
-        isOpen={formModal.isOpen}
+        open={formModal.isOpen}
         onClose={() => setFormModal({ isOpen: false, caja: null })}
-        onSubmit={handleFormSubmit}
-        caja={formModal.caja}
-        loading={formLoading}
+        onSuccess={() => {
+          setFormModal({ isOpen: false, caja: null });
+          refresh();
+        }}
+        cajaId={formModal.caja?.id}
       />
 
       <ConfirmDialog

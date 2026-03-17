@@ -3,34 +3,22 @@
  * ISTHO CRM - MovimientoForm Component
  * ============================================================================
  * Formulario modal para crear y editar movimientos de caja menor.
+ * Sigue el mismo patrón de diseño que VehiculoForm / ClienteForm.
  *
  * @author Coordinacion TI ISTHO
- * @version 1.0.0
+ * @version 2.0.0
  * @date Marzo 2026
  */
 
 import { useState, useEffect, useRef } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Select,
-  Grid,
-  CircularProgress,
-  InputAdornment,
-} from '@mui/material';
-import { Button } from '../../../components/common';
+import { Receipt, Wallet, MapPin, DollarSign, FileText, Upload, ArrowUpDown } from 'lucide-react';
+import { Button, Modal } from '../../../components/common/index';
 import { movimientosService, cajasMenoresService, viajesService } from '../../../api/viajes.service';
 import useNotification from '../../../hooks/useNotification';
 import { useAuth } from '../../../context/AuthContext';
 
 // ════════════════════════════════════════════════════════════════════════════
-// OPCIONES ESTATICAS
+// OPCIONES ESTÁTICAS
 // ════════════════════════════════════════════════════════════════════════════
 
 const TIPOS_MOVIMIENTO = [
@@ -42,8 +30,8 @@ const CONCEPTOS_EGRESO = [
   { value: 'cuadre_de_caja', label: 'Cuadre de Caja' },
   { value: 'descargues', label: 'Descargues' },
   { value: 'acpm', label: 'ACPM' },
-  { value: 'administracion', label: 'Administracion' },
-  { value: 'alimentacion', label: 'Alimentacion' },
+  { value: 'administracion', label: 'Administración' },
+  { value: 'alimentacion', label: 'Alimentación' },
   { value: 'comisiones', label: 'Comisiones' },
   { value: 'desencarpe', label: 'Desencarpe' },
   { value: 'encarpe', label: 'Encarpe' },
@@ -51,7 +39,7 @@ const CONCEPTOS_EGRESO = [
   { value: 'otros', label: 'Otros' },
   { value: 'seguros', label: 'Seguros' },
   { value: 'repuestos', label: 'Repuestos' },
-  { value: 'tecnomecanica', label: 'Tecnomecanica' },
+  { value: 'tecnicomecanica', label: 'Tecnomecánica' },
   { value: 'peajes', label: 'Peajes' },
   { value: 'ligas', label: 'Ligas' },
   { value: 'parqueadero', label: 'Parqueadero' },
@@ -78,6 +66,28 @@ const INITIAL_FORM = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// INPUT FIELD (mismo patrón que VehiculoForm / ClienteForm)
+// ════════════════════════════════════════════════════════════════════════════
+
+const InputField = ({ label, icon: Icon, required, children, error }) => (
+  <div className="space-y-1">
+    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+      {label}
+      {required && <span className="text-red-500 ml-1">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Icon className="h-5 w-5 text-slate-400" />
+        </div>
+      )}
+      {children}
+    </div>
+    {error && <p className="text-xs text-red-500">{error}</p>}
+  </div>
+);
+
+// ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -95,6 +105,7 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
   const [soporte, setSoporte] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const [activeTab, setActiveTab] = useState('datos');
   const fileInputRef = useRef(null);
 
   const isEditing = !!movimientoId;
@@ -106,6 +117,16 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
       ? CONCEPTOS_EGRESO
       : [];
 
+  const inputClasses = (hasIcon = false, hasError = false) => `
+    w-full px-4 py-2.5
+    bg-white dark:bg-slate-800 border rounded-xl
+    text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500
+    focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500
+    transition-all duration-200
+    ${hasError ? 'border-red-300' : 'border-slate-200 dark:border-slate-600'}
+    ${hasIcon ? 'pl-10' : ''}
+  `;
+
   // ──────────────────────────────────────────────────────────────────────────
   // EFECTOS
   // ──────────────────────────────────────────────────────────────────────────
@@ -113,6 +134,8 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
   // Cargar cajas menores al abrir
   useEffect(() => {
     if (!open) return;
+
+    setActiveTab('datos');
 
     const fetchCajas = async () => {
       try {
@@ -151,7 +174,7 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
     fetchViajes();
   }, [formData.caja_menor_id]);
 
-  // Cargar datos del movimiento en modo edicion o resetear
+  // Cargar datos del movimiento en modo edición o resetear
   useEffect(() => {
     if (!open) {
       setFormData(INITIAL_FORM);
@@ -177,7 +200,7 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
               descripcion: m.descripcion || '',
             });
           } else {
-            error('No se pudo cargar la informacion del movimiento');
+            error('No se pudo cargar la información del movimiento');
             onClose();
           }
         } catch (err) {
@@ -191,7 +214,6 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
 
       fetchMovimiento();
     } else {
-      // Modo creacion: aplicar defaults
       setFormData({
         ...INITIAL_FORM,
         caja_menor_id: defaultCajaId || '',
@@ -242,15 +264,12 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
   };
 
   const handleValorChange = (e) => {
-    // Solo permitir numeros y punto decimal
     const raw = e.target.value.replace(/[^0-9.]/g, '');
     setFormData((prev) => ({ ...prev, valor: raw }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Validaciones basicas
+  const handleSubmit = async () => {
+    // Validaciones básicas
     if (!formData.caja_menor_id) {
       error('Debe seleccionar una caja menor');
       return;
@@ -264,7 +283,7 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
       return;
     }
     if (!formData.valor || parseFloat(formData.valor) <= 0) {
-      error('Debe ingresar un valor valido');
+      error('Debe ingresar un valor válido');
       return;
     }
 
@@ -309,178 +328,228 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
 
+  const tabs = [
+    { id: 'datos', label: 'Datos del Movimiento' },
+    { id: 'soporte', label: 'Soporte y Descripción' },
+  ];
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <form onSubmit={handleSubmit}>
-        <DialogTitle>
-          {isEditing ? 'Editar Movimiento' : 'Nuevo Movimiento'}
-        </DialogTitle>
-
-        <DialogContent dividers>
-          {loadingData ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
-              <CircularProgress />
-            </div>
-          ) : (
-            <Grid container spacing={2} sx={{ mt: 0.5 }}>
-              {/* Caja Menor */}
-              <Grid size={{ xs: 12, md: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Caja Menor</InputLabel>
-                  <Select
-                    name="caja_menor_id"
-                    value={formData.caja_menor_id}
-                    onChange={handleChange}
-                    label="Caja Menor"
-                  >
-                    {cajas.map((caja) => (
-                      <MenuItem key={caja.id} value={caja.id}>
-                        {caja.numero || `Caja #${caja.id}`}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              {/* Viaje (Opcional) */}
-              <Grid size={{ xs: 12, md: 6 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Viaje (Opcional)</InputLabel>
-                  <Select
-                    name="viaje_id"
-                    value={formData.viaje_id}
-                    onChange={handleChange}
-                    label="Viaje (Opcional)"
-                    disabled={!formData.caja_menor_id}
-                  >
-                    <MenuItem value="">
-                      <em>Sin viaje asociado</em>
-                    </MenuItem>
-                    {viajes.map((viaje) => (
-                      <MenuItem key={viaje.id} value={viaje.id}>
-                        {viaje.numero || `Viaje #${viaje.id}`}{viaje.destino ? ` - ${viaje.destino}` : ''}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              {/* Tipo de Movimiento */}
-              <Grid size={{ xs: 12, md: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Tipo de Movimiento</InputLabel>
-                  <Select
-                    name="tipo_movimiento"
-                    value={formData.tipo_movimiento}
-                    onChange={handleChange}
-                    label="Tipo de Movimiento"
-                  >
-                    {TIPOS_MOVIMIENTO.map((tipo) => (
-                      <MenuItem key={tipo.value} value={tipo.value}>
-                        {tipo.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              {/* Concepto */}
-              <Grid size={{ xs: 12, md: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Concepto</InputLabel>
-                  <Select
-                    name="concepto"
-                    value={formData.concepto}
-                    onChange={handleChange}
-                    label="Concepto"
-                    disabled={!formData.tipo_movimiento}
-                  >
-                    {conceptosDisponibles.map((c) => (
-                      <MenuItem key={c.value} value={c.value}>
-                        {c.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              {/* Concepto Otro (solo si concepto === 'otros') */}
-              {formData.concepto === 'otros' && (
-                <Grid size={{ xs: 12, md: 6 }}>
-                  <TextField
-                    label="Especifique el Concepto"
-                    name="concepto_otro"
-                    value={formData.concepto_otro}
-                    onChange={handleChange}
-                    fullWidth
-                    required
-                  />
-                </Grid>
-              )}
-
-              {/* Valor */}
-              <Grid size={{ xs: 12, md: 6 }}>
-                <TextField
-                  label="Valor"
-                  name="valor"
-                  value={formData.valor}
-                  onChange={handleValorChange}
-                  required
-                  fullWidth
-                  placeholder="0"
-                  slotProps={{
-                    input: {
-                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                    },
-                  }}
-                  helperText={formData.valor ? `$ ${formatMoney(formData.valor)}` : ''}
-                />
-              </Grid>
-
-              {/* Soporte (archivo) */}
-              <Grid size={{ xs: 12, md: 6 }}>
-                <TextField
-                  label="Soporte"
-                  type="file"
-                  onChange={handleFileChange}
-                  fullWidth
-                  slotProps={{
-                    inputLabel: { shrink: true },
-                    htmlInput: {
-                      accept: '.pdf,.jpg,.jpeg,.png',
-                      ref: fileInputRef,
-                    },
-                  }}
-                  helperText="PDF, JPG o PNG"
-                />
-              </Grid>
-
-              {/* Descripcion */}
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  label="Descripcion"
-                  name="descripcion"
-                  value={formData.descripcion}
-                  onChange={handleChange}
-                  fullWidth
-                  multiline
-                  rows={3}
-                />
-              </Grid>
-            </Grid>
-          )}
-        </DialogContent>
-
-        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      title={isEditing ? 'Editar Movimiento' : 'Nuevo Movimiento'}
+      subtitle={isEditing ? 'Editando movimiento existente' : 'Complete la información del movimiento'}
+      size="lg"
+      footer={
+        <>
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
-          <Button variant="primary" type="submit" loading={loading} disabled={loadingData}>
+          <Button variant="primary" onClick={handleSubmit} loading={loading} disabled={loadingData}>
             {isEditing ? 'Guardar Cambios' : 'Registrar Movimiento'}
           </Button>
-        </DialogActions>
-      </form>
-    </Dialog>
+        </>
+      }
+    >
+      {loadingData ? (
+        <div className="flex justify-center py-12">
+          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          {/* Tabs */}
+          <div className="border-b border-gray-100 dark:border-slate-700 mb-6">
+            <nav className="flex gap-4">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    pb-3 px-1 text-sm font-medium transition-colors relative
+                    ${activeTab === tab.id
+                      ? 'text-orange-600'
+                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                    }
+                  `}
+                >
+                  {tab.label}
+                  {activeTab === tab.id && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
+                  )}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Tab 1: Datos del Movimiento */}
+          {activeTab === 'datos' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Caja Menor */}
+              <InputField label="Caja Menor" icon={Wallet} required>
+                <select
+                  name="caja_menor_id"
+                  value={formData.caja_menor_id}
+                  onChange={handleChange}
+                  className={inputClasses(true)}
+                >
+                  <option value="">Seleccionar...</option>
+                  {cajas.map((caja) => (
+                    <option key={caja.id} value={caja.id}>
+                      {caja.numero || `Caja #${caja.id}`}
+                    </option>
+                  ))}
+                </select>
+              </InputField>
+
+              {/* Viaje (Opcional) */}
+              <InputField label="Viaje (Opcional)" icon={MapPin}>
+                <select
+                  name="viaje_id"
+                  value={formData.viaje_id}
+                  onChange={handleChange}
+                  disabled={!formData.caja_menor_id}
+                  className={inputClasses(true)}
+                >
+                  <option value="">Sin viaje asociado</option>
+                  {viajes.map((viaje) => (
+                    <option key={viaje.id} value={viaje.id}>
+                      {viaje.numero || `Viaje #${viaje.id}`}{viaje.destino ? ` - ${viaje.destino}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </InputField>
+
+              {/* Tipo de Movimiento */}
+              <InputField label="Tipo de Movimiento" icon={ArrowUpDown} required>
+                <select
+                  name="tipo_movimiento"
+                  value={formData.tipo_movimiento}
+                  onChange={handleChange}
+                  className={inputClasses(true)}
+                >
+                  <option value="">Seleccionar...</option>
+                  {TIPOS_MOVIMIENTO.map((tipo) => (
+                    <option key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </option>
+                  ))}
+                </select>
+              </InputField>
+
+              {/* Concepto */}
+              <InputField label="Concepto" icon={Receipt} required>
+                <select
+                  name="concepto"
+                  value={formData.concepto}
+                  onChange={handleChange}
+                  disabled={!formData.tipo_movimiento}
+                  className={inputClasses(true)}
+                >
+                  <option value="">Seleccionar...</option>
+                  {conceptosDisponibles.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </InputField>
+
+              {/* Concepto Otro (solo si concepto === 'otros') */}
+              {formData.concepto === 'otros' && (
+                <InputField label="Especifique el Concepto" icon={FileText} required>
+                  <input
+                    type="text"
+                    name="concepto_otro"
+                    value={formData.concepto_otro}
+                    onChange={handleChange}
+                    placeholder="Describa el concepto..."
+                    className={inputClasses(true)}
+                  />
+                </InputField>
+              )}
+
+              {/* Valor */}
+              <InputField label="Valor" icon={DollarSign} required>
+                <input
+                  type="text"
+                  name="valor"
+                  value={formData.valor}
+                  onChange={handleValorChange}
+                  placeholder="0"
+                  className={inputClasses(true)}
+                />
+                {formData.valor && (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    $ {formatMoney(formData.valor)}
+                  </p>
+                )}
+              </InputField>
+            </div>
+          )}
+
+          {/* Tab 2: Soporte y Descripción */}
+          {activeTab === 'soporte' && (
+            <div className="grid grid-cols-1 gap-4">
+              {/* Descripción */}
+              <InputField label="Descripción" icon={FileText}>
+                <textarea
+                  name="descripcion"
+                  value={formData.descripcion}
+                  onChange={handleChange}
+                  placeholder="Notas adicionales sobre el movimiento..."
+                  rows={4}
+                  className={inputClasses(true)}
+                />
+              </InputField>
+
+              {/* Soporte (archivo) */}
+              <InputField label="Soporte" icon={Upload}>
+                <label
+                  className={`
+                    flex items-center gap-3 cursor-pointer
+                    w-full px-4 py-3 pl-10
+                    bg-white dark:bg-slate-800 border border-dashed rounded-xl
+                    text-sm text-slate-500 dark:text-slate-400
+                    border-slate-200 dark:border-slate-600
+                    hover:border-orange-400 hover:bg-orange-50 dark:hover:bg-slate-700
+                    transition-all duration-200
+                  `}
+                >
+                  <span className="truncate">
+                    {soporte ? soporte.name : 'Seleccionar archivo (PDF, JPG o PNG)'}
+                  </span>
+                  <input
+                    type="file"
+                    onChange={handleFileChange}
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    ref={fileInputRef}
+                    className="hidden"
+                  />
+                </label>
+                {soporte && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {(soporte.size / 1024).toFixed(1)} KB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSoporte(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className="text-xs text-red-500 hover:text-red-600 transition-colors"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                )}
+              </InputField>
+            </div>
+          )}
+        </>
+      )}
+    </Modal>
   );
 };
 

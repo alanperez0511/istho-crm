@@ -19,11 +19,6 @@ import {
   Tabs,
   Tab,
   Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
 } from '@mui/material';
 import {
   ArrowLeft,
@@ -37,7 +32,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 
-import { Button, StatusChip, ConfirmDialog } from '../../components/common';
+import { Button, Modal, StatusChip, ConfirmDialog } from '../../components/common';
 import { cajasMenoresService } from '../../api/viajes.service';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
@@ -533,49 +528,50 @@ const CajaMenorDetail = () => {
       {/* CERRAR CAJA DIALOG                                              */}
       {/* ══════════════════════════════════════════════════════════════════ */}
 
-      <Dialog
-        open={cerrarDialogOpen}
+      <Modal
+        isOpen={cerrarDialogOpen}
         onClose={() => setCerrarDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
+        title="Cerrar Caja Menor"
+        subtitle={`Caja ${caja?.numero || ''}`}
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setCerrarDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="danger" icon={Lock} onClick={handleCerrarCaja} loading={cerrarLoading}>
+              Cerrar Caja
+            </Button>
+          </>
+        }
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>Cerrar Caja Menor</DialogTitle>
-        <DialogContent>
-          <div className="space-y-4 mt-2">
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <p className="text-sm text-amber-700">
-                <strong>Importante:</strong> Al cerrar la caja menor no se podran registrar mas
-                movimientos ni viajes asociados.
-              </p>
-            </div>
+        <div className="space-y-4">
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              <strong>Importante:</strong> Al cerrar la caja menor no se podrán registrar más
+              movimientos ni viajes asociados.
+            </p>
+          </div>
 
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
-              <span className="text-sm font-medium text-slate-600">Saldo Actual</span>
-              <span className="text-xl font-bold text-slate-800">{formatCOP(saldoActual)}</span>
-            </div>
+          <div className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl flex justify-between items-center">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Saldo Actual</span>
+            <span className="text-xl font-bold text-slate-800 dark:text-white">{formatCOP(saldoActual)}</span>
+          </div>
 
-            <TextField
-              label="Observaciones de cierre"
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Observaciones de cierre
+            </label>
+            <textarea
               placeholder="Agregar notas sobre el cierre..."
-              multiline
               rows={3}
-              fullWidth
               value={observacionesCierre}
               onChange={(e) => setObservacionesCierre(e.target.value)}
-              variant="outlined"
-              size="small"
+              className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200"
             />
           </div>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button variant="outline" onClick={() => setCerrarDialogOpen(false)}>
-            Cancelar
-          </Button>
-          <Button variant="danger" icon={Lock} onClick={handleCerrarCaja} loading={cerrarLoading}>
-            Cerrar Caja
-          </Button>
-        </DialogActions>
-      </Dialog>
+        </div>
+      </Modal>
     </div>
   );
 };
