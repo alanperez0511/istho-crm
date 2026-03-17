@@ -450,8 +450,8 @@ const CajaMenorDetail = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Observaciones */}
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-slate-800">Observaciones</h4>
-                  <p className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200">Observaciones</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
                     {caja.observaciones || 'Sin observaciones'}
                   </p>
                 </div>
@@ -459,40 +459,46 @@ const CajaMenorDetail = () => {
                 {/* Caja anterior */}
                 {caja.caja_anterior && (
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-slate-800">Caja Anterior</h4>
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-sm">
+                    <h4 className="font-semibold text-slate-800 dark:text-slate-200">Caja Anterior</h4>
+                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Numero</span>
-                        <span className="text-slate-800 font-medium">{caja.caja_anterior.numero || '-'}</span>
+                        <span className="text-slate-500 dark:text-slate-400">Número</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-medium">{caja.caja_anterior.numero || '-'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Saldo Final</span>
-                        <span className="text-slate-800 font-medium">
+                        <span className="text-slate-500 dark:text-slate-400">Saldo Final</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-medium">
                           {formatCOP(caja.caja_anterior.saldo_actual)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Estado</span>
+                        <span className="text-slate-500 dark:text-slate-400">Estado</span>
                         <StatusChip status={caja.caja_anterior.estado} />
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Creador */}
+                {/* Registro */}
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-slate-800">Registro</h4>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-sm">
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200">Registro</h4>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Creado por</span>
-                      <span className="text-slate-800 font-medium">
-                        {caja.creador?.nombre_completo || '-'}
+                      <span className="text-slate-500 dark:text-slate-400">Creado por</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-medium">
+                        {caja.creador?.nombre_completo || caja.creador?.username || '-'}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Fecha creacion</span>
-                      <span className="text-slate-800 font-medium">
-                        {formatFecha(caja.created_at)}
+                      <span className="text-slate-500 dark:text-slate-400">Fecha de apertura</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-medium">
+                        {formatFecha(caja.fecha_apertura)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Fecha de registro</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-medium">
+                        {caja.created_at ? new Date(caja.created_at).toLocaleString('es-CO') : '-'}
                       </span>
                     </div>
                   </div>
@@ -501,18 +507,18 @@ const CajaMenorDetail = () => {
                 {/* Fecha cierre */}
                 {caja.fecha_cierre && (
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-slate-800">Cierre</h4>
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-sm">
+                    <h4 className="font-semibold text-slate-800 dark:text-slate-200">Cierre</h4>
+                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Fecha de cierre</span>
-                        <span className="text-emerald-600 font-medium">
+                        <span className="text-slate-500 dark:text-slate-400">Fecha de cierre</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                           {new Date(caja.fecha_cierre).toLocaleString('es-CO')}
                         </span>
                       </div>
                       {caja.observaciones_cierre && (
                         <div className="flex justify-between">
-                          <span className="text-slate-500">Observaciones cierre</span>
-                          <span className="text-slate-800">{caja.observaciones_cierre}</span>
+                          <span className="text-slate-500 dark:text-slate-400">Observaciones cierre</span>
+                          <span className="text-slate-800 dark:text-slate-200">{caja.observaciones_cierre}</span>
                         </div>
                       )}
                     </div>

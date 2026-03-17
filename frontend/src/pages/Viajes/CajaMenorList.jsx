@@ -2,59 +2,94 @@
  * ============================================================================
  * ISTHO CRM - CajaMenorList
  * ============================================================================
- * Lista de cajas menores conectada al backend real.
+ * Lista de cajas menores con gestión de saldos y estados.
+ * Flujo: Abierta → En Revisión → Cerrada
  *
- * @author Coordinacion TI ISTHO
- * @version 1.0.0
+ * @author Coordinación TI ISTHO
+ * @version 2.0.0
  * @date Marzo 2026
  */
 
-import { useState, useEffect } from 'react';
-import { Menu, MenuItem, IconButton, Chip } from '@mui/material';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Menu, MenuItem, IconButton } from '@mui/material';
+import { useThemeContext } from '../../context/ThemeContext';
+import { cajasMenoresService } from '../../api/viajes.service';
+import useNotification from '../../hooks/useNotification';
+import { useAuth } from '../../context/AuthContext';
+import { ProtectedAction } from '../../components/auth/PrivateRoute';
 import {
+  Wallet,
+  Search,
   Plus,
-  Filter,
   MoreVertical,
   Eye,
   Pencil,
   Trash2,
-  Wallet,
   Lock,
-  RefreshCw,
+  Clock,
+  DollarSign,
+  User,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react';
-
-// Components
-import {
-  Button,
-  SearchBar,
-  FilterDropdown,
-  StatusChip,
-  Pagination,
-  ConfirmDialog,
-} from '../../components/common';
-
-// Local Components
+import { Pagination, ConfirmDialog } from '../../components/common';
 import CajaMenorForm from './components/CajaMenorForm';
 
-// Services
-import { cajasMenoresService } from '../../api/viajes.service';
-
-// Hooks
-import useNotification from '../../hooks/useNotification';
-import { useAuth } from '../../context/AuthContext';
-import { ProtectedAction } from '../../components/auth/PrivateRoute';
-
 // ════════════════════════════════════════════════════════════════════════════
-// CONFIGURACION DE FILTROS
+// CONFIGURACIÓN DE ESTADOS
 // ════════════════════════════════════════════════════════════════════════════
 
-const FILTER_OPTIONS = {
-  estado: [
-    { value: 'abierta', label: 'Abierta' },
-    { value: 'en_revision', label: 'En Revision' },
-    { value: 'cerrada', label: 'Cerrada' },
-  ],
+const ESTADO_CONFIG = {
+  abierta: {
+    label: 'Abierta',
+    icon: CheckCircle2,
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-700',
+    border: 'border-emerald-200',
+    dot: 'bg-emerald-500',
+    darkBg: 'dark:bg-emerald-900/20',
+    darkText: 'dark:text-emerald-300',
+    darkBorder: 'dark:border-emerald-800',
+  },
+  en_revision: {
+    label: 'En Revisión',
+    icon: Clock,
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    border: 'border-amber-200',
+    dot: 'bg-amber-500',
+    darkBg: 'dark:bg-amber-900/20',
+    darkText: 'dark:text-amber-300',
+    darkBorder: 'dark:border-amber-800',
+  },
+  cerrada: {
+    label: 'Cerrada',
+    icon: Lock,
+    bg: 'bg-slate-50',
+    text: 'text-slate-700',
+    border: 'border-slate-200',
+    dot: 'bg-slate-500',
+    darkBg: 'dark:bg-slate-700/30',
+    darkText: 'dark:text-slate-300',
+    darkBorder: 'dark:border-slate-600',
+  },
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// STATUS BADGE COMPONENT
+// ════════════════════════════════════════════════════════════════════════════
+
+const StatusBadge = ({ estado }) => {
+  const config = ESTADO_CONFIG[estado] || ESTADO_CONFIG.abierta;
+  const Icon = config.icon;
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text} ${config.darkBg} ${config.darkText}`}>
+      <Icon className="w-3.5 h-3.5" />
+      {config.label}
+    </span>
+  );
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -67,106 +102,52 @@ const formatMoney = (value) => {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-// HELPER: Chip de estado
-// ════════════════════════════════════════════════════════════════════════════
-
-const EstadoChip = ({ estado }) => {
-  const config = {
-    abierta: { label: 'Abierta', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
-    en_revision: { label: 'En Revision', color: '#ca8a04', bg: '#fefce8', border: '#fef08a' },
-    cerrada: { label: 'Cerrada', color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' },
-  };
-
-  const c = config[estado] || config.cerrada;
-
-  return (
-    <Chip
-      label={c.label}
-      size="small"
-      sx={{
-        backgroundColor: c.bg,
-        color: c.color,
-        border: `1px solid ${c.border}`,
-        fontWeight: 600,
-        fontSize: '0.75rem',
-      }}
-    />
-  );
-};
-
-// ════════════════════════════════════════════════════════════════════════════
-// HELPER: Formatear fecha
-// ════════════════════════════════════════════════════════════════════════════
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-};
-
-// ════════════════════════════════════════════════════════════════════════════
-// COMPONENTE ROW ACTIONS
+// ROW ACTIONS COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
 const RowActions = ({ caja, onView, onEdit, onClose, onDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
+  const { isDark } = useThemeContext();
   const open = Boolean(anchorEl);
-
-  const handleClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleCloseMenu = () => {
-    setAnchorEl(null);
-  };
 
   return (
     <>
-      <IconButton
-        onClick={handleClick}
-        size="small"
-        className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-      >
-        <MoreVertical className="w-4 h-4" />
+      <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small">
+        <MoreVertical className="w-4 h-4 text-slate-400" />
       </IconButton>
-
       <Menu
         anchorEl={anchorEl}
         open={open}
-        onClose={handleCloseMenu}
+        onClose={() => setAnchorEl(null)}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         PaperProps={{
           elevation: 0,
           sx: {
             overflow: 'visible',
-            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))',
+            filter: isDark ? 'drop-shadow(0px 2px 8px rgba(0,0,0,0.4))' : 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))',
             mt: 0.5,
             borderRadius: '0.75rem',
-            border: '1px solid #f3f4f6',
+            border: isDark ? '1px solid #334155' : '1px solid #f3f4f6',
+            backgroundColor: isDark ? '#1e293b' : '#ffffff',
             minWidth: '160px',
             '& .MuiMenuItem-root': {
               fontSize: '0.875rem',
-              color: '#334155',
+              color: isDark ? '#e2e8f0' : '#334155',
               padding: '8px 16px',
               gap: '8px',
-              '&:hover': {
-                backgroundColor: '#f8fafc',
-              }
+              '&:hover': { backgroundColor: isDark ? '#334155' : '#f8fafc' },
             },
           },
         }}
       >
-        <MenuItem onClick={() => { onView(caja); handleCloseMenu(); }}>
+        <MenuItem onClick={() => { onView(caja); setAnchorEl(null); }}>
           <Eye className="w-4 h-4" />
           Ver detalle
         </MenuItem>
 
         <ProtectedAction module="viajes" action="editar">
-          <MenuItem onClick={() => { onEdit(caja); handleCloseMenu(); }}>
+          <MenuItem onClick={() => { onEdit(caja); setAnchorEl(null); }}>
             <Pencil className="w-4 h-4" />
             Editar
           </MenuItem>
@@ -175,8 +156,8 @@ const RowActions = ({ caja, onView, onEdit, onClose, onDelete }) => {
         {caja.estado === 'abierta' && (
           <ProtectedAction module="viajes" action="cerrar_caja">
             <MenuItem
-              onClick={() => { onClose(caja); handleCloseMenu(); }}
-              sx={{ color: '#d97706 !important', '&:hover': { backgroundColor: '#fffbeb !important' } }}
+              onClick={() => { onClose(caja); setAnchorEl(null); }}
+              sx={{ color: isDark ? '#fbbf24 !important' : '#d97706 !important', '&:hover': { backgroundColor: isDark ? '#422006 !important' : '#fffbeb !important' } }}
             >
               <Lock className="w-4 h-4" />
               Cerrar Caja
@@ -186,8 +167,8 @@ const RowActions = ({ caja, onView, onEdit, onClose, onDelete }) => {
 
         <ProtectedAction module="viajes" action="eliminar">
           <MenuItem
-            onClick={() => { onDelete(caja); handleCloseMenu(); }}
-            sx={{ color: '#dc2626 !important', '&:hover': { backgroundColor: '#fef2f2 !important' } }}
+            onClick={() => { onDelete(caja); setAnchorEl(null); }}
+            sx={{ color: isDark ? '#f87171 !important' : '#dc2626 !important', '&:hover': { backgroundColor: isDark ? '#450a0a !important' : '#fef2f2 !important' } }}
           >
             <Trash2 className="w-4 h-4" />
             Eliminar
@@ -199,83 +180,38 @@ const RowActions = ({ caja, onView, onEdit, onClose, onDelete }) => {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-// COMPONENTE STATS CARDS
+// KPI CARDS
 // ════════════════════════════════════════════════════════════════════════════
 
-const StatsCards = ({ stats }) => {
-  const cards = [
-    {
-      label: 'Abiertas',
-      value: stats.abiertas ?? 0,
-      color: 'text-green-600',
-      bg: 'bg-green-50',
-      border: 'border-green-200',
-    },
-    {
-      label: 'En Revision',
-      value: stats.en_revision ?? 0,
-      color: 'text-yellow-600',
-      bg: 'bg-yellow-50',
-      border: 'border-yellow-200',
-    },
-    {
-      label: 'Cerradas',
-      value: stats.cerradas ?? 0,
-      color: 'text-slate-600',
-      bg: 'bg-slate-50',
-      border: 'border-slate-200',
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      {cards.map((card) => (
-        <div
-          key={card.label}
-          className={`${card.bg} ${card.border} border rounded-2xl p-4 flex items-center gap-4`}
-        >
-          <div className={`w-12 h-12 rounded-xl ${card.bg} flex items-center justify-center`}>
-            <Wallet className={`w-6 h-6 ${card.color}`} />
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">{card.label}</p>
-            <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
-          </div>
-        </div>
-      ))}
+const KpiMini = ({ icon: Icon, label, value, color }) => (
+  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${color} transition-all hover:scale-[1.02]`}>
+    <div className="p-2 rounded-lg bg-white/80 dark:bg-slate-800/80">
+      <Icon className="w-5 h-5" />
     </div>
-  );
-};
+    <div>
+      <p className="text-2xl font-bold">{value}</p>
+      <p className="text-xs opacity-70">{label}</p>
+    </div>
+  </div>
+);
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
+const PAGE_SIZE = 20;
+
 const CajaMenorList = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // HOOKS
-  // ──────────────────────────────────────────────────────────────────────────
-  const { success, apiError, saved, deleted } = useNotification();
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // ESTADOS LOCALES
-  // ──────────────────────────────────────────────────────────────────────────
-  const [cajas, setCajas] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0, limit: 10 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [stats, setStats] = useState({ abiertas: 0, en_revision: 0, cerradas: 0 });
-
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    estado: searchParams.get('estado') || '',
-    conductor_id: searchParams.get('conductor_id') || '',
-  });
+  const { success, apiError, deleted } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState('todos');
+  const [loading, setLoading] = useState(true);
+  const [cajas, setCajas] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState({ abiertas: 0, en_revision: 0, cerradas: 0, total_egresos: 0 });
 
   // Modales
   const [formModal, setFormModal] = useState({ isOpen: false, caja: null });
@@ -287,83 +223,43 @@ const CajaMenorList = () => {
   // FETCH DATA
   // ──────────────────────────────────────────────────────────────────────────
 
-  const fetchCajas = async (page = 1, currentFilters = filters, query = searchTerm) => {
+  const fetchCajas = useCallback(async (page = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const params = {
-        page,
-        limit: pagination.limit,
-        ...(query && { search: query }),
-        ...(currentFilters.estado && { estado: currentFilters.estado }),
-        ...(currentFilters.conductor_id && { conductor_id: currentFilters.conductor_id }),
-      };
+      const params = { page, limit: PAGE_SIZE };
+      if (estadoFilter !== 'todos') params.estado = estadoFilter;
+      if (searchTerm) params.search = searchTerm;
+
       const response = await cajasMenoresService.getAll(params);
       setCajas(response.data || []);
       if (response.pagination) {
-        setPagination((prev) => ({
-          ...prev,
-          page: response.pagination.page || page,
-          totalPages: response.pagination.totalPages || 1,
-          total: response.pagination.total || 0,
-        }));
+        setPagination(response.pagination);
       }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error al cargar las cajas menores');
+    } catch {
+      setCajas([]);
+      setError('No se pudo conectar con el servidor. Verifique que el servicio esté activo e intente nuevamente.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [estadoFilter, searchTerm]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await cajasMenoresService.getStats();
       setStats(response.data || response);
     } catch (err) {
-      console.error('Error al cargar estadisticas:', err);
+      console.error('Error al cargar estadísticas:', err);
     }
-  };
-
-  useEffect(() => {
-    fetchCajas();
-    fetchStats();
   }, []);
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // HANDLERS DE BUSQUEDA Y FILTROS
-  // ──────────────────────────────────────────────────────────────────────────
-
-  const handleSearch = (value) => {
-    setSearchTerm(value);
-    fetchCajas(1, filters, value);
-  };
-
-  const handleFilterChange = (key, value) => {
-    const newFilters = { ...filters, [key]: value || undefined };
-    setFilters(newFilters);
-    fetchCajas(1, newFilters, searchTerm);
-
-    const params = new URLSearchParams();
-    Object.entries(newFilters).forEach(([k, v]) => {
-      if (v) params.set(k, v);
-    });
-    setSearchParams(params);
-  };
-
-  const handleClearFilters = () => {
-    setFilters({});
-    setSearchTerm('');
-    fetchCajas(1, {}, '');
-    setSearchParams({});
-  };
-
-  const handleRefresh = () => {
-    fetchCajas(pagination.page, filters, searchTerm);
+  useEffect(() => {
+    fetchCajas(1);
     fetchStats();
-  };
+  }, [fetchCajas, fetchStats]);
 
-  const goToPage = (page) => {
-    fetchCajas(page, filters, searchTerm);
+  const handlePageChange = (page) => {
+    fetchCajas(page);
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -396,7 +292,7 @@ const CajaMenorList = () => {
       await cajasMenoresService.delete(deleteModal.caja.id);
       deleted('Caja menor');
       setDeleteModal({ isOpen: false, caja: null });
-      fetchCajas(pagination.page, filters, searchTerm);
+      fetchCajas(pagination.page);
       fetchStats();
     } catch (err) {
       apiError(err);
@@ -411,7 +307,7 @@ const CajaMenorList = () => {
       await cajasMenoresService.close(closeModal.caja.id);
       success('Caja menor cerrada exitosamente');
       setCloseModal({ isOpen: false, caja: null });
-      fetchCajas(pagination.page, filters, searchTerm);
+      fetchCajas(pagination.page);
       fetchStats();
     } catch (err) {
       apiError(err);
@@ -420,178 +316,165 @@ const CajaMenorList = () => {
     }
   };
 
+  const handleFormSuccess = () => {
+    setFormModal({ isOpen: false, caja: null });
+    fetchCajas(pagination.page);
+    fetchStats();
+  };
+
   // ──────────────────────────────────────────────────────────────────────────
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
       <main className="pt-28 px-4 pb-8 max-w-7xl mx-auto">
+
         {/* PAGE HEADER */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800">Cajas Menores</h1>
-            <p className="text-slate-500 mt-1">
-              Gestiona las cajas menores de los viajes
-            </p>
-          </div>
-
           <div className="flex items-center gap-3">
-            <ProtectedAction module="viajes" action="crear">
-              <Button variant="primary" icon={Plus} onClick={handleCreate}>
-                Nueva Caja Menor
-              </Button>
-            </ProtectedAction>
+            <div className="p-2.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
+              <Wallet className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Cajas Menores</h1>
+              <p className="text-slate-500 dark:text-slate-400 mt-0.5">Gestión de cajas menores y saldos</p>
+            </div>
           </div>
+          <ProtectedAction module="viajes" action="crear">
+            <button
+              onClick={handleCreate}
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva Caja
+            </button>
+          </ProtectedAction>
         </div>
 
-        {/* STATS CARDS */}
-        <StatsCards stats={stats} />
+        {/* KPI CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+          <KpiMini
+            icon={Wallet}
+            label="Abiertas"
+            value={stats.abiertas ?? 0}
+            color="bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300"
+          />
+          <KpiMini
+            icon={Clock}
+            label="En Revisión"
+            value={stats.en_revision ?? 0}
+            color="bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
+          />
+          <KpiMini
+            icon={Lock}
+            label="Cerradas"
+            value={stats.cerradas ?? 0}
+            color="bg-slate-50 border-slate-200 text-slate-700 dark:bg-slate-700/20 dark:border-slate-600 dark:text-slate-300"
+          />
+          <KpiMini
+            icon={DollarSign}
+            label="Total Egresos Activos"
+            value={formatMoney(stats.total_egresos ?? 0)}
+            color="bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300"
+          />
+        </div>
 
-        {/* ERROR STATE */}
+        {/* ERROR BANNER */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
-            <p className="font-medium">Error al cargar cajas menores</p>
-            <p className="text-sm">{error}</p>
-            <button
-              onClick={handleRefresh}
-              className="mt-2 text-sm underline hover:no-underline"
-            >
-              Reintentar
-            </button>
+          <div className="mb-4 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center justify-between">
+            <p className="text-sm text-amber-700 dark:text-amber-300">{error}</p>
+            <button onClick={() => fetchCajas(1)} className="text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline">Reintentar</button>
           </div>
         )}
 
-        {/* SEARCH & FILTERS BAR */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+        {/* FILTERS BAR */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1">
-              <SearchBar
-                placeholder="Buscar por numero o conductor..."
+            {/* Search */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar por número o conductor..."
                 value={searchTerm}
-                onChange={handleSearch}
-                onClear={() => handleSearch('')}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
               />
             </div>
 
-            <Button
-              variant={showFilters ? 'secondary' : 'outline'}
-              icon={Filter}
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              Filtros
-              {Object.values(filters).filter(Boolean).length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded-full">
-                  {Object.values(filters).filter(Boolean).length}
-                </span>
-              )}
-            </Button>
-
-            <Button
-              variant="outline"
-              icon={RefreshCw}
-              onClick={handleRefresh}
-              loading={loading}
-            >
-              <span className="hidden sm:inline">Actualizar</span>
-            </Button>
-          </div>
-
-          {showFilters && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FilterDropdown
-                  label="Estado"
-                  options={FILTER_OPTIONS.estado}
-                  value={filters.estado}
-                  onChange={(v) => handleFilterChange('estado', v)}
-                  placeholder="Todos los estados"
-                />
-              </div>
-
-              {Object.values(filters).filter(Boolean).length > 0 && (
-                <div className="mt-4 flex justify-end">
-                  <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-                    Limpiar filtros
-                  </Button>
-                </div>
-              )}
+            {/* Estado Filter Tabs */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+              {[
+                { key: 'todos', label: 'Todas' },
+                { key: 'abierta', label: 'Abiertas' },
+                { key: 'en_revision', label: 'En Revisión' },
+                { key: 'cerrada', label: 'Cerradas' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setEstadoFilter(tab.key)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    estadoFilter === tab.key
+                      ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
         </div>
 
         {/* RESULTS COUNT */}
         <div className="mb-4">
-          <p className="text-sm text-slate-500">
-            {pagination.total} caja{pagination.total !== 1 && 's'} menor{pagination.total !== 1 && 'es'} encontrada{pagination.total !== 1 && 's'}
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {cajas.length} caja{cajas.length !== 1 && 's'} menor{cajas.length !== 1 && 'es'} encontrada{cajas.length !== 1 && 's'}
           </p>
         </div>
 
         {/* TABLE */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
           {loading ? (
-            <div className="p-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50 animate-pulse">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-1/3" />
-                    <div className="h-3 bg-gray-100 rounded w-1/4" />
-                  </div>
-                  <div className="h-6 w-16 bg-gray-200 rounded-full" />
-                </div>
-              ))}
+            <div className="p-8 text-center">
+              <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
+              <p className="text-slate-500 dark:text-slate-400">Cargando cajas menores...</p>
             </div>
           ) : cajas.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Wallet className="w-8 h-8 text-slate-400" />
               </div>
-              <h3 className="text-lg font-medium text-slate-800 mb-1">
+              <h3 className="text-lg font-medium text-slate-800 dark:text-slate-100 mb-1">
                 No se encontraron cajas menores
               </h3>
-              <p className="text-slate-500 mb-4">
-                {searchTerm || Object.values(filters).filter(Boolean).length > 0
-                  ? 'Intenta ajustar los filtros de busqueda'
-                  : 'Comienza creando tu primera caja menor'}
+              <p className="text-slate-500 dark:text-slate-400">
+                {searchTerm ? 'Intenta ajustar el término de búsqueda' : 'Comienza creando tu primera caja menor'}
               </p>
-              {!searchTerm && Object.values(filters).filter(Boolean).length === 0 && (
-                <ProtectedAction module="viajes" action="crear">
-                  <Button variant="primary" icon={Plus} onClick={handleCreate}>
-                    Nueva Caja Menor
-                  </Button>
-                </ProtectedAction>
-              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Numero
+                  <tr className="border-b border-gray-100 dark:border-slate-700">
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Número
                     </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Conductor
                     </th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Saldo Inicial
                     </th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Saldo Actual
                     </th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Estado
                     </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Fecha Apertura
-                    </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Caja Anterior
-                    </th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Acciones
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-16">
+                      {/* Acciones */}
                     </th>
                   </tr>
                 </thead>
@@ -599,44 +482,57 @@ const CajaMenorList = () => {
                   {cajas.map((caja) => (
                     <tr
                       key={caja.id}
-                      className="border-b border-gray-50 hover:bg-slate-50 transition-colors"
+                      className="border-b border-gray-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer group"
+                      onClick={() => handleView(caja)}
                     >
+                      {/* Número */}
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                            <Wallet className="w-5 h-5 text-orange-600" />
+                          <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                           </div>
                           <div>
-                            <p
-                              className="text-sm font-medium text-slate-800 hover:text-orange-600 cursor-pointer"
-                              onClick={() => handleView(caja)}
-                            >
+                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                               {caja.numero || `CM-${caja.id}`}
+                            </p>
+                            <p className="text-xs text-slate-400 dark:text-slate-500">
+                              Apertura: {caja.fecha_apertura ? new Date(caja.fecha_apertura).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-sm text-slate-600">
-                        {caja.conductor?.nombre_completo || caja.conductor?.username || '-'}
+
+                      {/* Conductor */}
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          <span className="text-sm text-slate-700 dark:text-slate-200 truncate max-w-[200px]">
+                            {caja.conductor?.nombre_completo || caja.conductor?.username || '-'}
+                          </span>
+                        </div>
                       </td>
-                      <td className="py-4 px-4 text-sm text-slate-600 text-right font-mono">
-                        {formatMoney(caja.saldo_inicial)}
+
+                      {/* Saldo Inicial */}
+                      <td className="py-4 px-4 text-right">
+                        <span className="text-sm text-slate-600 dark:text-slate-300 font-mono">
+                          {formatMoney(caja.saldo_inicial)}
+                        </span>
                       </td>
-                      <td className="py-4 px-4 text-sm text-right font-mono font-semibold">
-                        <span className={caja.saldo_actual < 0 ? 'text-red-600' : 'text-slate-800'}>
+
+                      {/* Saldo Actual */}
+                      <td className="py-4 px-4 text-right">
+                        <span className={`text-sm font-mono font-bold ${Number(caja.saldo_actual) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                           {formatMoney(caja.saldo_actual)}
                         </span>
                       </td>
+
+                      {/* Estado */}
                       <td className="py-4 px-4 text-center">
-                        <EstadoChip estado={caja.estado} />
+                        <StatusBadge estado={caja.estado} />
                       </td>
-                      <td className="py-4 px-4 text-sm text-slate-600">
-                        {formatDate(caja.fecha_apertura)}
-                      </td>
-                      <td className="py-4 px-4 text-sm text-slate-600">
-                        {caja.caja_anterior?.numero || caja.caja_anterior_numero || '-'}
-                      </td>
-                      <td className="py-4 px-4 text-center">
+
+                      {/* Acciones */}
+                      <td className="py-4 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                         <RowActions
                           caja={caja}
                           onView={handleView}
@@ -657,16 +553,16 @@ const CajaMenorList = () => {
               currentPage={pagination.page}
               totalPages={pagination.totalPages}
               totalItems={pagination.total}
-              itemsPerPage={pagination.limit}
-              onPageChange={goToPage}
+              itemsPerPage={PAGE_SIZE}
+              onPageChange={handlePageChange}
             />
           )}
         </div>
 
         {/* FOOTER */}
-        <footer className="text-center py-6 mt-8 text-slate-500 text-sm border-t border-gray-200">
-          &copy; 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
-          Centro Logistico Industrial del Norte, Girardota, Antioquia
+        <footer className="text-center py-6 mt-8 text-slate-500 dark:text-slate-400 text-sm border-t border-gray-200 dark:border-slate-700">
+          © 2026 ISTHO S.A.S. - Sistema CRM Interno<br />
+          Centro Logístico Industrial del Norte, Girardota, Antioquia
         </footer>
       </main>
 
@@ -674,10 +570,7 @@ const CajaMenorList = () => {
       <CajaMenorForm
         open={formModal.isOpen}
         onClose={() => setFormModal({ isOpen: false, caja: null })}
-        onSuccess={() => {
-          setFormModal({ isOpen: false, caja: null });
-          handleRefresh();
-        }}
+        onSuccess={handleFormSuccess}
         cajaId={formModal.caja?.id}
       />
 
@@ -686,7 +579,7 @@ const CajaMenorList = () => {
         onClose={() => setDeleteModal({ isOpen: false, caja: null })}
         onConfirm={handleConfirmDelete}
         title="Eliminar Caja Menor"
-        message={`Estas seguro de eliminar la caja menor "${deleteModal.caja?.numero || ''}"? Esta accion no se puede deshacer.`}
+        message={`¿Estás seguro de eliminar la caja menor "${deleteModal.caja?.numero || ''}"? Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         type="danger"
         loading={formLoading}
@@ -697,7 +590,7 @@ const CajaMenorList = () => {
         onClose={() => setCloseModal({ isOpen: false, caja: null })}
         onConfirm={handleConfirmClose}
         title="Cerrar Caja Menor"
-        message={`Estas seguro de cerrar la caja menor "${closeModal.caja?.numero || ''}"? Una vez cerrada no se podran registrar mas gastos.`}
+        message={`¿Estás seguro de cerrar la caja menor "${closeModal.caja?.numero || ''}"? Una vez cerrada no se podrán registrar más gastos.`}
         confirmText="Cerrar Caja"
         type="warning"
         loading={formLoading}

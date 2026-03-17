@@ -126,11 +126,6 @@ const crear = async (req, res) => {
   try {
     const datos = limpiarObjeto(req.body);
 
-    // Conductor se asigna a sí mismo
-    if (req.user.esConductor) {
-      datos.conductor_id = req.user.id;
-    }
-
     // Verificar caja menor
     const caja = await CajaMenor.findByPk(datos.caja_menor_id, { transaction });
     if (!caja) {
@@ -141,6 +136,13 @@ const crear = async (req, res) => {
     if (caja.estado === 'cerrada') {
       try { await transaction.rollback(); } catch (_) {}
       return errorResponse(res, 'La caja menor está cerrada, no se pueden agregar movimientos', 400);
+    }
+
+    // Asignar conductor: si es conductor se asigna a sí mismo, sino usar el de la caja
+    if (req.user.esConductor) {
+      datos.conductor_id = req.user.id;
+    } else if (!datos.conductor_id) {
+      datos.conductor_id = caja.conductor_id;
     }
 
     // Verificar viaje si se especifica

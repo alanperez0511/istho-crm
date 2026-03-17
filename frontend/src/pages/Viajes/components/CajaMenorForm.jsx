@@ -33,6 +33,20 @@ const formatMoney = (value) => {
   }).format(num);
 };
 
+/** Formatea número con separadores de miles para input visual */
+const formatThousands = (value) => {
+  if (!value && value !== 0) return '';
+  const num = String(value).replace(/[^\d]/g, '');
+  if (!num) return '';
+  return Number(num).toLocaleString('es-CO');
+};
+
+/** Extrae número limpio de string formateado */
+const parseThousands = (formatted) => {
+  const clean = String(formatted).replace(/[^\d]/g, '');
+  return clean ? Number(clean) : '';
+};
+
 // ════════════════════════════════════════════════════════════════════════════
 // INPUT FIELD (mismo patrón que ClienteForm / VehiculoForm)
 // ════════════════════════════════════════════════════════════════════════════
@@ -310,21 +324,14 @@ const CajaMenorForm = ({ open, onClose, onSuccess, cajaId }) => {
             error={errors.saldo_inicial}
           >
             <input
-              type="number"
+              type="text"
               name="saldo_inicial"
-              value={formData.saldo_inicial}
-              onChange={(e) => handleChange('saldo_inicial', e.target.value)}
-              placeholder="$0"
-              min={0}
-              step={1000}
+              value={formatThousands(formData.saldo_inicial)}
+              onChange={(e) => handleChange('saldo_inicial', parseThousands(e.target.value))}
+              placeholder="0"
               disabled={isEditing || loadingData}
               className={`${baseInputClasses(true, errors.saldo_inicial)} ${isEditing ? 'opacity-60 cursor-not-allowed' : ''}`}
             />
-            {formData.saldo_inicial && !errors.saldo_inicial && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {formatMoney(formData.saldo_inicial)}
-              </p>
-            )}
           </InputField>
 
           {/* Caja Anterior (traslado de saldo) - solo en creación */}

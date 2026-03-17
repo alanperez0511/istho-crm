@@ -264,8 +264,15 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
   };
 
   const handleValorChange = (e) => {
-    const raw = e.target.value.replace(/[^0-9.]/g, '');
-    setFormData((prev) => ({ ...prev, valor: raw }));
+    const raw = e.target.value.replace(/[^\d]/g, '');
+    setFormData((prev) => ({ ...prev, valor: raw ? Number(raw) : '' }));
+  };
+
+  const formatThousands = (value) => {
+    if (!value && value !== 0) return '';
+    const num = String(value).replace(/[^\d]/g, '');
+    if (!num) return '';
+    return Number(num).toLocaleString('es-CO');
   };
 
   const handleSubmit = async () => {
@@ -474,16 +481,11 @@ const MovimientoForm = ({ open, onClose, onSuccess, movimientoId, defaultCajaId,
                 <input
                   type="text"
                   name="valor"
-                  value={formData.valor}
+                  value={formatThousands(formData.valor)}
                   onChange={handleValorChange}
                   placeholder="0"
                   className={inputClasses(true)}
                 />
-                {formData.valor && (
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    $ {formatMoney(formData.valor)}
-                  </p>
-                )}
               </InputField>
             </div>
           )}
