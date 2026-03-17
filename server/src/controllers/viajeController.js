@@ -133,7 +133,7 @@ const crear = async (req, res) => {
     // Verificar vehículo
     const vehiculo = await Vehiculo.findByPk(datos.vehiculo_id, { transaction });
     if (!vehiculo) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Vehículo no encontrado');
     }
 
@@ -141,11 +141,11 @@ const crear = async (req, res) => {
     if (datos.caja_menor_id) {
       const caja = await CajaMenor.findByPk(datos.caja_menor_id, { transaction });
       if (!caja) {
-        await transaction.rollback();
+        try { await transaction.rollback(); } catch (_) {}
         return notFound(res, 'Caja menor no encontrada');
       }
       if (caja.estado === 'cerrada') {
-        await transaction.rollback();
+        try { await transaction.rollback(); } catch (_) {}
         return errorResponse(res, 'La caja menor está cerrada', 400);
       }
     }
@@ -179,7 +179,7 @@ const crear = async (req, res) => {
 
     return created(res, resultado, 'Viaje registrado exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al crear viaje:', { message: error.message });
     return serverError(res, 'Error al crear viaje', error);
   }
@@ -196,17 +196,17 @@ const actualizar = async (req, res) => {
 
     const viaje = await Viaje.findByPk(id, { transaction });
     if (!viaje) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Viaje no encontrado');
     }
 
     if (viaje.estado === 'anulado') {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return errorResponse(res, 'No se puede modificar un viaje anulado', 400);
     }
 
     if (req.user.esConductor && viaje.conductor_id !== req.user.id) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Viaje no encontrado');
     }
 
@@ -228,7 +228,7 @@ const actualizar = async (req, res) => {
     await transaction.commit();
     return success(res, viaje, 'Viaje actualizado exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al actualizar viaje:', { message: error.message });
     return serverError(res, 'Error al actualizar viaje', error);
   }
@@ -243,13 +243,13 @@ const eliminar = async (req, res) => {
     const { id } = req.params;
     const viaje = await Viaje.findByPk(id, { transaction });
     if (!viaje) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Viaje no encontrado');
     }
 
     const gastos = await MovimientoCajaMenor.count({ where: { viaje_id: id } });
     if (gastos > 0) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return conflict(res, `No se puede eliminar: tiene ${gastos} gasto(s) asociado(s)`);
     }
 
@@ -270,7 +270,7 @@ const eliminar = async (req, res) => {
     await transaction.commit();
     return success(res, { id }, 'Viaje eliminado exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al eliminar viaje:', { message: error.message });
     return serverError(res, 'Error al eliminar viaje', error);
   }

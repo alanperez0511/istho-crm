@@ -106,7 +106,7 @@ const crear = async (req, res) => {
 
     const existe = await Vehiculo.findOne({ where: { placa: datos.placa }, transaction });
     if (existe) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return conflict(res, 'Ya existe un vehículo con esta placa');
     }
 
@@ -133,7 +133,7 @@ const crear = async (req, res) => {
 
     return created(res, resultado, 'Vehículo registrado exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al crear vehículo:', { message: error.message });
     return serverError(res, 'Error al crear vehículo', error);
   }
@@ -150,14 +150,14 @@ const actualizar = async (req, res) => {
 
     const vehiculo = await Vehiculo.findByPk(id, { transaction });
     if (!vehiculo) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Vehículo no encontrado');
     }
 
     if (datos.placa && datos.placa !== vehiculo.placa) {
       const existe = await Vehiculo.findOne({ where: { placa: datos.placa, id: { [Op.ne]: id } }, transaction });
       if (existe) {
-        await transaction.rollback();
+        try { await transaction.rollback(); } catch (_) {}
         return conflict(res, 'Ya existe otro vehículo con esta placa');
       }
     }
@@ -185,7 +185,7 @@ const actualizar = async (req, res) => {
 
     return success(res, resultado, 'Vehículo actualizado exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al actualizar vehículo:', { message: error.message });
     return serverError(res, 'Error al actualizar vehículo', error);
   }
@@ -200,13 +200,13 @@ const eliminar = async (req, res) => {
     const { id } = req.params;
     const vehiculo = await Vehiculo.findByPk(id, { transaction });
     if (!vehiculo) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Vehículo no encontrado');
     }
 
     const viajesActivos = await Viaje.count({ where: { vehiculo_id: id, estado: 'activo' } });
     if (viajesActivos > 0) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return conflict(res, `No se puede eliminar: tiene ${viajesActivos} viaje(s) activo(s)`);
     }
 
@@ -227,7 +227,7 @@ const eliminar = async (req, res) => {
     await transaction.commit();
     return success(res, { id }, 'Vehículo eliminado exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al eliminar vehículo:', { message: error.message });
     return serverError(res, 'Error al eliminar vehículo', error);
   }

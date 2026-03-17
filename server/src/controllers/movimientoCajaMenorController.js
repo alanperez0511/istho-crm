@@ -134,12 +134,12 @@ const crear = async (req, res) => {
     // Verificar caja menor
     const caja = await CajaMenor.findByPk(datos.caja_menor_id, { transaction });
     if (!caja) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Caja menor no encontrada');
     }
 
     if (caja.estado === 'cerrada') {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return errorResponse(res, 'La caja menor está cerrada, no se pueden agregar movimientos', 400);
     }
 
@@ -147,7 +147,7 @@ const crear = async (req, res) => {
     if (datos.viaje_id) {
       const viaje = await Viaje.findByPk(datos.viaje_id, { transaction });
       if (!viaje) {
-        await transaction.rollback();
+        try { await transaction.rollback(); } catch (_) {}
         return notFound(res, 'Viaje no encontrado');
       }
     }
@@ -196,7 +196,7 @@ const crear = async (req, res) => {
 
     return created(res, resultado, 'Movimiento registrado exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al crear movimiento:', { message: error.message });
     return serverError(res, 'Error al crear movimiento', error);
   }
@@ -217,18 +217,18 @@ const actualizar = async (req, res) => {
     });
 
     if (!movimiento) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Movimiento no encontrado');
     }
 
     if (req.user.esConductor && movimiento.conductor_id !== req.user.id) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Movimiento no encontrado');
     }
 
     // Conductor no puede editar movimientos ya aprobados
     if (req.user.esConductor && movimiento.aprobado) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return errorResponse(res, 'No puedes modificar un movimiento ya aprobado', 400);
     }
 
@@ -255,7 +255,7 @@ const actualizar = async (req, res) => {
     await transaction.commit();
     return success(res, movimiento, 'Movimiento actualizado exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al actualizar movimiento:', { message: error.message });
     return serverError(res, 'Error al actualizar movimiento', error);
   }
@@ -277,7 +277,7 @@ const aprobar = async (req, res) => {
     });
 
     if (!movimiento) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Movimiento no encontrado');
     }
 
@@ -335,7 +335,7 @@ const aprobar = async (req, res) => {
     logger.info(`Movimiento ${aprobado ? 'aprobado' : 'rechazado'}:`, { id: movimiento.id });
     return success(res, movimiento, `Movimiento ${aprobado ? 'aprobado' : 'rechazado'} exitosamente`);
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al aprobar movimiento:', { message: error.message });
     return serverError(res, 'Error al procesar aprobación', error);
   }
@@ -351,7 +351,7 @@ const aprobarMasivo = async (req, res) => {
     const { ids, observaciones_aprobacion } = req.body;
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return errorResponse(res, 'Debe seleccionar al menos un movimiento', 400);
     }
 
@@ -397,7 +397,7 @@ const aprobarMasivo = async (req, res) => {
     await transaction.commit();
     return success(res, { aprobados }, `${aprobados} movimiento(s) aprobado(s) exitosamente`);
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error en aprobación masiva:', { message: error.message });
     return serverError(res, 'Error en aprobación masiva', error);
   }
@@ -416,12 +416,12 @@ const eliminar = async (req, res) => {
     });
 
     if (!movimiento) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Movimiento no encontrado');
     }
 
     if (movimiento.aprobado) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return conflict(res, 'No se puede eliminar un movimiento aprobado');
     }
 
@@ -442,7 +442,7 @@ const eliminar = async (req, res) => {
     await transaction.commit();
     return success(res, { id }, 'Movimiento eliminado exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al eliminar movimiento:', { message: error.message });
     return serverError(res, 'Error al eliminar movimiento', error);
   }

@@ -120,7 +120,7 @@ const crear = async (req, res) => {
     // Verificar que el conductor existe
     const conductor = await Usuario.findByPk(datos.conductor_id);
     if (!conductor) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Conductor no encontrado');
     }
 
@@ -176,7 +176,7 @@ const crear = async (req, res) => {
 
     return created(res, resultado, 'Caja menor creada exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al crear caja menor:', { message: error.message });
     return serverError(res, 'Error al crear caja menor', error);
   }
@@ -193,12 +193,12 @@ const actualizar = async (req, res) => {
 
     const caja = await CajaMenor.findByPk(id, { transaction });
     if (!caja) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Caja menor no encontrada');
     }
 
     if (caja.estado === 'cerrada') {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return errorResponse(res, 'No se puede modificar una caja cerrada', 400);
     }
 
@@ -220,7 +220,7 @@ const actualizar = async (req, res) => {
     await transaction.commit();
     return success(res, caja, 'Caja menor actualizada exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al actualizar caja menor:', { message: error.message });
     return serverError(res, 'Error al actualizar caja menor', error);
   }
@@ -238,12 +238,12 @@ const cerrar = async (req, res) => {
 
     const caja = await CajaMenor.findByPk(id, { transaction });
     if (!caja) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Caja menor no encontrada');
     }
 
     if (caja.estado === 'cerrada') {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return errorResponse(res, 'La caja ya está cerrada', 400);
     }
 
@@ -287,7 +287,7 @@ const cerrar = async (req, res) => {
     logger.info('Caja menor cerrada:', { id: caja.id, numero: caja.numero, saldo: caja.saldo_actual });
     return success(res, caja, 'Caja menor cerrada exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al cerrar caja menor:', { message: error.message });
     return serverError(res, 'Error al cerrar caja menor', error);
   }
@@ -302,13 +302,13 @@ const eliminar = async (req, res) => {
     const { id } = req.params;
     const caja = await CajaMenor.findByPk(id, { transaction });
     if (!caja) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return notFound(res, 'Caja menor no encontrada');
     }
 
     const movimientos = await MovimientoCajaMenor.count({ where: { caja_menor_id: id } });
     if (movimientos > 0) {
-      await transaction.rollback();
+      try { await transaction.rollback(); } catch (_) {}
       return conflict(res, `No se puede eliminar: tiene ${movimientos} movimiento(s) asociado(s)`);
     }
 
@@ -329,7 +329,7 @@ const eliminar = async (req, res) => {
     await transaction.commit();
     return success(res, { id }, 'Caja menor eliminada exitosamente');
   } catch (error) {
-    await transaction.rollback();
+    try { await transaction.rollback(); } catch (_) {}
     logger.error('Error al eliminar caja menor:', { message: error.message });
     return serverError(res, 'Error al eliminar caja menor', error);
   }
