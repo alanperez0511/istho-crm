@@ -640,7 +640,9 @@ const MobileMenu = ({ isOpen, onClose, user, onNavigate, onLogout, currentPath, 
   const roleConfig = {
     admin: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', label: 'Administrador' },
     supervisor: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', label: 'Supervisor' },
+    financiera: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', label: 'Financiera' },
     operador: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', label: 'Operador' },
+    conductor: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300', label: 'Conductor' },
     cliente: { bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-700 dark:text-violet-300', label: 'Cliente' },
   };
 
@@ -748,13 +750,15 @@ const MobileMenu = ({ isOpen, onClose, user, onNavigate, onLogout, currentPath, 
           <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-2 mb-3">
             Acciones Rápidas
           </p>
-          <button
-            onClick={() => handleNavigation('/reportes')}
-            className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Reportes
-          </button>
+          {!['conductor', 'cliente'].includes(user?.rol) && (
+            <button
+              onClick={() => handleNavigation('/reportes')}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Reportes
+            </button>
+          )}
           <button
             onClick={() => handleNavigation('/perfil')}
             className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
@@ -762,20 +766,15 @@ const MobileMenu = ({ isOpen, onClose, user, onNavigate, onLogout, currentPath, 
             <UserCircle className="w-4 h-4" />
             Mi Perfil
           </button>
-          <button
-            onClick={() => handleNavigation('/configuracion')}
-            className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            Configuración
-          </button>
-          <button
-            onClick={() => { onShowShortcuts(); onClose(); }}
-            className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <Keyboard className="w-4 h-4" />
-            Atajos de Teclado
-          </button>
+          {!['conductor', 'cliente'].includes(user?.rol) && (
+            <button
+              onClick={() => handleNavigation('/configuracion')}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              Configuración
+            </button>
+          )}
           <button
             onClick={onToggleDark}
             className="flex items-center justify-between w-full px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
@@ -844,7 +843,9 @@ const AvatarDropdown = ({ user, onNavigate, onLogout }) => {
   const roleLabels = {
     admin: 'Administrador',
     supervisor: 'Supervisor',
+    financiera: 'Financiera',
     operador: 'Operador',
+    conductor: 'Conductor',
     cliente: 'Portal Cliente',
   };
 
@@ -1088,6 +1089,26 @@ const FloatingHeader = () => {
                   </div>
                 </div>
               )}
+
+              {/* Badge de Rol (no-cliente) */}
+              {user?.rol && user.rol !== 'cliente' && (() => {
+                const rolBadges = {
+                  admin: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400', label: 'Admin' },
+                  supervisor: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400', label: 'Supervisor' },
+                  financiera: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-600 dark:text-amber-400', label: 'Financiera' },
+                  operador: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-600 dark:text-emerald-400', label: 'Operador' },
+                  conductor: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-600 dark:text-orange-400', label: 'Conductor' },
+                };
+                const badge = rolBadges[user.rol];
+                if (!badge) return null;
+                return (
+                  <div className="flex items-center ml-2 pl-3 border-l border-slate-200 dark:border-slate-700">
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${badge.bg} ${badge.text}`}>
+                      {badge.label}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Desktop Navigation */}

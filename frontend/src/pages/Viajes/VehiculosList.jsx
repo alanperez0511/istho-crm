@@ -679,6 +679,7 @@ const VehiculosList = () => {
           fetchVehiculos(pagination.page);
         }}
         vehiculoId={formModal.vehiculo?.id}
+        readOnly={user?.rol === 'conductor'}
       />
 
       <ConfirmDialog

@@ -28,6 +28,7 @@ import {
 import { Button } from '../../components/common';
 import { cajasMenoresService, viajesService, movimientosService } from '../../api/viajes.service';
 import { useAuth } from '../../context/AuthContext';
+import { getServerFileUrl } from '../../api/client';
 import useNotification from '../../hooks/useNotification';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -92,6 +93,13 @@ const getGastoBorder = (estado) => {
     rechazado: 'border-l-red-400',
   };
   return map[estado] || 'border-l-gray-400';
+};
+
+// Derivar estado de aprobación desde booleans del movimiento
+const getAprobacionEstado = (mov) => {
+  if (mov.aprobado) return 'aprobado';
+  if (mov.rechazado) return 'rechazado';
+  return 'pendiente';
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -174,15 +182,20 @@ const DashboardConductor = () => {
   // RENDER
   // ──────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 pt-24 pb-8 px-3 sm:px-4">
+    <div className="max-w-lg mx-auto space-y-5">
 
       {/* ═══════════════════════════════════════════════════════════════════
           1. WELCOME HEADER
           ═══════════════════════════════════════════════════════════════════ */}
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg font-bold shrink-0">
-          {iniciales}
-        </div>
+        {user?.avatar_url ? (
+          <img src={getServerFileUrl(user.avatar_url)} alt={nombre} className="w-12 h-12 rounded-full object-cover shrink-0 shadow-md" />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg font-bold shrink-0">
+            {iniciales}
+          </div>
+        )}
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
             Hola, {nombre}
@@ -402,7 +415,7 @@ const DashboardConductor = () => {
               <div
                 key={gasto.id}
                 className={`rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-l-4 ${getGastoBorder(
-                  gasto.estado
+                  getAprobacionEstado(gasto)
                 )} p-4`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -413,10 +426,10 @@ const DashboardConductor = () => {
                       </span>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getEstadoBadge(
-                          gasto.estado
+                          getAprobacionEstado(gasto)
                         )}`}
                       >
-                        {gasto.estado?.replace(/_/g, ' ')}
+                        {getAprobacionEstado(gasto)}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -433,8 +446,7 @@ const DashboardConductor = () => {
         )}
       </div>
 
-      {/* Espaciado inferior para móvil */}
-      <div className="h-6" />
+    </div>
     </div>
   );
 };

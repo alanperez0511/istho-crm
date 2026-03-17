@@ -85,15 +85,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // RUTAS
 // ==============================================
 
-// Healthcheck
-app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'ISTHO CRM API está funcionando',
-    environment: process.env.NODE_ENV,
-    timestamp: new Date().toISOString()
-  });
-});
+// Healthcheck se define en server.js (con estado de DB dinámico)
 
 // Ruta raíz
 app.get('/', (req, res) => {

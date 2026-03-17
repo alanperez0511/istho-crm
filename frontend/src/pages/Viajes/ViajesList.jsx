@@ -507,7 +507,7 @@ const ViajesList = () => {
                         <div className="flex items-center gap-2">
                           <Truck className="w-4 h-4 text-slate-400 flex-shrink-0" />
                           <span className="text-sm text-slate-700 dark:text-slate-200">
-                            {viaje.vehiculo_placa || viaje.Vehiculo?.placa || '-'}
+                            {viaje.vehiculo?.placa || viaje.Vehiculo?.placa || '-'}
                           </span>
                         </div>
                       </td>

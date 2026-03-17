@@ -156,7 +156,7 @@ const InputField = ({ field, value, onChange, error, conductores }) => {
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
-const VehiculoForm = ({ open, onClose, onSuccess, vehiculoId }) => {
+const VehiculoForm = ({ open, onClose, onSuccess, vehiculoId, readOnly = false }) => {
   const { success: notifySuccess, error: notifyError } = useNotification();
   const [formData, setFormData] = useState({});
   const [conductores, setConductores] = useState([]);
@@ -268,18 +268,22 @@ const VehiculoForm = ({ open, onClose, onSuccess, vehiculoId }) => {
     <Modal
       isOpen={open}
       onClose={onClose}
-      title={isEditing ? 'Editar Vehículo' : 'Nuevo Vehículo'}
-      subtitle={isEditing ? `Editando: ${formData.placa || ''}` : 'Complete la información del vehículo'}
+      title={readOnly ? 'Detalle Vehículo' : (isEditing ? 'Editar Vehículo' : 'Nuevo Vehículo')}
+      subtitle={isEditing ? `${readOnly ? 'Viendo' : 'Editando'}: ${formData.placa || ''}` : 'Complete la información del vehículo'}
       size="lg"
       footer={
-        <>
-          <Button variant="outline" onClick={onClose} disabled={loading}>
-            Cancelar
-          </Button>
-          <Button variant="primary" onClick={handleSubmit} loading={loading} disabled={loadingData}>
-            {isEditing ? 'Guardar Cambios' : 'Crear Vehículo'}
-          </Button>
-        </>
+        readOnly ? (
+          <Button variant="outline" onClick={onClose}>Cerrar</Button>
+        ) : (
+          <>
+            <Button variant="outline" onClick={onClose} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={handleSubmit} loading={loading} disabled={loadingData}>
+              {isEditing ? 'Guardar Cambios' : 'Crear Vehículo'}
+            </Button>
+          </>
+        )
       }
     >
       {loadingData ? (

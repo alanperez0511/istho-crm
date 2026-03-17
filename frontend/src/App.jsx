@@ -163,10 +163,11 @@ const snackbarConfig = {
   autoHideDuration: 4000,
   anchorOrigin: {
     vertical: 'bottom',
-    horizontal: 'right',
+    horizontal: 'center',
   },
   preventDuplicate: true,
   dense: false,
+  style: { zIndex: 9999 },
 };
 
 // ════════════════════════════════════════════════════════════════════════════

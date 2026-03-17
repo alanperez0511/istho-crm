@@ -349,7 +349,7 @@ const ViajeDetail = () => {
           />
           <SummaryCard
             title="Peso"
-            value={viaje.peso ? `${Number(viaje.peso).toLocaleString('es-CO')} kg` : '-'}
+            value={viaje.peso ? `${Number(viaje.peso).toLocaleString('es-CO')} ton` : '-'}
             icon={Package}
             iconColor="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
           />
