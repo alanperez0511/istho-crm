@@ -351,24 +351,6 @@ const VehiculosList = () => {
     setDeleteModal({ isOpen: true, vehiculo });
   };
 
-  const handleFormSubmit = async (data) => {
-    setFormLoading(true);
-    try {
-      if (formModal.vehiculo) {
-        await vehiculosService.update(formModal.vehiculo.id, data);
-        saved('Vehículo');
-      } else {
-        await vehiculosService.create(data);
-        saved('Vehículo');
-      }
-      setFormModal({ isOpen: false, vehiculo: null });
-      refresh();
-    } catch (err) {
-      apiError(err);
-    } finally {
-      setFormLoading(false);
-    }
-  };
 
   const handleConfirmDelete = async () => {
     setFormLoading(true);
