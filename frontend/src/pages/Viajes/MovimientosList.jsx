@@ -477,25 +477,6 @@ const MovimientosList = () => {
     setAprobarModal({ isOpen: true, movimiento });
   };
 
-  const handleFormSubmit = async (data) => {
-    setFormLoading(true);
-    try {
-      if (formModal.movimiento && !formModal.movimiento._readOnly) {
-        await movimientosService.update(formModal.movimiento.id, data);
-        saved('Movimiento');
-      } else {
-        await movimientosService.create(data);
-        saved('Movimiento');
-      }
-      setFormModal({ isOpen: false, movimiento: null });
-      fetchMovimientos(pagination.page);
-    } catch (err) {
-      apiError(err);
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
   const handleConfirmDelete = async () => {
     setFormLoading(true);
     try {

@@ -390,26 +390,6 @@ const CajaMenorList = () => {
     setCloseModal({ isOpen: true, caja });
   };
 
-  const handleFormSubmit = async (data) => {
-    setFormLoading(true);
-    try {
-      if (formModal.caja) {
-        await cajasMenoresService.update(formModal.caja.id, data);
-        saved('Caja menor');
-      } else {
-        await cajasMenoresService.create(data);
-        saved('Caja menor');
-      }
-      setFormModal({ isOpen: false, caja: null });
-      fetchCajas(pagination.page, filters, searchTerm);
-      fetchStats();
-    } catch (err) {
-      apiError(err);
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
   const handleConfirmDelete = async () => {
     setFormLoading(true);
     try {
@@ -696,7 +676,7 @@ const CajaMenorList = () => {
         onClose={() => setFormModal({ isOpen: false, caja: null })}
         onSuccess={() => {
           setFormModal({ isOpen: false, caja: null });
-          refresh();
+          handleRefresh();
         }}
         cajaId={formModal.caja?.id}
       />

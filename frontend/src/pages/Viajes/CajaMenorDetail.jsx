@@ -36,7 +36,7 @@ import { Button, Modal, StatusChip, ConfirmDialog } from '../../components/commo
 import { cajasMenoresService } from '../../api/viajes.service';
 import useNotification from '../../hooks/useNotification';
 import { useAuth } from '../../context/AuthContext';
-import ProtectedAction from '../../components/auth/ProtectedAction';
+import { ProtectedAction } from '../../components/auth/PrivateRoute';
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -258,7 +258,7 @@ const CajaMenorDetail = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <ProtectedAction permiso="cajas_menores" accion="editar">
+            <ProtectedAction module="caja_menor" action="editar">
               {isAbierta && (
                 <>
                   <Button
