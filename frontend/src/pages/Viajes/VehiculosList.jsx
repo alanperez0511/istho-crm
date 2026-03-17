@@ -571,7 +571,7 @@ const VehiculosList = () => {
                         {vehiculo.capacidad_ton != null ? vehiculo.capacidad_ton : '-'}
                       </td>
                       <td className="py-4 px-4 text-sm text-slate-600 dark:text-slate-300">
-                        {vehiculo.conductor || '-'}
+                        {vehiculo.conductor?.nombre_completo || vehiculo.conductor?.username || '-'}
                       </td>
                       <td className="py-4 px-4 text-center">
                         <VencimientoBadge fecha={vehiculo.vencimiento_soat} label="SOAT" />
