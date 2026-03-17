@@ -299,14 +299,15 @@ const CajaMenorList = () => {
         ...(currentFilters.conductor_id && { conductor_id: currentFilters.conductor_id }),
       };
       const response = await cajasMenoresService.getAll(params);
-      const data = response.data || response;
-      setCajas(data.data || data.cajasMenores || []);
-      setPagination((prev) => ({
-        ...prev,
-        page: data.pagination?.page || data.page || page,
-        totalPages: data.pagination?.totalPages || data.totalPages || 1,
-        total: data.pagination?.total || data.total || 0,
-      }));
+      setCajas(response.data || []);
+      if (response.pagination) {
+        setPagination((prev) => ({
+          ...prev,
+          page: response.pagination.page || page,
+          totalPages: response.pagination.totalPages || 1,
+          total: response.pagination.total || 0,
+        }));
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar las cajas menores');
     } finally {
@@ -317,8 +318,7 @@ const CajaMenorList = () => {
   const fetchStats = async () => {
     try {
       const response = await cajasMenoresService.getStats();
-      const data = response.data || response;
-      setStats(data);
+      setStats(response.data || response);
     } catch (err) {
       console.error('Error al cargar estadisticas:', err);
     }

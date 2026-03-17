@@ -341,13 +341,15 @@ const MovimientosList = () => {
       });
 
       const response = await movimientosService.getAll(params);
-      setMovimientos(response.data?.movimientos || response.data?.rows || []);
-      setPagination((prev) => ({
-        ...prev,
-        page: response.data?.page || page,
-        totalPages: response.data?.totalPages || 1,
-        total: response.data?.total || 0,
-      }));
+      setMovimientos(response.data || []);
+      if (response.pagination) {
+        setPagination((prev) => ({
+          ...prev,
+          page: response.pagination.page || page,
+          totalPages: response.pagination.totalPages || 1,
+          total: response.pagination.total || 0,
+        }));
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar movimientos');
       apiError(err);

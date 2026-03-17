@@ -271,14 +271,15 @@ const VehiculosList = () => {
         ...(filters.estado && { estado: filters.estado }),
       };
       const response = await vehiculosService.getAll(params);
-      const data = response.data || response;
-      setVehiculos(data.vehiculos || data.rows || data.data || []);
-      setPagination((prev) => ({
-        ...prev,
-        page: data.page || data.currentPage || page,
-        totalPages: data.totalPages || Math.ceil((data.total || 0) / prev.limit),
-        total: data.total || data.count || 0,
-      }));
+      setVehiculos(response.data || []);
+      if (response.pagination) {
+        setPagination((prev) => ({
+          ...prev,
+          page: response.pagination.page || page,
+          totalPages: response.pagination.totalPages || 1,
+          total: response.pagination.total || 0,
+        }));
+      }
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Error al cargar vehículos');
     } finally {
