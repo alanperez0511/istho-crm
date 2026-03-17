@@ -120,7 +120,7 @@ const InputField = ({ field, value, onChange, error, conductores }) => {
           >
             <option value="">Sin asignar</option>
             {conductores?.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre_completo || `${c.nombre} ${c.apellido}`}</option>
+              <option key={c.id} value={c.id}>{c.nombre_completo || `${c.nombre || ''} ${c.apellido || ''}`.trim() || c.username}</option>
             ))}
           </select>
         ) : field.type === 'textarea' ? (

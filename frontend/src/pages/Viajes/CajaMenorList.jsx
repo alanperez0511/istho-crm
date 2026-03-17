@@ -617,7 +617,7 @@ const CajaMenorList = () => {
                         </div>
                       </td>
                       <td className="py-4 px-4 text-sm text-slate-600">
-                        {caja.conductor?.nombre || caja.conductor_nombre || '-'}
+                        {caja.conductor?.nombre_completo || caja.conductor?.username || '-'}
                       </td>
                       <td className="py-4 px-4 text-sm text-slate-600 text-right font-mono">
                         {formatMoney(caja.saldo_inicial)}

@@ -368,7 +368,7 @@ const MovimientosList = () => {
         (cajasRes.data || []).map((c) => ({ value: String(c.id), label: `Caja #${c.numero}` }))
       );
       setConductores(
-        (conductoresRes.data || []).map((c) => ({ value: String(c.id), label: c.nombre }))
+        (conductoresRes.data || []).map((c) => ({ value: String(c.id), label: c.nombre_completo || c.username || c.nombre }))
       );
     } catch {
       // Filtros dinamicos opcionales
@@ -818,7 +818,7 @@ const MovimientosList = () => {
                             : '-'}
                         </td>
                         <td className="py-4 px-4 text-sm text-slate-600">
-                          {mov.conductor?.nombre || mov.viaje?.conductor?.nombre || '-'}
+                          {mov.conductor?.nombre_completo || mov.conductor?.username || '-'}
                         </td>
                         <td className="py-4 px-4 text-sm text-slate-500">
                           {mov.fecha

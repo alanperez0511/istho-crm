@@ -544,7 +544,7 @@ const ViajesList = () => {
                         {viaje.vehiculo_placa || viaje.Vehiculo?.placa || '-'}
                       </td>
                       <td className="py-4 px-4 text-sm text-slate-600">
-                        {viaje.conductor_nombre || viaje.Conductor?.nombre || '-'}
+                        {viaje.conductor?.nombre_completo || viaje.conductor?.username || '-'}
                       </td>
                       <td className="py-4 px-4 text-center">
                         {viaje.facturado ? (

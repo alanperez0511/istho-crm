@@ -249,7 +249,7 @@ const CajaMenorDetail = () => {
                   <StatusChip status={caja.estado} />
                 </div>
                 <div className="flex items-center gap-2 text-slate-500 text-sm mt-0.5">
-                  <span>{caja.conductor?.nombre_completo || caja.conductor_nombre || 'Sin conductor'}</span>
+                  <span>{caja.conductor?.nombre_completo || caja.conductor?.username || 'Sin conductor'}</span>
                   <span>-</span>
                   <span>{formatFecha(caja.fecha_apertura)}</span>
                 </div>

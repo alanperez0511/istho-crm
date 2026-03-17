@@ -296,8 +296,7 @@ const CajaMenorForm = ({ open, onClose, onSuccess, cajaId }) => {
               <option value="">Seleccionar conductor...</option>
               {conductores.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.nombre} {c.apellido ? c.apellido : ''}{' '}
-                  {c.cedula ? `- CC ${c.cedula}` : ''}
+                  {c.nombre_completo || `${c.nombre || ''} ${c.apellido || ''}`.trim() || c.username}
                 </option>
               ))}
             </select>
