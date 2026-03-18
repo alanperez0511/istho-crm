@@ -8,20 +8,22 @@
 
 | Capa | Tecnología |
 |------|-----------|
-| **Frontend** | React 19 + Vite + Tailwind CSS 4 + MUI 7 + Lucide Icons |
-| **Backend** | Node.js + Express 4.18 + Sequelize 6 (ORM) |
+| **Frontend** | React 19 + Vite + Tailwind CSS 4 + MUI 7 + Lucide Icons + socket.io-client |
+| **Backend** | Node.js + Express 4.18 + Sequelize 6 (ORM) + node-cron + socket.io |
 | **Base de Datos** | MySQL (XAMPP local / Railway producción) |
 | **Autenticación** | JWT con refresh tokens (HS256) |
-| **Email** | Nodemailer + Handlebars templates |
+| **Email** | Dual: Resend (producción) + Nodemailer SMTP (desarrollo) |
 | **Exportaciones** | ExcelJS (Excel) + PDFKit (PDF) |
-| **Archivos** | Multer (uploads de fotos, PDFs, documentos) |
+| **Real-time** | Socket.IO (WebSocket) con JWT auth |
+| **Archivos** | Multer (uploads de fotos, PDFs, documentos, soportes) |
+| **Deploy** | Railway (backend + MySQL) + Vercel (frontend) |
 
 ## Módulos del Sistema
 
 ### 1. Autenticación y Autorización
 - Login con JWT + refresh tokens (1h acceso / 30d refresh)
 - **Login con email o nombre de usuario**
-- 4 roles: **admin**, **supervisor**, **operador**, **cliente** (portal)
+- 6 roles: **admin**, **supervisor**, **financiera**, **operador**, **conductor**, **cliente** (portal)
 - Sistema de permisos dual: Rol→Permiso (N:M) + override por usuario
 - Bloqueo de cuenta tras 5 intentos fallidos (15 min)
 - Forzar cambio de contraseña en primer login (modal compacto)
@@ -95,14 +97,31 @@
 - Resultados agrupados por módulo con navegación por teclado
 - Debounce 400ms, mínimo 2 caracteres
 
-### 12. Otros Módulos
-- **Dashboard**: KPIs consolidados con gráficos (Recharts)
-- **Clientes CRUD**: Gestión de empresas con contactos y logo
+### 11. Módulo de Viajes (Nuevo)
+- **Vehículos**: CRUD + alertas vencimiento SOAT/tecnicomecánica + asignación de conductor + readOnly para conductor
+- **Cajas Menores**: CRUD + cerrar/cuadrar + traslado de saldo desde caja anterior + recálculo automático de saldos
+- **Viajes**: CRUD + facturación + auto-fill conductor al seleccionar vehículo + selección de clientes CRM + secciones colapsables
+- **Movimientos**: CRUD + aprobación individual/masiva + upload soportes + estados (pendiente/aprobado/rechazado)
+- Peso en **toneladas** (no kg)
+- Conceptos de egreso (17): cuadre_de_caja, descargues, acpm, administracion, alimentacion, comisiones, desencarpe, encarpe, hospedaje, otros, seguros, repuestos, tecnicomecanica, peajes, ligas, parqueadero, urea
+- Conceptos de ingreso (6): ingreso_adicional, cuadre_de_caja, peajes_ingreso, ligas_ingresos, parqueadero_ingresos, urea_ingresos
+- Exportación Excel: viajes con filtros + caja menor con 3 hojas (Resumen, Movimientos, Viajes)
+
+### 12. Dashboards por Rol
+- **Admin/Supervisor**: Dashboard general con KPIs de inventario, operaciones recientes
+- **Financiera**: KPIs de cajas abiertas, gastos pendientes de aprobación con approve/reject inline, alertas vehículos
+- **Conductor**: Vista mobile-first con caja menor activa, acciones rápidas (2x2), últimos viajes y gastos
+- **Cliente Portal**: Inventario filtrado por empresa
+- Router automático: `index.jsx` detecta rol y renderiza dashboard correcto
+
+### 13. Otros Módulos
+- **Clientes CRUD**: Gestión de empresas con contactos, logo y total de productos registrados
 - **Despachos**: Gestión de envíos con transporte y documentos
 - **Notificaciones**: Sistema de notificaciones en tiempo real
 - **Documentos**: Gestión documental por operación
 - **Administración**: Gestión de usuarios, roles y permisos con reseteo de contraseña + envío por email
 - **Modo Oscuro**: Toggle global con `Ctrl+B`
+- **Menú filtrado por rol**: Conductor solo ve Dashboard + Viajes; Financiera ve Dashboard + Viajes + Reportes
 
 ## Estructura del Proyecto
 
@@ -113,10 +132,10 @@ istho-crm/
 │   ├── src/
 │   │   ├── app.js                   # Configuración Express
 │   │   ├── config/                  # Configuración (DB, JWT, Email, Multer)
-│   │   ├── models/                  # Modelos Sequelize (15 modelos)
-│   │   ├── controllers/             # Controladores (11 controladores)
-│   │   ├── services/                # Lógica de negocio (WMS, Email, Notificaciones)
-│   │   ├── routes/                  # Rutas Express (12 archivos)
+│   │   ├── models/                  # Modelos Sequelize (19 modelos)
+│   │   ├── controllers/             # Controladores (15 controladores)
+│   │   ├── services/                # Lógica de negocio (WMS, Email, Socket, Notificaciones)
+│   │   ├── routes/                  # Rutas Express (16 archivos)
 │   │   ├── middleware/              # Auth, roles, permisos
 │   │   ├── validators/              # Validación de entrada
 │   │   ├── utils/                   # Helpers, logger, responses
@@ -132,7 +151,7 @@ istho-crm/
 │   │   │   ├── common/              # Modal, CierreAuditoriaModal, GlobalSearch
 │   │   │   ├── layout/              # FloatingHeader, ProtectedLayout
 │   │   │   └── auth/                # PrivateRoute, ForceChangePasswordModal
-│   │   ├── context/                 # AuthContext, ThemeContext, AlertContext
+│   │   ├── context/                 # AuthContext, ThemeContext, AlertContext, SocketContext, NotificacionesContext
 │   │   ├── pages/                   # Páginas por módulo
 │   │   ├── hooks/                   # Custom hooks
 │   │   ├── utils/                   # Utilidades frontend
@@ -166,7 +185,8 @@ cd ../frontend && npm install
 cp server/.env.example server/.env
 # Editar server/.env con datos de MySQL y JWT
 
-# 4. Inicializar base de datos
+# 4. Inicializar base de datos (se ejecuta automáticamente al iniciar el servidor)
+# Manualmente si es necesario:
 cd server
 node src/scripts/seedRolesPermisos.js
 node src/scripts/seedPlantillasEmail.js
@@ -185,20 +205,25 @@ cd frontend && npm run dev        # Frontend en :5173
 | [MODELOS.md](MODELOS.md) | Modelos de base de datos y relaciones |
 | [FLUJOS_NEGOCIO.md](FLUJOS_NEGOCIO.md) | Flujos WMS, auditorías, cierre con email |
 | [GUIA_DESARROLLO.md](GUIA_DESARROLLO.md) | Convenciones, estructura, cómo agregar módulos |
+| [PRUEBAS_CRM.md](PRUEBAS_CRM.md) | Guía de pruebas con flujos y credenciales por rol |
 
 ## Roles del Sistema
 
 | Rol | Nivel | Descripción |
 |-----|-------|-------------|
 | **admin** | 100 | Acceso total al sistema |
-| **supervisor** | 75 | Gestión operativa y reportes |
+| **supervisor** | 75 | Gestión operativa completa + viajes + aprobaciones |
+| **financiera** | 70 | Gestión financiera, cajas menores, aprobación de gastos |
 | **operador** | 50 | Operaciones diarias de bodega |
+| **conductor** | 30 | Registro de viajes y gastos, interfaz móvil |
 | **cliente** | 10 | Portal de cliente (solo sus datos) |
 
 ## Despliegue
 
 - **Local**: XAMPP (MySQL) + Node.js
-- **Producción**: Railway (MySQL + Node.js)
+- **Backend producción**: Railway (Node.js + MySQL). Health check `/health` antes de error handlers. Seeds automáticos en startup. Resend para email (Railway bloquea SMTP 587). NO definir PORT.
+- **Frontend producción**: Vercel (Vite). Headers de seguridad (HSTS, X-Frame-Options, CSP). Sourcemaps desactivados. Root Directory: `frontend` (sin `./`). DataTable.jsx renombrado (case-sensitivity Linux).
+- **Archivos de referencia**: `server/.env.production.example`, `frontend/.env.production.example`
 
 ## Licencia
 

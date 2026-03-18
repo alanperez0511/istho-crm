@@ -20,8 +20,7 @@
 /* ════════════════════════════════════════════════════════════════════════════ */
 
 .notistack-SnackbarContainer {
-  margin-top: 80px !important; /* Espacio para el header flotante */
-  z-index: 9999 !important;
+  z-index: 99999 !important;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════ */
@@ -196,26 +195,63 @@
 /* RESPONSIVE */
 /* ════════════════════════════════════════════════════════════════════════════ */
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
+  /* Forzar posición y tamaño del contenedor en móvil */
   .notistack-SnackbarContainer {
-    left: 16px !important;
-    right: 16px !important;
-    bottom: auto !important;
-    top: 80px !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    top: auto !important;
+    z-index: 99999 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    transform: none !important;
   }
-  
+
+  /* Resetear min-width que causa overflow */
   .notistack-MuiContent,
   .notistack-MuiContent-success,
   .notistack-MuiContent-error,
   .notistack-MuiContent-warning,
   .notistack-MuiContent-info,
   .notistack-MuiContent-default {
-    min-width: auto !important;
+    min-width: unset !important;
     max-width: 100% !important;
     width: 100% !important;
     font-size: 13px !important;
     padding: 10px 14px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
   }
+
+  /* Cada snackbar individual */
+  .notistack-Snackbar {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    animation: toastSlideUp 0.3s ease-out forwards !important;
+  }
+
+  .notistack-Snackbar-exiting {
+    animation: toastSlideDown 0.2s ease-in forwards !important;
+  }
+
+  /* Desactivar hover transform en móvil */
+  .notistack-MuiContent:hover {
+    transform: none !important;
+  }
+}
+
+@keyframes toastSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes toastSlideDown {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(100%); opacity: 0; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════ */

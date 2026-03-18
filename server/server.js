@@ -19,10 +19,8 @@ let dbReady = false;
 let initError = null;
 
 // ══════════════════════════════════════════════════════════════════════════
-// HEALTH CHECK DINÁMICO
+// HEALTH CHECK DINÁMICO (ANTES de error handlers para que no lo capture el 404)
 // ══════════════════════════════════════════════════════════════════════════
-// Responde 200 siempre para que Railway no mate el deploy.
-// Incluye el estado real de la DB para monitoreo.
 app.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -33,6 +31,9 @@ app.get('/health', (req, res) => {
     ...(initError && { dbError: initError })
   });
 });
+
+// Registrar error handlers DESPUÉS del health check
+app.registerErrorHandlers();
 
 // ══════════════════════════════════════════════════════════════════════════
 // INICIAR SERVIDOR INMEDIATAMENTE (antes de DB)
@@ -76,6 +77,16 @@ async function initializeDatabase() {
     // Sincronizar modelos
     logger.info('Sincronizando modelos...');
     await db.syncModels({ alter: process.env.NODE_ENV === 'development' });
+
+    // Seed de roles y permisos (idempotente)
+    logger.info('Verificando roles y permisos...');
+    const seedRolesPermisos = require('./src/scripts/seedRolesPermisos');
+    await seedRolesPermisos({ standalone: false });
+
+    // Seed de plantillas de email (idempotente)
+    logger.info('Verificando plantillas de email...');
+    const seedPlantillasEmail = require('./src/scripts/seedPlantillasEmail');
+    await seedPlantillasEmail({ standalone: false });
 
     // Crear usuarios por defecto
     await crearAdminPorDefecto();

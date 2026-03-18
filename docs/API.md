@@ -1352,6 +1352,70 @@ Exporta auditorías a Excel. `:tipo` puede ser `entradas`, `salidas` o `kardex`.
 
 ---
 
+## Módulo de Viajes
+
+### Vehículos (`/vehiculos`)
+
+| Método | Endpoint | Descripción | Acceso |
+|--------|----------|-------------|--------|
+| GET | `/vehiculos` | Listar vehículos | `vehiculos:ver` |
+| GET | `/vehiculos/:id` | Detalle de vehículo | `vehiculos:ver` |
+| POST | `/vehiculos` | Crear vehículo | `vehiculos:crear` |
+| PUT | `/vehiculos/:id` | Actualizar vehículo | `vehiculos:editar` |
+| DELETE | `/vehiculos/:id` | Eliminar vehículo | `vehiculos:eliminar` |
+| GET | `/vehiculos/conductores` | Lista de conductores disponibles | Autenticado |
+
+**Query GET:** `page`, `limit`, `estado`, `tipo_vehiculo`, `search` (placa)
+
+### Cajas Menores (`/cajas-menores`)
+
+| Método | Endpoint | Descripción | Acceso |
+|--------|----------|-------------|--------|
+| GET | `/cajas-menores` | Listar cajas menores | `caja_menor:ver` |
+| GET | `/cajas-menores/stats` | KPIs (abiertas, en revisión, cerradas) | `caja_menor:ver` |
+| GET | `/cajas-menores/:id` | Detalle con viajes y movimientos | `caja_menor:ver` |
+| POST | `/cajas-menores` | Crear caja menor | `caja_menor:crear` |
+| PUT | `/cajas-menores/:id` | Actualizar caja menor | `caja_menor:editar` |
+| PUT | `/cajas-menores/:id/cerrar` | Cerrar/cuadrar caja | `caja_menor:cerrar` |
+| DELETE | `/cajas-menores/:id` | Eliminar caja menor | `caja_menor:eliminar` |
+
+**Query GET:** `page`, `limit`, `estado`, `conductor_id`
+
+### Viajes (`/viajes`)
+
+| Método | Endpoint | Descripción | Acceso |
+|--------|----------|-------------|--------|
+| GET | `/viajes` | Listar viajes | `viajes:ver` |
+| GET | `/viajes/:id` | Detalle del viaje con gastos | `viajes:ver` |
+| POST | `/viajes` | Crear viaje | `viajes:crear` |
+| PUT | `/viajes/:id` | Actualizar viaje | `viajes:editar` |
+| DELETE | `/viajes/:id` | Eliminar viaje | `viajes:eliminar` |
+
+**Query GET:** `page`, `limit`, `estado`, `fecha_desde`, `fecha_hasta`, `conductor_id`, `vehiculo_id`, `search`
+
+### Movimientos Caja Menor (`/movimientos-caja-menor`)
+
+| Método | Endpoint | Descripción | Acceso |
+|--------|----------|-------------|--------|
+| GET | `/movimientos-caja-menor` | Listar movimientos | `movimientos:ver` |
+| GET | `/movimientos-caja-menor/:id` | Detalle del movimiento | `movimientos:ver` |
+| POST | `/movimientos-caja-menor` | Crear movimiento (con soporte) | `movimientos:crear` |
+| PUT | `/movimientos-caja-menor/:id` | Actualizar movimiento | `movimientos:editar` |
+| DELETE | `/movimientos-caja-menor/:id` | Eliminar movimiento | `movimientos:eliminar` |
+| PUT | `/movimientos-caja-menor/:id/aprobar` | Aprobar/rechazar individual | `movimientos:aprobar` |
+| PUT | `/movimientos-caja-menor/aprobar-masivo` | Aprobar varios a la vez | `movimientos:aprobar` |
+
+**Query GET:** `page`, `limit`, `caja_menor_id`, `viaje_id`, `tipo_movimiento`, `concepto`, `aprobado`, `conductor_id`
+
+### Exportación Excel (Reportes)
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/reportes/viajes/excel` | Excel de viajes con filtros |
+| GET | `/reportes/cajas-menores/:id/excel` | Excel de caja menor (3 hojas: Resumen, Movimientos, Viajes) |
+
+---
+
 ## Caché de Permisos
 
 El sistema implementa un caché de permisos con TTL de 60 segundos para optimizar consultas:

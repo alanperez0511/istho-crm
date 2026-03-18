@@ -717,10 +717,12 @@ const plantillaKardex = {
 // EJECUTAR SEED (upsert: actualiza si ya existe)
 // ════════════════════════════════════════════════════════════════════════════
 
-async function seed() {
+async function seed({ standalone = true } = {}) {
   try {
-    await db.sequelize.authenticate();
-    console.log('✅ Conexión a BD establecida');
+    if (standalone) {
+      await db.sequelize.authenticate();
+      console.log('✅ Conexión a BD establecida');
+    }
 
     const { PlantillaEmail } = db;
 
@@ -763,12 +765,18 @@ async function seed() {
       console.log('✅ Plantilla de Kardex creada (id:', kardex.id, ')');
     }
 
-    console.log('\n🎉 Seed completado exitosamente');
-    process.exit(0);
+    console.log('\n🎉 Seed de plantillas de email completado exitosamente');
+    if (standalone) process.exit(0);
   } catch (err) {
-    console.error('❌ Error:', err.message);
-    process.exit(1);
+    console.error('❌ Error en seed de plantillas:', err.message);
+    if (standalone) process.exit(1);
+    throw err;
   }
 }
 
-seed();
+module.exports = seed;
+
+// Ejecución directa: node src/scripts/seedPlantillasEmail.js
+if (require.main === module) {
+  seed({ standalone: true });
+}

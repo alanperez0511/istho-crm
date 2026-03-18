@@ -129,6 +129,10 @@ const PERMISOS_CATALOGO = [
   { modulo: 'movimientos', accion: 'editar', descripcion: 'Modificar movimientos', grupo: 'Viajes' },
   { modulo: 'movimientos', accion: 'eliminar', descripcion: 'Eliminar movimientos', grupo: 'Viajes' },
   { modulo: 'movimientos', accion: 'aprobar', descripcion: 'Aprobar/rechazar movimientos', grupo: 'Viajes' },
+
+  // Perfil (disponible para todos los roles)
+  { modulo: 'perfil', accion: 'ver', descripcion: 'Ver y editar perfil propio', grupo: 'General' },
+  { modulo: 'perfil', accion: 'cambiar_password', descripcion: 'Cambiar contraseña propia', grupo: 'General' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -155,6 +159,7 @@ const PERMISOS_POR_ROL = {
     viajes: ['ver', 'crear', 'editar', 'eliminar', 'exportar'],
     caja_menor: ['ver', 'crear', 'editar', 'cerrar', 'aprobar', 'eliminar', 'exportar'],
     movimientos: ['ver', 'crear', 'editar', 'eliminar', 'aprobar'],
+    perfil: ['ver', 'cambiar_password'],
   },
 
   financiera: {
@@ -166,6 +171,7 @@ const PERMISOS_POR_ROL = {
     viajes: ['ver', 'exportar'],
     caja_menor: ['ver', 'crear', 'editar', 'cerrar', 'aprobar', 'exportar'],
     movimientos: ['ver', 'crear', 'editar', 'aprobar'],
+    perfil: ['ver', 'cambiar_password'],
   },
 
   operador: {
@@ -178,6 +184,7 @@ const PERMISOS_POR_ROL = {
     auditoria: ['ver'],
     kardex: ['ver'],
     notificaciones: ['ver'],
+    perfil: ['ver', 'cambiar_password'],
   },
 
   conductor: {
@@ -187,6 +194,7 @@ const PERMISOS_POR_ROL = {
     viajes: ['ver', 'crear', 'editar'],
     caja_menor: ['ver'],
     movimientos: ['ver', 'crear', 'editar'],
+    perfil: ['ver', 'cambiar_password'],
   },
 
   cliente: {
@@ -198,6 +206,7 @@ const PERMISOS_POR_ROL = {
     auditoria: ['ver'],
     kardex: ['ver'],
     notificaciones: ['ver'],
+    perfil: ['ver', 'cambiar_password'],
   },
 };
 
@@ -205,10 +214,12 @@ const PERMISOS_POR_ROL = {
 // EJECUCIÓN
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function seed() {
+async function seed({ standalone = true } = {}) {
   try {
-    await sequelize.authenticate();
-    console.log('Conectado a la base de datos.\n');
+    if (standalone) {
+      await sequelize.authenticate();
+      console.log('Conectado a la base de datos.\n');
+    }
 
     // 1. Sincronizar tablas nuevas
     await Rol.sync({ alter: true });
@@ -306,12 +317,18 @@ async function seed() {
     }
     console.log(`  ${migrados} usuarios migrados a rol_id`);
 
-    console.log('\n Seed completado exitosamente.');
-    process.exit(0);
+    console.log('\n Seed de roles/permisos completado exitosamente.');
+    if (standalone) process.exit(0);
   } catch (error) {
-    console.error('Error en seed:', error);
-    process.exit(1);
+    console.error('Error en seed de roles/permisos:', error);
+    if (standalone) process.exit(1);
+    throw error;
   }
 }
 
-seed();
+module.exports = seed;
+
+// Ejecución directa: node src/scripts/seedRolesPermisos.js
+if (require.main === module) {
+  seed({ standalone: true });
+}
